@@ -3,8 +3,8 @@ name: Sincronizar disponibilidad del Project
 on:
   issues:
     types: [opened, closed, reopened]
-  pull_request:
-    types: [opened, reopened, synchronize, closed, ready_for_review, converted_to_draft]
+  push:
+    branches: [main]
   schedule:
     # Reconciliación de respaldo para cambios manuales de dependencias o del Project.
     - cron: "*/10 * * * *"
@@ -19,10 +19,10 @@ concurrency:
 
 jobs:
   sync:
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Defensa en profundidad: restringir también el environment main a la rama main
+    # desde Settings > Environments. La condición anterior sigue siendo autoritativa.
     environment: main
     timeout-minutes: 5
     env:
