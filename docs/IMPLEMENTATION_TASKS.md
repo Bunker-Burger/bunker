@@ -12,8 +12,9 @@ Este documento traduce el plan maestro a tareas autosuficientes. Cada tarea corr
 - No crear tablas ni flujos de pedidos, cocina, reparto, zonas, clientes o facturas.
 - No agregar bebidas alcohólicas ni contenido de alérgenos.
 - Supabase se usa exclusivamente en la nube: un proyecto de desarrollo y otro de producción. No se usa Docker ni stack local.
+- Durante el desarrollo, el repositorio canónico es `Bunker-Burger/bunker`; al cerrar el proyecto se transferirá completo a `Lautaro073/bunker`, conservando historial, Issues y PRs.
 - Cada agente debe trabajar en una rama propia, respetar cambios ajenos, escribir pruebas primero cuando corresponda y abrir PR contra `main`.
-- Antes del PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea.
+- Antes del PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea. GitHub Actions repite los gates en cada PR.
 - Una tarea no puede darse por terminada si solo deja mocks, TODOs o una interfaz visual sin integrar.
 
 ## Orden recomendado
@@ -39,13 +40,14 @@ Dejar una base reproducible que compile y permita a todos los demás agentes tra
 - Resolver incompatibilidades reales entre TypeScript y `typescript-eslint` usando la versión estable más nueva compatible; documentar cualquier excepción a “latest”.
 - Configurar Tailwind CSS 4.3 y shadcn/ui (`components.json`, utilidades y componentes base).
 - Mantener `.env.example` sin secretos.
-- Gates sin GitHub Actions: verificación local reproducible y build de Vercel Preview antes de fusionar.
+- GitHub Actions en la organización: instalación reproducible, lint, typecheck, unitarias, build, Playwright y verificación cloud de base cuando exista el secreto de desarrollo.
 - Añadir scripts de desarrollo y documentación mínima.
 
 ### Criterios de aceptación
 
 - Una clonación limpia con Node 22 ejecuta `npm ci` reproduciblemente.
 - Lint, typecheck, tests y build pasan.
+- El workflow de GitHub Actions arranca en PR y `main` sin `startup_failure`.
 - El lockfile está versionado y no hay rangos flotantes en dependencias directas.
 - Ninguna clave secreta usa prefijo `NEXT_PUBLIC_`.
 
@@ -511,7 +513,7 @@ Convertir la matriz de aceptación del plan en pruebas repetibles y evidencia de
 
 ### Criterios de aceptación
 
-- El script local de verificación y el build de Vercel Preview bloquean regresiones críticas antes de fusionar.
+- GitHub Actions y el build de Vercel Preview bloquean regresiones críticas antes de fusionar.
 - Selectores accesibles, sin depender de estructura CSS frágil.
 - Se adjuntan screenshots/traces en fallos.
 - Cada caso del plan maestro queda mapeado a test o checklist manual justificado.
@@ -559,12 +561,13 @@ Publicar con entornos separados, previews seguras y un proceso de rollback docum
 
 ### Alcance
 
-- Vincular repositorio privado `Lautaro073/bunker` a Vercel.
+- Vincular el repositorio privado temporal `Bunker-Burger/bunker` a Vercel.
 - Previews por PR sin secretos/recursos de producción peligrosos.
 - Dos proyectos Supabase cloud separados: desarrollo y producción; migraciones reproducibles promovidas primero a desarrollo.
 - Variables por entorno, dominios/callbacks/webhook MP y rotación documentada.
 - Checklist de backup, migración, smoke test, observabilidad y rollback.
 - Crear manual de operación corto para el dueño.
+- Al completar todos los gates, transferir el repositorio íntegro nuevamente a `Lautaro073/bunker` y actualizar remotos/integraciones.
 
 ### Criterios de aceptación
 
@@ -572,6 +575,7 @@ Publicar con entornos separados, previews seguras y un proceso de rollback docum
 - Ningún secreto está versionado o expuesto al browser.
 - Smoke test cubre carta, WhatsApp, login admin y MP cuando esté habilitado.
 - Se puede revertir aplicación y migración compatible sin perder datos.
+- La transferencia final conserva commits, Issues, PRs y redirecciones, y el remoto local vuelve a apuntar a `Lautaro073/bunker`.
 
 ---
 
