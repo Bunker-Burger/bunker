@@ -4,7 +4,7 @@ on:
   issues:
     types: [opened, closed, reopened]
   pull_request:
-    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
+    types: [opened, reopened, synchronize, closed, ready_for_review, converted_to_draft]
   schedule:
     # Reconciliación de respaldo para cambios manuales de dependencias o del Project.
     - cron: "*/10 * * * *"
