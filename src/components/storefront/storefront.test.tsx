@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Storefront } from "./storefront";
+import { ProductDrawer, Storefront } from "./storefront";
 
 describe("Storefront", () => {
   beforeEach(() => {
@@ -91,5 +91,65 @@ describe("Storefront", () => {
     expect(within(dialog).getByRole("radio", { name: /Con hielo/ })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radio", { name: /Doble/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Tamaño / medallones")).not.toBeInTheDocument();
+  });
+
+  it("renders checkboxes for selectionMode multiple with maxSelections 1, allows single toggle, blocks second and allows untoggle", async () => {
+    const user = userEvent.setup();
+    const testProduct = {
+      id: "burger-custom",
+      slug: "burger-custom",
+      categoryId: "burgers",
+      type: "burger" as const,
+      name: "Hamburguesa Custom",
+      description: "Con salsa opcional",
+      priceCents: 500000n,
+      imageUrl: null,
+      published: true,
+      featured: false,
+      inStock: true,
+      optionGroups: [
+        {
+          id: "sauce",
+          name: "Salsa opcional",
+          selectionMode: "multiple" as const,
+          required: false,
+          minSelections: 0,
+          maxSelections: 1,
+          defaultOptionIds: [],
+          applicableTypes: ["burger" as const],
+          options: [
+            { id: "mayo", name: "Mayonesa casera", priceDeltaCents: 0n, available: true },
+            { id: "bbq", name: "Salsa barbacoa", priceDeltaCents: 50000n, available: true }
+          ]
+        }
+      ]
+    };
+
+    render(<ProductDrawer onClose={() => {}} onSubmit={() => {}} product={testProduct} />);
+
+    // 1. Debe renderizar checkbox, no radio
+    const mayoCheckbox = screen.getByRole("checkbox", { name: /Mayonesa casera/ });
+    const bbqCheckbox = screen.getByRole("checkbox", { name: /Salsa barbacoa/ });
+    expect(mayoCheckbox).toBeInTheDocument();
+    expect(bbqCheckbox).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+
+    // 2. Permitir seleccionar una opción
+    await user.click(mayoCheckbox);
+    expect(mayoCheckbox).toBeChecked();
+    expect(bbqCheckbox).not.toBeChecked();
+
+    // 3. Impedir seleccionar una segunda mientras ya hay una seleccionada
+    await user.click(bbqCheckbox);
+    expect(bbqCheckbox).not.toBeChecked();
+    expect(mayoCheckbox).toBeChecked();
+
+    // 4. Permitir deseleccionar la opción actual
+    await user.click(mayoCheckbox);
+    expect(mayoCheckbox).not.toBeChecked();
+
+    // Ahora la otra opción sí puede seleccionarse
+    await user.click(bbqCheckbox);
+    expect(bbqCheckbox).toBeChecked();
   });
 });

@@ -2,6 +2,7 @@ import type {
   ConfigurableOptionGroup,
   ConfigurableProduct,
   OptionSelectionError,
+  OptionSelectionMode,
   Product,
   ProductType,
   PublicationError,
@@ -11,59 +12,38 @@ import type {
 import { ok, type Result } from "@/lib/result";
 
 /**
- * Authoritative option group applicability registry.
- * Maps known option group identifiers (including Supabase seed UUIDs)
- * to their strictly applicable product types without relying on text heuristics.
- */
-export const KNOWN_OPTION_GROUP_APPLICABILITY: Record<string, readonly ProductType[]> = {
-  // Authoritative Supabase seed UUIDs
-  "0199b2c8-40b0-7000-8000-000000000301": ["burger"],
-  "0199b2c8-40b0-7000-8000-000000000302": ["burger", "sandwich"],
-  "0199b2c8-40b0-7000-8000-000000000303": ["fries"],
-  // Catalog domain identifiers
-  patty: ["burger"],
-  extras: ["burger", "sandwich"],
-  bread: ["sandwich"],
-  portion: ["fries"],
-  ice: ["beverage"]
-};
-
-/**
- * Resolves the structured applicable product types for an option group.
- * Reads explicit category kind overrides or falls back to the authoritative registry.
+ * Resolves structured applicable product types from category kinds.
  */
 export function resolveOptionGroupApplicability(
-  groupId: string,
   categoryKinds?: readonly string[]
 ): readonly ProductType[] {
-  if (categoryKinds && categoryKinds.length > 0) {
-    const kindsMap: Record<string, ProductType> = {
-      burger: "burger",
-      sandwich: "sandwich",
-      side: "fries",
-      drink: "beverage",
-      other: "other"
-    };
-    return categoryKinds
-      .map((k) => kindsMap[k])
-      .filter((t): t is ProductType => Boolean(t));
+  if (!categoryKinds || categoryKinds.length === 0) {
+    return [];
   }
-  return KNOWN_OPTION_GROUP_APPLICABILITY[groupId] ?? [];
+  const kindsMap: Record<string, ProductType> = {
+    burger: "burger",
+    sandwich: "sandwich",
+    side: "fries",
+    drink: "beverage",
+    other: "other"
+  };
+  return categoryKinds
+    .map((k) => kindsMap[k])
+    .filter((t): t is ProductType => Boolean(t));
 }
 
 /**
  * Checks whether an option group is applicable to a given product.
- * Strictly checks structured applicable types without text heuristics.
+ * Strictly checks structured applicable types without text heuristics or hardcoded UUID registries.
  */
 export function isGroupApplicableToProduct(
   group: Pick<ConfigurableOptionGroup, "id"> & { applicableTypes?: readonly ProductType[] },
   product: Pick<ConfigurableProduct, "type">
 ): boolean {
-  const types =
-    group.applicableTypes && group.applicableTypes.length > 0
-      ? group.applicableTypes
-      : resolveOptionGroupApplicability(group.id);
-  return types.includes(product.type);
+  if (!group.applicableTypes || group.applicableTypes.length === 0) {
+    return false;
+  }
+  return group.applicableTypes.includes(product.type);
 }
 
 /**
@@ -403,18 +383,20 @@ export function isPublishable(product: Product): boolean {
 /**
  * Pure state toggle helper for client selection state.
  * Respects single vs multiple selection modes, maximum limits, and availability.
+ * Selection mode is determined strictly by selectionMode, never inferred from maxSelections.
  */
 export function toggleOption(
   selected: SelectedOptions,
   groupId: string,
   optionId: string,
   maxSelections: number,
-  isAvailable = true
+  isAvailable = true,
+  selectionMode: OptionSelectionMode = "multiple"
 ): SelectedOptions {
   if (!isAvailable) return selected;
   const current = selected[groupId] ?? [];
 
-  if (maxSelections === 1) {
+  if (selectionMode === "single") {
     return { ...selected, [groupId]: [optionId] };
   }
 

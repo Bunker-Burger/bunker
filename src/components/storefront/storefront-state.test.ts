@@ -34,18 +34,29 @@ describe("cart editing", () => {
 
 describe("product option selection", () => {
   it("replaces the previous option in a single-select group", () => {
-    expect(toggleOption({ size: ["double"] }, "size", "triple", 1)).toEqual({
+    expect(toggleOption({ size: ["double"] }, "size", "triple", 1, true, "single")).toEqual({
       size: ["triple"]
     });
   });
 
   it("toggles options without exceeding a multi-select maximum", () => {
-    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "egg", 2)).toEqual({
+    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "egg", 2, true, "multiple")).toEqual({
       extras: ["bacon", "cheddar"]
     });
-    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "bacon", 2)).toEqual({
+    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "bacon", 2, true, "multiple")).toEqual({
       extras: ["cheddar"]
     });
+  });
+
+  it("allows selecting, prevents selecting a second, and allows deselecting when mode is multiple with maxSelections 1", () => {
+    const initial = toggleOption({}, "extras", "opt1", 1, true, "multiple");
+    expect(initial).toEqual({ extras: ["opt1"] });
+
+    const blocked = toggleOption(initial, "extras", "opt2", 1, true, "multiple");
+    expect(blocked).toEqual({ extras: ["opt1"] });
+
+    const deselected = toggleOption(initial, "extras", "opt1", 1, true, "multiple");
+    expect(deselected).toEqual({ extras: [] });
   });
 });
 

@@ -310,7 +310,7 @@ function ProductCard({ product, featured, onOpen, onAdd }: {
   );
 }
 
-function ProductDrawer({ product, onClose, onSubmit }: {
+export function ProductDrawer({ product, onClose, onSubmit }: {
   product: Product;
   onClose: () => void;
   onSubmit: (line: CartLine) => void;
@@ -354,7 +354,7 @@ function ProductDrawer({ product, onClose, onSubmit }: {
               <legend><span>{group.name}</span><small>{group.required ? "Requerido" : `Hasta ${group.maxSelections}`}</small></legend>
               {group.options.map((option) => {
                 const checked = (selected[group.id] ?? []).includes(option.id);
-                const inputType = group.selectionMode === "single" || group.maxSelections === 1 ? "radio" : "checkbox";
+                const inputType = group.selectionMode === "single" ? "radio" : "checkbox";
                 const isAvailable = option.available;
                 return (
                   <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " opacity-50 cursor-not-allowed" : ""}`} key={option.id}>
@@ -366,7 +366,7 @@ function ProductDrawer({ product, onClose, onSubmit }: {
                       name={group.id}
                       onChange={() => {
                         if (!isAvailable) return;
-                        setSelected((current) => toggleOption(current, group.id, option.id, group.maxSelections, isAvailable));
+                        setSelected((current) => toggleOption(current, group.id, option.id, group.maxSelections, isAvailable, group.selectionMode));
                       }}
                       type={inputType}
                     />

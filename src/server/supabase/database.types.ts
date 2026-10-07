@@ -92,6 +92,7 @@ export type Database = {
       }
       option_groups: {
         Row: {
+          applicable_category_kinds: Database["public"]["Enums"]["category_kind"][]
           created_at: string
           id: string
           is_required: boolean
@@ -104,6 +105,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applicable_category_kinds?: Database["public"]["Enums"]["category_kind"][]
           created_at?: string
           id?: string
           is_required?: boolean
@@ -116,6 +118,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applicable_category_kinds?: Database["public"]["Enums"]["category_kind"][]
           created_at?: string
           id?: string
           is_required?: boolean

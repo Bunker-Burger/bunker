@@ -14,7 +14,7 @@ export interface ConfigurableOptionGroup {
   id: string;
   name: string;
   selectionMode: OptionSelectionMode;
-  required?: boolean;
+  required: boolean;
   minSelections: number;
   maxSelections: number;
   options: readonly ConfigurableOption[];

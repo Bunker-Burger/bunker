@@ -287,9 +287,23 @@ describe("BB-05: Motor de opciones y defaults", () => {
 
     it("opción deshabilitada: toggleOption no permite seleccionar una opción no disponible", () => {
       const current: SelectedOptions = { patty: ["double"] };
-      const updated = toggleOption(current, "patty", "quad", 1, false);
+      const updated = toggleOption(current, "patty", "quad", 1, false, "single");
 
       expect(updated).toEqual({ patty: ["double"] });
+    });
+
+    it("respeta selectionMode multiple con maxSelections 1: permite seleccionar, impide seleccionar una segunda y permite deseleccionar", () => {
+      // 1. Permite seleccionar una opción
+      const step1 = toggleOption({}, "extras", "bacon", 1, true, "multiple");
+      expect(step1).toEqual({ extras: ["bacon"] });
+
+      // 2. Impide seleccionar una segunda opción mientras ya hay una elegida
+      const step2 = toggleOption(step1, "extras", "cheddar", 1, true, "multiple");
+      expect(step2).toEqual({ extras: ["bacon"] });
+
+      // 3. Permite deseleccionar la opción actual
+      const step3 = toggleOption(step1, "extras", "bacon", 1, true, "multiple");
+      expect(step3).toEqual({ extras: [] });
     });
 
     it("rechaza opciones duplicadas dentro del mismo grupo", () => {

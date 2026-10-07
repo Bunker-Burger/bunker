@@ -9,7 +9,6 @@ import type {
   PromotionRule,
   StoreSettings
 } from "@/domain/types";
-import { resolveOptionGroupApplicability } from "@/domain/options";
 import { ok, type Result } from "@/lib/result";
 import { catalogError, type CatalogError } from "./errors";
 import type { CategoryRow, ProductRow, PromotionRow, StoreRow } from "./rows";
@@ -94,9 +93,8 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
     if (!group) {
       return catalogError("invalid_data", `products.${row.slug}: linked option group is not readable`);
     }
-    const applicableTypes = resolveOptionGroupApplicability(
-      group.id,
-      group.applicable_category_kinds
+    const applicableTypes = group.applicable_category_kinds.map(
+      (kind) => productTypeByKind[kind]
     );
     groups.push({
       group: {

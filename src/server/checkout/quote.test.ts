@@ -14,6 +14,7 @@ const burgerFixture: AuthoritativeProduct = {
       id: "size",
       name: "Tamaño",
       selectionMode: "single",
+      required: true,
       minSelections: 1,
       maxSelections: 1,
       applicableTypes: ["burger"],
@@ -27,6 +28,7 @@ const burgerFixture: AuthoritativeProduct = {
       id: "extras",
       name: "Extras",
       selectionMode: "multiple",
+      required: false,
       minSelections: 0,
       maxSelections: 3,
       applicableTypes: ["burger"],
@@ -50,6 +52,7 @@ const drinkWithErrantBurgerGroup: AuthoritativeProduct = {
       id: "size",
       name: "Tamaño",
       selectionMode: "single",
+      required: true,
       minSelections: 1,
       maxSelections: 1,
       applicableTypes: ["burger"], // Exclusive to burger!
@@ -305,5 +308,87 @@ describe("createAuthoritativeQuote", () => {
         { repository, quotes, createId: () => "q", now: () => new Date() }
       )
     ).rejects.toThrow(/no es aplicable a productos de tipo 'beverage'/i);
+  });
+
+  it("servidor rechaza selección vacía cuando required: true aunque minSelections: 0 por override (effectiveMin = 1)", async () => {
+    const productWithRequiredOverride: AuthoritativeProduct = {
+      id: "burger-req-override",
+      name: "Smash Override",
+      type: "burger",
+      priceCents: 780000n,
+      available: true,
+      optionGroups: [
+        {
+          id: "cooking",
+          name: "Cocción",
+          selectionMode: "single",
+          required: true,
+          minSelections: 0, // Override permitido por la DB
+          maxSelections: 1,
+          applicableTypes: ["burger"],
+          options: [{ id: "medium", name: "A punto", priceDeltaCents: 0n, available: true }]
+        }
+      ]
+    };
+    const { repository, quotes } = createTestContext(productWithRequiredOverride);
+
+    await expect(
+      createAuthoritativeQuote(
+        {
+          items: [
+            {
+              productId: "burger-req-override",
+              quantity: 1,
+              optionSelections: { cooking: [] },
+              notes: ""
+            }
+          ],
+          fulfilment: "pickup",
+          paymentMethod: "transfer"
+        },
+        { repository, quotes, createId: () => "q", now: () => new Date() }
+      )
+    ).rejects.toThrow(/Debe seleccionar una opción requerida/i);
+  });
+
+  it("servidor acepta selección vacía cuando required: false y minSelections: 0", async () => {
+    const productWithOptionalGroup: AuthoritativeProduct = {
+      id: "burger-opt",
+      name: "Smash Opcional",
+      type: "burger",
+      priceCents: 780000n,
+      available: true,
+      optionGroups: [
+        {
+          id: "sauce",
+          name: "Salsa",
+          selectionMode: "multiple",
+          required: false,
+          minSelections: 0,
+          maxSelections: 1,
+          applicableTypes: ["burger"],
+          options: [{ id: "bbq", name: "Barbacoa", priceDeltaCents: 0n, available: true }]
+        }
+      ]
+    };
+    const { repository, quotes } = createTestContext(productWithOptionalGroup);
+
+    const quote = await createAuthoritativeQuote(
+      {
+        items: [
+          {
+            productId: "burger-opt",
+            quantity: 1,
+            optionSelections: { sauce: [] },
+            notes: ""
+          }
+        ],
+        fulfilment: "pickup",
+        paymentMethod: "transfer"
+      },
+      { repository, quotes, createId: () => "q", now: () => new Date() }
+    );
+
+    expect(quote.totalCents).toBe(780000n - 100000n);
   });
 });
