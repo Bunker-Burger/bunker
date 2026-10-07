@@ -18,6 +18,7 @@ const product: Product = {
     {
       id: "patty",
       name: "Medallón",
+      selectionMode: "single",
       required: true,
       minSelections: 1,
       maxSelections: 1,

@@ -280,7 +280,7 @@ function ProductCard({ product, featured, onOpen, onAdd }: {
         <div className="product-image-wrap">
           {/* Remote mock photography is intentionally kept as reference content until supplied assets arrive. */}
           {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-          <img alt={product.imageAlt ?? product.name} className="product-image" src={product.imageUrl} />
+          {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="product-image" src={product.imageUrl} /> : null}
           {product.featured ? <span className="featured-dot" aria-label="Destacado"><Check size={16} /></span> : null}
           {!product.inStock ? <span className="sold-out-badge">Agotado</span> : null}
         </div>
@@ -331,7 +331,7 @@ function ProductDrawer({ product, onClose, onSubmit }: {
         <div className="drawer-grabber" />
         <button aria-label="Cerrar personalizador" className="close-button" onClick={onClose} ref={closeRef} type="button"><X /></button>
         {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-        <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} />
+        {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} /> : null}
         <div className="drawer-content">
           <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
           <p>{product.description}</p>

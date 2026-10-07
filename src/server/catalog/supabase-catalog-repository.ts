@@ -1,0 +1,90 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { ok, type Result } from "@/lib/result";
+import type { Database } from "@/server/supabase/database.types";
+import { parseRows, toCategories, toProducts, toPromotionRules, toStoreSettings } from "./adapters";
+import { catalogError, fromSupabaseError, type CatalogError } from "./errors";
+import type { CatalogRepository, CatalogScope } from "./ports";
+import {
+  CATEGORY_SELECT,
+  categoryRowSchema,
+  PRODUCT_SELECT,
+  productRowSchema,
+  PROMOTION_SELECT,
+  promotionRowSchema,
+  STORE_SELECT,
+  storeRowSchema
+} from "./rows";
+
+interface SupabaseCatalogRepositoryOptions {
+  scope: CatalogScope;
+  /** Public URL prefix of the `catalog` storage bucket. */
+  imageBaseUrl: string;
+}
+
+interface QueryResponse {
+  data: unknown;
+  error: unknown;
+  status: number;
+}
+
+/** Runs a PostgREST query, turning both returned errors and thrown network failures into results. */
+async function run(operation: string, query: PromiseLike<QueryResponse>): Promise<Result<unknown, CatalogError>> {
+  try {
+    const { data, error, status } = await query;
+    return error ? fromSupabaseError(operation, error, status) : ok(data);
+  } catch (thrown) {
+    return fromSupabaseError(operation, thrown);
+  }
+}
+
+export function createSupabaseCatalogRepository(
+  client: SupabaseClient<Database>,
+  { scope, imageBaseUrl }: SupabaseCatalogRepositoryOptions
+): CatalogRepository {
+  const isPublic = scope === "public";
+
+  return {
+    scope,
+
+    async getStoreBySlug(slug) {
+      let query = client.from("stores").select(STORE_SELECT).eq("slug", slug);
+      if (isPublic) query = query.eq("is_public", true).eq("store_payment_methods.is_enabled", true);
+      const response = await run("stores.select", query.maybeSingle() as PromiseLike<QueryResponse>);
+      if (!response.ok) return response;
+      if (response.value === null) return catalogError("not_found", `stores: no store "${slug}" for ${scope} reads`);
+      const rows = parseRows("stores", storeRowSchema, [response.value]);
+      if (!rows.ok) return rows;
+      const [row] = rows.value;
+      return row ? ok(toStoreSettings(row)) : catalogError("invalid_data", "stores: empty row");
+    },
+
+    async listCategories(storeId) {
+      let query = client.from("categories").select(CATEGORY_SELECT).eq("store_id", storeId);
+      if (isPublic) query = query.eq("is_visible", true);
+      const response = await run("categories.select", query.order("sort_order") as PromiseLike<QueryResponse>);
+      if (!response.ok) return response;
+      const rows = parseRows("categories", categoryRowSchema, response.value);
+      return rows.ok ? ok(toCategories(rows.value)) : rows;
+    },
+
+    async listProducts(storeId, categories) {
+      let query = client.from("products").select(PRODUCT_SELECT).eq("store_id", storeId);
+      if (isPublic) query = query.eq("is_published", true);
+      const response = await run("products.select", query.order("name") as PromiseLike<QueryResponse>);
+      if (!response.ok) return response;
+      const rows = parseRows("products", productRowSchema, response.value);
+      return rows.ok ? toProducts(rows.value, { categories, imageBaseUrl }) : rows;
+    },
+
+    async listPromotions(storeId) {
+      // The validity window is applied by the caller at read time, so cached responses never
+      // keep an expired promotion alive.
+      let query = client.from("promotion_rules").select(PROMOTION_SELECT).eq("store_id", storeId);
+      if (isPublic) query = query.eq("is_active", true);
+      const response = await run("promotion_rules.select", query.order("priority") as PromiseLike<QueryResponse>);
+      if (!response.ok) return response;
+      const rows = parseRows("promotion_rules", promotionRowSchema, response.value);
+      return rows.ok ? toPromotionRules(rows.value) : rows;
+    }
+  };
+}
