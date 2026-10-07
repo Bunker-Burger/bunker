@@ -98,6 +98,7 @@ describe("nulls", () => {
             option_groups: {
               id: "g-1",
               name: "Medallones",
+              selection_mode: "single",
               minimum_selections: 1,
               maximum_selections: 3,
               is_required: true,
@@ -179,6 +180,52 @@ describe("nulls", () => {
   });
 });
 
+describe("selection mode", () => {
+  const group = (id: string, selectionMode: "single" | "multiple", minimum: number, maximum: number) => ({
+    default_option_ids: [],
+    minimum_selections_override: null,
+    maximum_selections_override: null,
+    sort_order: id === "salsa" ? 10 : 20,
+    option_groups: {
+      id,
+      name: id,
+      selection_mode: selectionMode,
+      minimum_selections: minimum,
+      maximum_selections: maximum,
+      is_required: minimum > 0,
+      sort_order: 0,
+      options: []
+    }
+  });
+
+  it("transports the persisted mode instead of inferring it from cardinality", () => {
+    const [row] = parsedProducts([
+      productRow({
+        product_option_groups: [
+          // A checkbox group that happens to allow one pick is still "multiple".
+          group("salsa", "multiple", 0, 1),
+          group("medallones", "single", 1, 1)
+        ]
+      })
+    ]);
+    const result = toProducts([row!], { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value[0]?.optionGroups.map((g) => [g.id, g.selectionMode, g.maxSelections])).toEqual([
+      ["salsa", "multiple", 1],
+      ["medallones", "single", 1]
+    ]);
+  });
+
+  it("rejects rows without a valid selection_mode", () => {
+    for (const mode of [undefined, "radio"]) {
+      const result = parseRows("products", productRowSchema, [
+        productRow({ product_option_groups: [{ ...group("x", "single", 1, 1), option_groups: { ...group("x", "single", 1, 1).option_groups, selection_mode: mode } }] })
+      ]);
+      expect(result).toMatchObject({ ok: false, error: { code: "invalid_data" } });
+    }
+  });
+});
+
 describe("ordering", () => {
   it("orders categories by sort order and maps kinds to product types", () => {
     expect(categories.map((category) => [category.id, category.type])).toEqual([
@@ -210,7 +257,7 @@ describe("ordering", () => {
       minimum_selections_override: null,
       maximum_selections_override: null,
       sort_order: linkOrder,
-      option_groups: { id, name: id, minimum_selections: 0, maximum_selections: 3, is_required: false, sort_order: groupOrder, options }
+      option_groups: { id, name: id, selection_mode: "multiple", minimum_selections: 0, maximum_selections: 3, is_required: false, sort_order: groupOrder, options }
     });
     const option = (id: string, sortOrder: number) => ({ id, name: id, price_delta_cents: "0", is_available: true, sort_order: sortOrder });
     const [row] = parsedProducts([
@@ -272,6 +319,7 @@ describe("sold out", () => {
             option_groups: {
               id: "g-extras",
               name: "Extras",
+              selection_mode: "multiple",
               minimum_selections: 0,
               maximum_selections: 2,
               is_required: false,

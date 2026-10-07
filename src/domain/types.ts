@@ -7,9 +7,13 @@ export interface ProductOption {
   available: boolean;
 }
 
+/** Persisted selection semantics; never inferred from min/max cardinality. */
+export type OptionSelectionMode = "single" | "multiple";
+
 export interface OptionGroup {
   id: string;
   name: string;
+  selectionMode: OptionSelectionMode;
   required: boolean;
   minSelections: number;
   maxSelections: number;

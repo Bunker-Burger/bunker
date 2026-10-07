@@ -43,7 +43,9 @@ try {
     stdio: ["ignore", "pipe", "inherit"]
   });
 } catch (error) {
-  fail(`supabase gen types failed (${error.status ?? error.message})`);
+  // The CLI reports API errors (e.g. missing privileges) on stdout; surface them.
+  const detail = [error.stdout, error.stderr].filter(Boolean).join("\n").trim();
+  fail(`supabase gen types failed (exit ${error.status ?? "?"})${detail ? `: ${detail}` : `: ${error.message}`}`);
 }
 
 const normalized = generated.replace(/\r\n/g, "\n").trimEnd() + "\n";

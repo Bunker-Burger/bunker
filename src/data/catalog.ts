@@ -15,6 +15,7 @@ const burgerOptions = [
   {
     id: "patty",
     name: "Tamaño / medallones",
+    selectionMode: "single" as const,
     required: true,
     minSelections: 1,
     maxSelections: 1,
@@ -27,6 +28,7 @@ const burgerOptions = [
   {
     id: "extras",
     name: "Extras",
+    selectionMode: "multiple" as const,
     required: false,
     minSelections: 0,
     maxSelections: 3,

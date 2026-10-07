@@ -97,6 +97,7 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
       group: {
         id: group.id,
         name: group.name,
+        selectionMode: group.selection_mode,
         required: group.is_required,
         minSelections: link.minimum_selections_override ?? group.minimum_selections,
         maxSelections: link.maximum_selections_override ?? group.maximum_selections,
