@@ -1,0 +1,502 @@
+<!DOCTYPE html><html class="dark" lang="es" style="width: 390px; height: 2708px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Búnker Burguer - Admin: Nueva Promoción</title>
+<!-- Google Fonts: Oswald & Space Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed-dim": "#ffb3ad",
+            "inverse-on-surface": "#313030",
+            "on-tertiary-container": "#8d0012",
+            "inverse-primary": "#855300",
+            "on-secondary": "#4d2600",
+            "tertiary-container": "#ff938c",
+            "on-error": "#690005",
+            "primary": "#ffc174",
+            "surface-container-low": "#1c1b1b",
+            "tertiary-fixed": "#ffdad7",
+            "surface-container-highest": "#353534",
+            "on-tertiary-fixed": "#410004",
+            "surface-bright": "#393939",
+            "on-tertiary": "#68000a",
+            "surface-variant": "#353534",
+            "surface-container-high": "#2a2a2a",
+            "on-tertiary-fixed-variant": "#930013",
+            "outline-variant": "#534434",
+            "on-primary-fixed": "#2a1700",
+            "on-surface": "#e5e2e1",
+            "on-secondary-container": "#432100",
+            "on-primary-container": "#613b00",
+            "primary-container": "#f59e0b",
+            "surface-container": "#201f1f",
+            "surface-tint": "#ffb95f",
+            "primary-fixed-dim": "#ffb95f",
+            "on-secondary-fixed-variant": "#6e3900",
+            "tertiary": "#ffbcb7",
+            "surface": "#131313",
+            "on-background": "#e5e2e1",
+            "on-primary": "#472a00",
+            "on-surface-variant": "#d8c3ad",
+            "background": "#131313",
+            "on-secondary-fixed": "#2f1500",
+            "inverse-surface": "#e5e2e1",
+            "secondary-container": "#d97707",
+            "primary-fixed": "#ffddb8",
+            "secondary": "#ffb77d",
+            "surface-dim": "#131313",
+            "error": "#ffb4ab",
+            "error-container": "#93000a",
+            "secondary-fixed": "#ffdcc3",
+            "on-primary-fixed-variant": "#653e00",
+            "surface-container-lowest": "#0e0e0e",
+            "outline": "#a08e7a",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed-dim": "#ffb77d"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-lg": "1.5rem",
+            "gutter-desktop": "1.5rem",
+            "margin": "1rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-xl": "2.5rem",
+            "space-md": "1rem",
+            "margin-tablet": "1.5rem",
+            "margin-desktop": "2.5rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Oswald"],
+            "display-hero-mobile": ["Oswald"],
+            "headline-lg": ["Oswald"],
+            "title-sm": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "body-lg": ["Space Grotesk"],
+            "body-md": ["Space Grotesk"],
+            "headline-lg-mobile": ["Oswald"],
+            "display-hero": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"]
+          },
+          "fontSize": {
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "display-hero-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "title-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "price-tag": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "display-hero": ["48px", { "lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "label-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+            "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .custom-scroll {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface antialiased selection:bg-primary-container selection:text-surface-container-lowest font-body-md min-h-screen pb-36">
+<!-- TOP APP BAR -->
+<header class="bg-surface-dim sticky top-0 z-40 shadow-md"><div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto"><button aria-label="Volver atrás" class="text-on-surface-variant hover:text-primary active:scale-95 transition-all p-1 flex items-center justify-center" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="text-headline-lg-mobile font-headline-lg-mobile text-primary tracking-wider uppercase text-center flex-1">NUEVA PROMOCIÓN</h1><div class="flex items-center justify-end"><div class="w-10 h-10 rounded-full border border-primary-container overflow-hidden flex-shrink-0 bg-surface-container-lowest flex items-center justify-center"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAl0bZVajTC5JUxco8EvbhLDFd4t1ro3VF4htvVGXYXhbW58vbxIztj72pJULTxDGfaivjpHNSnZ7ClNnszKJDhoRdkeY61uMJF5eYuxrBIn2awrCptQgpstG4ubI8B_pR198eOw7HhuGwPXeTyV_1RzWxc7bdEtkcI2bOHK-IiYWAzhl3rcQ0cxpPDWV2BegvHUxM7h6bwgJlzUnpDk1QSYbBBsyv2xXNrgUM8hk_9QipX50uGEE0KfW9E_TVt_Okw" alt="Búnker Burguer" class="w-full h-full object-cover"></div></div></div></header>
+<!-- MAIN CANVAS CONTENT -->
+<main class="max-w-xl mx-auto px-margin pt-space-md space-y-space-lg">
+<!-- STATUS BANNER / HINT -->
+
+<!-- 1. BANNER & FLYER UPLOAD SECTION -->
+<section class="bg-surface-container-low rounded-lg p-space-md border border-white/5 space-y-space-sm relative overflow-hidden">
+<div class="flex justify-between items-center">
+<label class="font-title-sm text-title-sm text-on-surface uppercase flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="photo_camera">photo_camera</span>
+          Foto de la Promo
+        </label>
+<span class="font-label-badge text-label-badge text-primary uppercase">Requerido *</span>
+</div>
+<!-- Drag & Drop Container / Camera Upload Area -->
+<div class="relative border-2 border-dashed border-outline-variant/40 rounded-lg p-space-lg flex flex-col items-center justify-center text-center bg-surface-container-lowest/60 hover:border-primary-container transition-colors cursor-pointer group">
+<input accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" id="fileUploadInput" type="file">
+<div class="w-14 h-14 rounded-full bg-surface-container-high flex items-center justify-center mb-space-sm group-hover:scale-105 transition-transform duration-200">
+<span class="material-symbols-outlined text-primary text-[28px]" data-icon="cloud_upload">cloud_upload</span>
+</div>
+<p class="font-title-sm text-title-sm text-on-surface tracking-wide uppercase">Subir foto de la promo</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Formato JPG o PNG 16:9 o cuadrado • Alta resolución</p>
+<!-- Preview Street Tag Pill -->
+<div class="mt-space-sm flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-surface-container text-outline text-[11px] font-label-badge uppercase">
+<span class="material-symbols-outlined text-[13px] text-primary" data-icon="bolt">bolt</span>
+          Fondo oscuro Maillard recomendado
+        </div>
+</div>
+</section>
+<!-- 2. INFORMACIÓN BÁSICA DE LA PROMO -->
+<section class="bg-surface-container-low border border-white/5 rounded-xl p-space-md space-y-space-md">
+<div class="border-b border-outline-variant/20 pb-space-xs flex items-center justify-between">
+<h2 class="font-title-sm text-title-sm text-primary flex items-center space-x-1">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">edit_note</span>
+<span class="">DATOS DE LA PROMOCIÓN</span>
+</h2>
+
+</div>
+<!-- Nombre -->
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between" for="promo-name">
+<span class="">Nombre de la Promoción</span>
+<span class="text-outline text-body-sm">Máx 60 caracteres</span>
+</label>
+<input class="w-full bg-surface-container border border-outline-variant/40 focus:border-primary-container focus:ring-1 focus:ring-primary-container rounded-lg px-space-md py-2.5 text-on-surface placeholder:text-outline font-body-md outline-none transition-colors" id="promo-name" placeholder="ej. Combo Búnker Fest 2x1 Smash + Birras" type="text" value="Combo Búnker Fest 2x1 Smash + Birras">
+</div>
+<!-- Tag / Badge Llamativo -->
+<div class="space-y-1.5">
+<label class="font-label-lg text-label-lg text-on-surface">Badge o Tag de Impacto</label>
+<div class="flex flex-wrap gap-2">
+<button class="bg-primary-container text-on-primary-container font-label-badge text-label-badge px-3 py-1 rounded-full uppercase font-bold flex items-center space-x-1" type="button">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &quot;FILL&quot; 1;">bolt</span>
+<span class="">2X1 FEST</span>
+</button>
+<button class="bg-surface-container hover:border-primary border border-outline-variant/40 text-on-surface font-label-badge text-label-badge px-3 py-1 rounded-full uppercase transition-colors" type="button">
+            30% OFF
+          </button>
+<button class="bg-surface-container hover:border-primary border border-outline-variant/40 text-on-surface font-label-badge text-label-badge px-3 py-1 rounded-full uppercase transition-colors" type="button">
+            COMBO DÚO
+          </button>
+<button class="bg-surface-container hover:border-primary border border-outline-variant/40 text-on-surface font-label-badge text-label-badge px-3 py-1 rounded-full uppercase transition-colors" type="button">
+            HAPPY HOUR
+          </button>
+<button class="bg-surface-container hover:border-primary border border-outline-variant/40 text-outline font-label-badge text-label-badge px-3 py-1 rounded-full uppercase flex items-center space-x-0.5" type="button">
+<span class="material-symbols-outlined text-[14px]">add</span>
+<span class="">PERSONALIZADO</span>
+</button>
+</div>
+</div>
+<!-- Descripción -->
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-on-surface" for="promo-desc">Descripción y Términos</label>
+<textarea class="w-full bg-surface-container border border-outline-variant/40 focus:border-primary-container focus:ring-1 focus:ring-primary-container rounded-lg p-space-md text-on-surface placeholder:text-outline font-body-md outline-none transition-colors" id="promo-desc" placeholder="Describí qué incluye el combo y las condiciones de la promo..." rows="3">Incluye 2 Burger Doble Smash Búnker con doble queso cheddar inglés, 1 porción extragrande de Papas Rústicas con panceta crocante y 2 birras IPA artesanales tiradas en lata.</textarea>
+</div>
+</section>
+<!-- 3. TIPO Y MECÁNICA DE DESCUENTO -->
+<section class="bg-surface-container-low border border-white/5 rounded-xl p-space-md space-y-space-md">
+<div class="border-b border-outline-variant/20 pb-space-xs flex items-center justify-between">
+<h2 class="font-title-sm text-title-sm text-primary flex items-center space-x-1">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">percent</span>
+<span class="">MECÁNICA &amp; VALOR COMERCIAL</span>
+</h2>
+<span class="font-label-badge text-label-badge text-primary-container uppercase">Tarifa Activa</span>
+</div>
+<!-- Selector Visual en Bento Grid -->
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Tipo 1: Combo Fijo (Activo) -->
+<div class="relative bg-surface-container border-2 border-primary-container rounded-lg p-3 cursor-pointer flex flex-col justify-between transition-all">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary-container text-[24px]">takeout_dining</span>
+<span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings: &quot;FILL&quot; 1;">check_circle</span>
+</div>
+<div class="mt-2">
+<p class="font-title-sm text-title-sm text-on-surface leading-tight">Combo Fijo</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Menú armado con precio cerrado</p>
+</div>
+</div>
+<!-- Tipo 2: Porcentaje OFF -->
+<div class="bg-surface-container-high border border-outline-variant/30 hover:border-outline rounded-lg p-3 cursor-pointer flex flex-col justify-between transition-all">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-outline text-[24px]">loyalty</span>
+</div>
+<div class="mt-2">
+<p class="font-title-sm text-title-sm text-on-surface leading-tight">% Descuento</p>
+<p class="font-body-sm text-body-sm text-outline">Rebaja porcentual directa</p>
+</div>
+</div>
+<!-- Tipo 3: 2x1 -->
+<div class="bg-surface-container-high border border-outline-variant/30 hover:border-outline rounded-lg p-3 cursor-pointer flex flex-col justify-between transition-all">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-outline text-[24px]">content_copy</span>
+</div>
+<div class="mt-2">
+<p class="font-title-sm text-title-sm text-on-surface leading-tight">2x1 Clásico</p>
+<p class="font-body-sm text-body-sm text-outline">Segunda unidad sin cargo</p>
+</div>
+</div>
+<!-- Tipo 4: Envío Gratis -->
+<div class="bg-surface-container-high border border-outline-variant/30 hover:border-outline rounded-lg p-3 cursor-pointer flex flex-col justify-between transition-all">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-outline text-[24px]">two_wheeler</span>
+</div>
+<div class="mt-2">
+<p class="font-title-sm text-title-sm text-on-surface leading-tight">Envío Gratis</p>
+<p class="font-body-sm text-body-sm text-outline">Delivery $0 sobre el pedido</p>
+</div>
+</div>
+</div>
+<!-- Configuración de Precios -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-space-md space-y-space-md">
+<div class="grid grid-cols-2 gap-3">
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-outline" for="original-price">Precio Normal (Tachado)</label>
+<div class="relative">
+<span class="absolute left-3 top-2.5 text-outline font-title-sm">$</span>
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded-lg pl-7 pr-3 py-2 text-on-surface line-through font-title-sm text-title-sm outline-none focus:border-outline" id="original-price" type="text" value="18.500">
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-primary" for="promo-price">Precio Promocional</label>
+<div class="relative">
+<span class="absolute left-3 top-2 text-primary font-price-tag text-price-tag">$</span>
+<input class="w-full bg-surface-container border-2 border-primary-container rounded-lg pl-7 pr-3 py-1.5 text-primary font-price-tag text-price-tag outline-none shadow-[0_0_15px_rgba(245,158,11,0.2)]" id="promo-price" type="text" value="13.900">
+</div>
+</div>
+</div>
+<!-- Cálculo automático del ahorro -->
+<div class="bg-primary/10 border border-primary-container/30 rounded-lg p-2.5 flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-primary-container text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">savings</span>
+<span class="font-body-md text-body-md text-on-surface">Ahorro para el cliente:</span>
+</div>
+<span class="font-price-tag text-price-tag text-primary tracking-wide">$4.600 (-25%)</span>
+</div>
+</div>
+</section>
+<!-- 4. PRODUCTOS QUE COMPONEN LA PROMOCIÓN -->
+<section class="bg-surface-container-low border border-white/5 rounded-xl p-space-md space-y-space-md">
+<div class="border-b border-outline-variant/20 pb-space-xs flex items-center justify-between">
+<h2 class="font-title-sm text-title-sm text-primary flex items-center space-x-1">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">layers</span>
+<span class="">PRODUCTOS INCLUIDOS EN EL COMBO</span>
+</h2>
+
+</div>
+<!-- Lista de Ítems Agregados -->
+<div class="space-y-2">
+<!-- Ítem 1 -->
+<div class="bg-surface-container border border-outline-variant/30 rounded-lg p-2.5 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&amp;fit=crop&amp;w=300&amp;q=80" alt="Smash Búnker Doble" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/10">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">Smash Búnker Doble</p>
+<p class="font-body-sm text-body-sm text-outline">Carne madurada 2x100g, cheddar, salsa búnker</p>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<span class="bg-surface-container-high border border-outline-variant/40 px-2 py-1 rounded text-primary font-title-sm text-title-sm">x2</span>
+<button aria-label="Eliminar item" class="text-outline hover:text-error transition-colors p-1" type="button">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+<!-- Ítem 2 -->
+<div class="bg-surface-container border border-outline-variant/30 rounded-lg p-2.5 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<img src="https://images.unsplash.com/photo-1585109649139-366815a0d713?auto=format&amp;fit=crop&amp;w=300&amp;q=80" alt="Papas Cheddar &amp; Bacon" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/10">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">Papas Cheddar &amp; Bacon</p>
+<p class="font-body-sm text-body-sm text-outline">Porción rústica extragrande crocante</p>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<span class="bg-surface-container-high border border-outline-variant/40 px-2 py-1 rounded text-primary font-title-sm text-title-sm">x1</span>
+<button aria-label="Eliminar item" class="text-outline hover:text-error transition-colors p-1" type="button">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+<!-- Ítem 3 -->
+<div class="bg-surface-container border border-outline-variant/30 rounded-lg p-2.5 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_h3ZD-i4jwJjzS6tdh0ziRYd2tF9TuZGysrlFKkrAbSrT_2j0dc6b3OXfWRbgYwyTLhRqidzzK2TMya1Zu9iPmyAbQK1y3qLqgtZYPf49mLs8_MKbVbknJ7mH9TG516xJ9jgtQibeaPTdrdQ9Pp4v6tO4sjHXk6zDWBGsmQqnktyNGjPRDFhRYdjWyLG8g-Ji7BWwGuHncruTSrX3fiY_byYCCN4mCAIsR8MZNTSkxiSwxs9x_Po" alt="Latas Cerveza IPA 473ml" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/10">
+<div>
+<p class="font-title-sm text-title-sm text-on-surface">Latas Cerveza IPA 473ml</p>
+<p class="font-body-sm text-body-sm text-outline">Lúpulo artesanal o Gaseosa a elección</p>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<span class="bg-surface-container-high border border-outline-variant/40 px-2 py-1 rounded text-primary font-title-sm text-title-sm">x2</span>
+<button aria-label="Eliminar item" class="text-outline hover:text-error transition-colors p-1" type="button">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Botón Agregar Producto -->
+<button class="w-full py-2.5 border-2 border-dashed border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-title-sm text-title-sm rounded-lg flex items-center justify-center space-x-1.5 transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span class="">AGREGAR PRODUCTO A ESTE COMBO</span>
+</button>
+</section>
+<!-- 5. DÍAS Y HORARIOS DE VIGENCIA -->
+<section class="bg-surface-container-low border border-white/5 rounded-xl p-space-md space-y-space-md">
+<div class="border-b border-outline-variant/20 pb-space-xs flex items-center justify-between">
+<h2 class="font-title-sm text-title-sm text-primary flex items-center space-x-1">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">schedule</span>
+<span class="">REGLAS DE ACTIVACIÓN Y VIGENCIA</span>
+</h2>
+<span class="font-label-badge text-label-badge text-outline">CALENDARIO</span>
+</div>
+<!-- Selector de Días de la semana -->
+<div class="space-y-1.5">
+<label class="font-label-lg text-label-lg text-on-surface">Días de aplicación</label>
+<div class="grid grid-cols-7 gap-1.5 text-center">
+<!-- Lunes (Inactivo) -->
+<button class="py-2 rounded bg-surface-container border border-outline-variant/30 text-outline font-title-sm text-title-sm hover:border-outline" type="button">
+            L
+          </button>
+<!-- Martes (Inactivo) -->
+<button class="py-2 rounded bg-surface-container border border-outline-variant/30 text-outline font-title-sm text-title-sm hover:border-outline" type="button">
+            M
+          </button>
+<!-- Miércoles (Inactivo) -->
+<button class="py-2 rounded bg-surface-container border border-outline-variant/30 text-outline font-title-sm text-title-sm hover:border-outline" type="button">
+            M
+          </button>
+<!-- Jueves (Activo) -->
+<button class="py-2 rounded bg-primary-container text-surface-container-lowest font-title-sm text-title-sm font-bold shadow-sm" type="button">
+            J
+          </button>
+<!-- Viernes (Activo) -->
+<button class="py-2 rounded bg-primary-container text-surface-container-lowest font-title-sm text-title-sm font-bold shadow-sm" type="button">
+            V
+          </button>
+<!-- Sábado (Activo) -->
+<button class="py-2 rounded bg-primary-container text-surface-container-lowest font-title-sm text-title-sm font-bold shadow-sm" type="button">
+            S
+          </button>
+<!-- Domingo (Activo) -->
+<button class="py-2 rounded bg-primary-container text-surface-container-lowest font-title-sm text-title-sm font-bold shadow-sm" type="button">
+            D
+          </button>
+</div>
+<p class="font-body-sm text-body-sm text-outline">Activo: Jueves a Domingos en turno noche.</p>
+</div>
+<!-- Rango Horario -->
+<div class="grid grid-cols-2 gap-3 pt-1">
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-on-surface" for="time-start">Hora Inicio</label>
+<div class="relative">
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded-lg px-3 py-2 text-on-surface font-body-md outline-none focus:border-primary-container" id="time-start" type="time" value="20:00">
+</div>
+</div>
+<div class="space-y-1">
+<label class="font-label-lg text-label-lg text-on-surface" for="time-end">Hora Cierre</label>
+<div class="relative">
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded-lg px-3 py-2 text-on-surface font-body-md outline-none focus:border-primary-container" id="time-end" type="time" value="00:30">
+</div>
+</div>
+</div>
+<!-- Límite de Stock Diario -->
+<div class="pt-2 border-t border-outline-variant/20 flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="font-title-sm text-title-sm text-on-surface">Limitar unidades por turno</p>
+<p class="font-body-sm text-body-sm text-outline">Se desactiva automáticamente al agotar</p>
+</div>
+<div class="flex items-center space-x-2">
+<input class="w-16 bg-surface-container border border-outline-variant/40 text-center font-title-sm text-title-sm text-primary py-1 rounded" type="number" value="50">
+<span class="text-body-sm font-body-sm text-outline">u.</span>
+</div>
+</div>
+</section>
+<!-- 6. VISIBILIDAD, CANALES Y ESTADO -->
+<section class="bg-surface-container-low border border-white/5 rounded-xl p-space-md space-y-space-md">
+<div class="border-b border-outline-variant/20 pb-space-xs flex items-center justify-between">
+<h2 class="font-title-sm text-title-sm text-primary flex items-center space-x-1">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">tune</span>
+<span class="">ESTADO Y CANALES DE VENTA</span>
+</h2>
+<span class="bg-primary/20 text-primary px-2 py-0.5 rounded text-label-badge font-label-badge uppercase">INMEDIATO</span>
+</div>
+<!-- Toggle: Publicar en Inicio -->
+<div class="flex items-center justify-between py-1">
+<div class="space-y-0.5 pr-2">
+<div class="flex items-center space-x-2">
+<span class="font-title-sm text-title-sm text-on-surface">Publicar en Inicio</span>
+<span class="bg-secondary-container text-on-secondary-container font-label-badge text-label-badge px-1.5 py-0.5 rounded uppercase font-bold">DESTACADO</span>
+</div>
+<p class="font-body-sm text-body-sm text-outline">Aparece en el carrusel superior del menú principal.</p>
+</div>
+<!-- Switch Active -->
+<button aria-checked="true" class="w-12 h-6 bg-primary-container rounded-full p-0.5 transition-colors relative flex items-center justify-end" role="switch" type="button">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full shadow-md"></div>
+</button>
+</div>
+<div class="h-[1px] bg-outline-variant/20"></div>
+<!-- Toggle: Canal Delivery / Takeaway -->
+<div class="flex items-center justify-between py-1">
+<div class="space-y-0.5 pr-2">
+<span class="font-title-sm text-title-sm text-on-surface">Disponible en Local y Delivery</span>
+<p class="font-body-sm text-body-sm text-outline">Apto para pedidos online y en el local.</p>
+</div>
+<!-- Switch Active -->
+<button aria-checked="true" class="w-12 h-6 bg-primary-container rounded-full p-0.5 transition-colors relative flex items-center justify-end" role="switch" type="button">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full shadow-md"></div>
+</button>
+</div>
+</section>
+<!-- ACCIONES DE FORMULARIO -->
+<div class="space-y-space-sm pt-2">
+<button class="w-full bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-headline-md text-headline-md uppercase tracking-wider py-3.5 px-6 rounded-full flex items-center justify-center space-x-2 shadow-[0_4px_20px_-2px_rgba(245,158,11,0.4)] active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="">GUARDAR Y ACTIVAR PROMOCIÓN</span>
+</button>
+<button class="w-full bg-transparent hover:bg-surface-container border border-secondary-container text-on-surface font-title-sm text-title-sm py-3 px-6 rounded-full flex items-center justify-center space-x-2 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">save_as</span>
+<span class="">GUARDAR COMO BORRADOR</span>
+</button>
+</div>
+</main>
+<!-- BOTTOM NAVIGATION BAR (MANDATORY SHARED COMPONENT) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low shadow-2xl">
+<!-- Tab 0: Menú -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[22px]">lunch_dining</span>
+<span class="mt-1">Menú</span>
+</a>
+<!-- Tab 1: Carrito -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[22px]">shopping_cart</span>
+<span class="mt-1">Carrito</span>
+</a>
+<!-- Tab 2: Checkout -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[22px]">point_of_sale</span>
+<span class="mt-1">Checkout</span>
+</a>
+<!-- Tab 3: Admin (ACTIVE NAVIGATION TAB) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: &quot;FILL&quot; 1;">tune</span>
+<span class="mt-0.5">Admin</span>
+</a>
+</nav>
+
+
+</body></html>

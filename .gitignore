@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.env.*.local
+.vercel/
+.supabase/
+supabase/.temp/
+*.tsbuildinfo
+public/sw.js
+public/sw.js.map
+

@@ -1,0 +1,448 @@
+<!DOCTYPE html><html class="dark" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>BÚNKER BURGUER - Finalizar Pedido</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Google Fonts: Oswald & Space Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#6e3900",
+            "surface-container-lowest": "#0e0e0e",
+            "on-primary": "#472a00",
+            "secondary-fixed-dim": "#ffb77d",
+            "on-tertiary-container": "#8d0012",
+            "surface-dim": "#131313",
+            "surface-container-high": "#2a2a2a",
+            "on-tertiary-fixed-variant": "#930013",
+            "tertiary": "#ffbcb7",
+            "on-background": "#e5e2e1",
+            "inverse-primary": "#855300",
+            "surface": "#131313",
+            "primary-fixed-dim": "#ffb95f",
+            "tertiary-fixed": "#ffdad7",
+            "on-secondary-fixed": "#2f1500",
+            "on-error-container": "#ffdad6",
+            "on-secondary": "#4d2600",
+            "surface-container-low": "#1c1b1b",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "outline": "#a08e7a",
+            "on-primary-fixed-variant": "#653e00",
+            "primary-fixed": "#ffddb8",
+            "surface-variant": "#353534",
+            "background": "#131313",
+            "primary": "#ffc174",
+            "on-secondary-container": "#432100",
+            "inverse-surface": "#e5e2e1",
+            "on-error": "#690005",
+            "secondary-fixed": "#ffdcc3",
+            "secondary": "#ffb77d",
+            "surface-container": "#201f1f",
+            "inverse-on-surface": "#313030",
+            "outline-variant": "#534434",
+            "surface-bright": "#393939",
+            "on-primary-fixed": "#2a1700",
+            "surface-tint": "#ffb95f",
+            "on-tertiary-fixed": "#410004",
+            "secondary-container": "#d97707",
+            "primary-container": "#f59e0b",
+            "error": "#ffb4ab",
+            "on-primary-container": "#613b00",
+            "surface-container-highest": "#353534",
+            "on-tertiary": "#68000a",
+            "error-container": "#93000a",
+            "on-surface-variant": "#d8c3ad",
+            "tertiary-container": "#ff938c",
+            "on-surface": "#e5e2e1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin-tablet": "1.5rem",
+            "margin": "1rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-lg": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "body-lg": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "display-hero": ["Oswald"],
+            "headline-lg-mobile": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"],
+            "body-md": ["Space Grotesk"],
+            "title-sm": ["Oswald"],
+            "display-hero-mobile": ["Oswald"],
+            "headline-md": ["Oswald"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", {"lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700"}],
+            "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+            "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+            "price-tag": ["20px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700"}],
+            "display-hero": ["48px", {"lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700"}],
+            "headline-lg-mobile": ["26px", {"lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700"}],
+            "label-badge": ["11px", {"lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700"}],
+            "label-lg": ["14px", {"lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "title-sm": ["18px", {"lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+            "display-hero-mobile": ["36px", {"lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700"}],
+            "headline-md": ["22px", {"lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    /* Amber subtle ambient glow token */
+    .glow-amber {
+      box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.35);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased selection:bg-primary selection:text-on-primary min-h-screen pb-28">
+<!-- TOP APP BAR -->
+<header class="sticky top-0 z-40 bg-surface-dim shadow-md">
+<div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto">
+<div class="flex items-center gap-space-sm">
+<button aria-label="Volver atrás" class="flex items-center justify-center w-10 h-10 rounded-full bg-surface-container text-on-surface hover:text-primary hover:bg-surface-container-high transition-colors duration-150 active:scale-95" type="button">
+<span class="material-symbols-outlined text-xl">arrow_back</span>
+</button>
+<div class="flex flex-col">
+<span class="text-label-badge font-label-badge text-primary uppercase tracking-wider">BÚNKER BURGUER</span>
+<h1 class="text-headline-lg-mobile font-headline-lg-mobile text-on-surface leading-tight">Finalizar Pedido</h1>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+
+</div>
+</div>
+</header>
+<!-- MAIN CHECKOUT CONTENT -->
+<main class="max-w-xl mx-auto px-margin pt-space-md space-y-space-lg">
+<!-- HERO NOTIFICATION / BADGE BANNER -->
+
+<!-- SECCIÓN 1: TIPO DE ENTREGA -->
+<section class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<h2 class="text-title-sm font-title-sm text-on-surface flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-lg">local_shipping</span>
+          Tipo de Entrega
+        </h2>
+<span class="text-label-badge font-label-badge text-outline uppercase">Seleccioná una</span>
+</div>
+<!-- Selector Cards -->
+<div class="grid grid-cols-2 gap-space-sm" role="radiogroup">
+<!-- Opción 1: Delivery (Active) -->
+<label class="relative cursor-pointer rounded-xl bg-surface-container p-space-md flex flex-col justify-between transition-all duration-150 border-outline-variant opacity-85" id="card-delivery">
+<input checked="" class="sr-only" name="delivery_type" onchange="toggleDelivery(true)" type="radio" value="delivery">
+<div><div class="flex justify-between items-center mb-space-xs"><p class="text-label-lg font-label-lg text-on-surface">Delivery a Domicilio</p><span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: &quot;FILL&quot; 1;">check_circle</span></div></div>
+<div class="mt-space-md pt-space-xs border-t border-outline-variant flex justify-between items-center">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase">Costo</span>
+<span class="text-price-tag font-price-tag text-primary">$1.200</span>
+</div>
+</label>
+<!-- Opción 2: Retiro en Local -->
+<label class="relative cursor-pointer rounded-xl bg-surface-container p-space-md border hover:border-outline hover:opacity-100 flex flex-col justify-between transition-all duration-150 border-primary-container glow-amber border-2" id="card-pickup">
+<input class="sr-only" name="delivery_type" onchange="toggleDelivery(false)" type="radio" value="pickup">
+<div><div class="flex justify-between items-start mb-space-xs"><div class="flex flex-col"><p class="text-label-lg font-label-lg text-on-surface">Retiro en Local</p></div><span class="material-symbols-outlined text-outline-variant text-xl shrink-0" id="pickup-check">radio_button_unchecked</span></div></div>
+<div class="mt-space-md pt-space-xs border-t border-outline-variant flex justify-between items-center">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase">Costo</span>
+<span class="text-price-tag font-price-tag text-primary">$0</span>
+</div>
+</label>
+</div>
+<!-- Formulario Dirección de Entrega (Dinámico) -->
+
+</section>
+<!-- SECCIÓN 2: DATOS DEL CLIENTE -->
+
+<!-- SECCIÓN 3: MÉTODOS DE PAGO -->
+<section class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<h2 class="text-title-sm font-title-sm text-on-surface flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-lg">payments</span>
+          Método de Pago
+        </h2>
+
+</div>
+<div class="space-y-space-sm">
+<!-- Opción Mercado Pago -->
+<div class="rounded-xl border border-outline-variant bg-surface-container-low transition-all border-primary-container glow-amber" id="method-mp">
+<label class="flex items-center justify-between p-space-md cursor-pointer">
+<div class="flex items-center gap-space-md">
+<input checked="" class="text-primary-container focus:ring-primary-container bg-surface-container border-outline-variant h-4 w-4" name="payment_method" onchange="selectPayment('mp')" type="radio" value="mp">
+<div class="flex flex-col">
+<span class="text-label-lg font-label-lg text-on-surface flex items-center gap-space-xs">
+ Mercado Pago
+                </span>
+<span class="text-body-sm font-body-sm text-on-surface-variant">QR, Dinero en cuenta, Débito o Crédito</span>
+</div>
+</div>
+
+</label>
+<div class="px-space-md pb-space-md pt-0 text-body-sm font-body-sm text-on-surface-variant border-t border-outline-variant/30 mt-space-xs pt-space-xs flex items-center gap-space-xs" id="box-mp">
+<span class="material-symbols-outlined text-primary text-sm">flash_on</span>
+<span class="">Acreditación automática. Se enviará el link directo de pago junto al pedido.</span>
+</div>
+</div>
+<!-- Opción Transferencia Bancaria -->
+<div class="rounded-xl border border-outline-variant bg-surface-container-low transition-all" id="method-transfer">
+<label class="flex items-center justify-between p-space-md cursor-pointer">
+<div class="flex items-center gap-space-md">
+<input class="text-primary-container focus:ring-primary-container bg-surface-container border-outline-variant h-4 w-4" name="payment_method" onchange="selectPayment('transfer')" type="radio" value="transfer">
+<div class="flex flex-col">
+<span class="text-label-lg font-label-lg text-on-surface flex items-center gap-space-xs">
+ Transferencia Bancaria
+                </span>
+<span class="text-body-sm font-body-sm text-on-surface-variant">CBU / CVU / Alias de Búnker</span>
+</div>
+</div>
+
+</label>
+<!-- Detalle Transferencia (Expandible/Activo) -->
+<div class="px-space-md pb-space-md pt-space-xs border-t border-outline-variant/40 space-y-space-sm bg-surface-container/60 rounded-b-xl hidden" id="box-transfer">
+<div class="p-space-sm rounded-lg bg-surface-container-highest border border-outline-variant flex items-center justify-between">
+<div>
+<span class="text-label-badge font-label-badge text-outline uppercase block">Alias Mercado Pago</span>
+<span class="text-label-lg font-label-lg text-primary tracking-wide" id="alias-text">bunker.burguer.mp</span>
+</div>
+<button class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-full bg-primary-container text-on-primary font-label-badge text-label-badge uppercase active:scale-95 transition-transform" id="btn-copy" onclick="copyAlias()" type="button">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span id="copy-label" class="">Copiar Alias</span>
+</button>
+</div>
+<div class="flex items-start gap-space-xs text-body-sm font-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary-fixed text-base shrink-0">info</span>
+<span class="">Deberás adjuntar el comprobante de pago en el chat de WhatsApp al confirmar tu pedido.</span>
+</div>
+</div>
+</div>
+<!-- Opción Efectivo Contra Entrega -->
+<div class="rounded-xl border border-outline-variant bg-surface-container-low transition-all" id="method-cash">
+<label class="flex items-center justify-between p-space-md cursor-pointer">
+<div class="flex items-center gap-space-md">
+<input class="text-primary-container focus:ring-primary-container bg-surface-container border-outline-variant h-4 w-4" name="payment_method" onchange="selectPayment('cash')" type="radio" value="cash">
+<div class="flex flex-col">
+<span class="text-label-lg font-label-lg text-on-surface flex items-center gap-space-xs">
+ Efectivo</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Abonás al recibir o retirar</span>
+</div>
+</div>
+
+</label>
+<!-- Campo de Cambio -->
+<div class="px-space-md pb-space-md pt-space-xs border-t border-outline-variant/40 space-y-space-xs bg-surface-container/60 rounded-b-xl hidden" id="box-cash">
+<label class="text-label-badge font-label-badge text-on-surface-variant uppercase block">¿Con cuánto abonas? (para calcular tu vuelto)</label>
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-body-md font-body-md text-primary">$</span>
+<input class="w-full bg-surface-container rounded-lg border border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-body-md font-body-md text-on-surface placeholder:text-outline pl-8 pr-space-md py-space-sm" placeholder="Ej: 20000 (Monto exacto si no necesitas cambio)" type="number">
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECCIÓN 4: RESUMEN DE LA ORDEN & DESGLOSE -->
+<section class="space-y-space-sm">
+<h2 class="text-title-sm font-title-sm text-on-surface flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-lg">receipt_long</span>
+        Resumen de la Orden
+      </h2>
+<div class="rounded-xl bg-surface-container p-space-md border border-outline-variant space-y-space-md">
+<!-- Ítems miniatura -->
+<div class="space-y-space-sm border-b border-outline-variant pb-space-md">
+<div class="flex items-center justify-between text-body-md font-body-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded bg-surface-container-high text-primary flex items-center justify-center font-bold text-xs">2x</span>
+<span class="text-on-surface font-medium">Búnker Doble Smash Bacon</span>
+</div>
+<span class="text-on-surface font-semibold">$9.600</span>
+</div>
+<div class="flex items-center justify-between text-body-md font-body-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded bg-surface-container-high text-primary flex items-center justify-center font-bold text-xs">1x</span>
+<span class="text-on-surface font-medium">Papas Rústicas Cheddar Fundido</span>
+</div>
+<span class="text-on-surface font-semibold">$2.800</span>
+</div>
+<div class="flex items-center justify-between text-body-md font-body-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded bg-surface-container-high text-primary flex items-center justify-center font-bold text-xs">2x</span>
+<span class="text-on-surface font-medium">Gaseosa Lata 354ml</span>
+</div>
+<span class="text-on-surface font-semibold">$1.400</span>
+</div>
+</div>
+<!-- Cálculos -->
+<div class="space-y-space-xs text-body-md font-body-md">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="">Subtotal productos</span>
+<span class="font-medium text-on-surface">$13.800</span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant" id="row-shipping">
+<span class="flex items-center gap-1">Envío a domicilio <span class="text-xs text-outline">(Tarifa plana)</span></span>
+<span class="font-medium text-on-surface" id="shipping-cost-label">$1.200</span>
+</div>
+</div>
+<!-- Total destacado Maillard Sear -->
+<div class="pt-space-sm border-t-2 border-dashed border-outline-variant flex justify-between items-baseline">
+<div>
+<span class="text-label-badge font-label-badge text-primary uppercase block">Total Final a Pagar</span>
+<span class="text-body-sm font-body-sm text-outline">Impuestos y empaque incluidos</span>
+</div>
+<span class="text-display-hero-mobile font-display-hero-mobile text-primary tracking-wide" id="total-display">$15.000</span>
+</div>
+</div>
+</section>
+<!-- CALL TO ACTION: CONFIRMAR POR WHATSAPP -->
+<section class="space-y-space-sm pt-space-xs">
+<a class="group w-full py-3.5 px-space-md rounded-full bg-primary-container hover:bg-primary text-surface-container-lowest font-headline-md text-headline-md tracking-wider flex items-center justify-center gap-space-sm glow-amber active:scale-95 transition-all text-center uppercase shadow-2xl" href="https://wa.me/5493865207458?text=Hola%20Búnker%20Burguer!%20Quiero%20confirmar%20mi%20pedido%20por%20$15.000" rel="noopener noreferrer" target="_blank">
+<span class="">Confirmar Pedido y Enviar a WhatsApp</span>
+
+</a>
+<!-- Subaviso del local -->
+<div class="text-center space-y-1">
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+          Te redirigirá para confirmar al <strong class="text-primary font-bold">3865 207458</strong>
+</p>
+<div class="flex items-center justify-center gap-space-xs text-xs text-outline">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: &quot;FILL&quot; 1;">lock</span>
+<span class="">Atención y despacho inmediato de Búnker Burguer</span>
+</div>
+</div>
+</section>
+<!-- BRAND FOOTER BADGE -->
+<div class="pt-space-md text-center">
+
+</div>
+</main>
+<!-- BOTTOM NAVBAR (Shared Component from JSON) -->
+<!-- Destination count: 4, Labels: ["Menú", "Carrito", "Checkout", "Admin"], Active Tab: "Checkout" -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low shadow-2xl">
+<!-- Menú (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#menu">
+<span class="material-symbols-outlined text-2xl" data-icon="lunch_dining">lunch_dining</span>
+<span class="text-label-badge font-label-badge uppercase">Menú</span>
+</a>
+<!-- Carrito (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#carrito">
+<span class="material-symbols-outlined text-2xl" data-icon="shopping_cart">shopping_cart</span>
+<span class="text-label-badge font-label-badge uppercase">Carrito</span>
+</a>
+<!-- Checkout (ACTIVE TAB) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#checkout">
+<span class="material-symbols-outlined text-2xl" data-icon="point_of_sale" style="font-variation-settings: &quot;FILL&quot; 1;">point_of_sale</span>
+<span class="text-label-badge font-label-badge uppercase">Checkout</span>
+</a>
+<!-- Admin (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#admin">
+<span class="material-symbols-outlined text-2xl" data-icon="tune">tune</span>
+<span class="text-label-badge font-label-badge uppercase">Admin</span>
+</a>
+</nav>
+<!-- Interactive Logic Script -->
+<script>
+    function toggleDelivery(isDelivery) {
+      const deliveryCard = document.getElementById('card-delivery');
+      const pickupCard = document.getElementById('card-pickup');
+      const deliveryFields = document.getElementById('delivery-fields');
+      const shippingRow = document.getElementById('row-shipping');
+      const totalDisplay = document.getElementById('total-display');
+      const pickupCheck = document.getElementById('pickup-check');
+
+      if (isDelivery) {
+        deliveryCard.classList.add('border-primary-container', 'glow-amber', 'border-2');
+        deliveryCard.classList.remove('border-outline-variant', 'opacity-85');
+        pickupCard.classList.remove('border-primary-container', 'glow-amber', 'border-2');
+        pickupCard.classList.add('border-outline-variant', 'opacity-85');
+        deliveryFields.classList.remove('hidden');
+        shippingRow.classList.remove('hidden');
+        pickupCheck.textContent = 'radio_button_unchecked';
+        pickupCheck.classList.remove('text-primary');
+        pickupCheck.classList.add('text-outline-variant');
+        pickupCheck.style.fontVariationSettings = "'FILL' 0";
+        totalDisplay.textContent = '$15.000';
+      } else {
+        pickupCard.classList.add('border-primary-container', 'glow-amber', 'border-2');
+        pickupCard.classList.remove('border-outline-variant', 'opacity-85');
+        deliveryCard.classList.remove('border-primary-container', 'glow-amber', 'border-2');
+        deliveryCard.classList.add('border-outline-variant', 'opacity-85');
+        deliveryFields.classList.add('hidden');
+        shippingRow.classList.add('hidden');
+        pickupCheck.textContent = 'check_circle';
+        pickupCheck.classList.add('text-primary');
+        pickupCheck.classList.remove('text-outline-variant');
+        pickupCheck.style.fontVariationSettings = "'FILL' 1";
+        totalDisplay.textContent = '$13.800';
+      }
+    }
+
+    function selectPayment(type) {
+      const boxMp = document.getElementById('box-mp');
+      const boxTransfer = document.getElementById('box-transfer');
+      const boxCash = document.getElementById('box-cash');
+      
+      const mMp = document.getElementById('method-mp');
+      const mTransfer = document.getElementById('method-transfer');
+      const mCash = document.getElementById('method-cash');
+
+      boxMp.classList.add('hidden');
+      boxTransfer.classList.add('hidden');
+      boxCash.classList.add('hidden');
+
+      mMp.classList.remove('border-primary-container', 'glow-amber');
+      mTransfer.classList.remove('border-primary-container', 'glow-amber');
+      mCash.classList.remove('border-primary-container', 'glow-amber');
+
+      if (type === 'mp') {
+        boxMp.classList.remove('hidden');
+        mMp.classList.add('border-primary-container', 'glow-amber');
+      } else if (type === 'transfer') {
+        boxTransfer.classList.remove('hidden');
+        mTransfer.classList.add('border-primary-container', 'glow-amber');
+      } else if (type === 'cash') {
+        boxCash.classList.remove('hidden');
+        mCash.classList.add('border-primary-container', 'glow-amber');
+      }
+    }
+
+    function copyAlias() {
+      const alias = document.getElementById('alias-text').innerText;
+      navigator.clipboard.writeText(alias).then(() => {
+        const copyLabel = document.getElementById('copy-label');
+        copyLabel.innerText = '¡Copiado!';
+        setTimeout(() => {
+          copyLabel.innerText = 'Copiar Alias';
+        }, 2000);
+      });
+    }
+
+    // Set initial payment state
+    selectPayment('mp');
+  </script>
+</body></html>

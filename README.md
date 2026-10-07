@@ -1,0 +1,38 @@
+# Búnker Burger
+
+Carta, carrito y checkout para Búnker Burger, Aguilares (Tucumán). La operación diaria se confirma por WhatsApp; Mercado Pago Checkout Pro es opcional.
+
+## Desarrollo
+
+1. Instalar Node.js 22 (`.nvmrc`) y Docker Desktop.
+2. Copiar `.env.example` a `.env.local` y completar las claves disponibles.
+3. Ejecutar `npm ci`.
+4. Ejecutar `npm run db:start` para el entorno local de datos.
+5. Ejecutar `npm run dev`.
+
+Mercado Pago se oculta automáticamente si falta cualquiera de sus variables requeridas. Las claves secretas nunca llevan prefijo `NEXT_PUBLIC_`.
+
+## Scripts
+
+| Script | Uso |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo (Turbopack, service worker desactivado). |
+| `npm run build` / `npm start` | Build de producción (webpack, genera `public/sw.js`) y servidor. |
+| `npm run lint` | ESLint sin warnings permitidos. |
+| `npm run typecheck` | `tsc --noEmit` en modo estricto. |
+| `npm test` / `npm run test:watch` | Pruebas unitarias con Vitest. |
+| `npm run test:e2e` | Playwright (mobile + desktop, Chromium) contra el build de producción; correr `npm run build` antes. |
+| `npm run db:start` / `db:stop` / `db:reset` / `db:test` | Supabase local y pruebas pgTAP. |
+
+Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea. CI (`.github/workflows/ci.yml`) corre además build, pruebas de base de datos y Playwright.
+
+## UI
+
+Tailwind CSS 4.3 se carga desde `src/app/globals.css`. shadcn/ui está configurado en `components.json` (alias `@/components/ui`, utilidad `cn` en `src/lib/utils.ts`); agregar componentes con `npx shadcn@latest add <componente>`.
+
+## Excepciones de versiones
+
+Todas las dependencias directas están fijadas a versiones exactas y el lockfile está versionado.
+
+- **TypeScript 6.0.3** en lugar de 7.x: `typescript-eslint` (usado por `eslint-config-next`) solo soporta `>=4.8.4 <6.1.0` y aborta con TS 7. Volver a `latest` cuando typescript-eslint publique soporte (ver typescript-eslint/typescript-eslint#10940).
+- **Build con webpack** (`next build --webpack`): `@serwist/next` todavía no soporta Turbopack. El desarrollo sigue usando Turbopack con el service worker desactivado.

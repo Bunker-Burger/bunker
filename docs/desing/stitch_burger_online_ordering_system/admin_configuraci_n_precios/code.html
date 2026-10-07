@@ -1,0 +1,622 @@
+<!DOCTYPE html><html class="dark" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>BÚNKER BURGUER - Panel de Control Dueño</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#6e3900",
+            "surface-container-lowest": "#0e0e0e",
+            "on-primary": "#472a00",
+            "secondary-fixed-dim": "#ffb77d",
+            "on-tertiary-container": "#8d0012",
+            "surface-dim": "#131313",
+            "surface-container-high": "#2a2a2a",
+            "on-tertiary-fixed-variant": "#930013",
+            "tertiary": "#ffbcb7",
+            "on-background": "#e5e2e1",
+            "inverse-primary": "#855300",
+            "surface": "#131313",
+            "primary-fixed-dim": "#ffb95f",
+            "tertiary-fixed": "#ffdad7",
+            "on-secondary-fixed": "#2f1500",
+            "on-error-container": "#ffdad6",
+            "on-secondary": "#4d2600",
+            "surface-container-low": "#1c1b1b",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "outline": "#a08e7a",
+            "on-primary-fixed-variant": "#653e00",
+            "primary-fixed": "#ffddb8",
+            "surface-variant": "#353534",
+            "background": "#131313",
+            "primary": "#ffc174",
+            "on-secondary-container": "#432100",
+            "inverse-surface": "#e5e2e1",
+            "on-error": "#690005",
+            "secondary-fixed": "#ffdcc3",
+            "secondary": "#ffb77d",
+            "surface-container": "#201f1f",
+            "inverse-on-surface": "#313030",
+            "outline-variant": "#534434",
+            "surface-bright": "#393939",
+            "on-primary-fixed": "#2a1700",
+            "surface-tint": "#ffb95f",
+            "on-tertiary-fixed": "#410004",
+            "secondary-container": "#d97707",
+            "primary-container": "#f59e0b",
+            "error": "#ffb4ab",
+            "on-primary-container": "#613b00",
+            "surface-container-highest": "#353534",
+            "on-tertiary": "#68000a",
+            "error-container": "#93000a",
+            "on-surface-variant": "#d8c3ad",
+            "tertiary-container": "#ff938c",
+            "on-surface": "#e5e2e1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin-tablet": "1.5rem",
+            "margin": "1rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-lg": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "body-lg": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "display-hero": ["Oswald"],
+            "headline-lg-mobile": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"],
+            "body-md": ["Space Grotesk"],
+            "title-sm": ["Oswald"],
+            "display-hero-mobile": ["Oswald"],
+            "headline-md": ["Oswald"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "price-tag": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "display-hero": ["48px", { "lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "label-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+            "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "title-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "display-hero-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .amber-halo {
+      box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.35);
+    }
+    .amber-ring-focus:focus-within {
+      box-shadow: 0 0 0 1px #f59e0b;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased pb-28">
+<!-- TOP APP BAR (Shared Component Exact Specs) -->
+<header class="sticky top-0 z-40 bg-surface-dim shadow-md w-full">
+<div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto">
+<div class="flex items-center gap-space-sm">
+<!-- Logo Emblem -->
+<div class="w-10 h-10 rounded-full border border-primary-container flex items-center justify-center bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Official vintage street emblem logo for Bunker Burguer featuring two youth streetwear characters facing away under a detailed toasted smash burger silhouette in warm gold and deep black tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2nZ08JmLZCx-L-JrAlDtgj8E7VTKyKck4huQhz6VymEjJfkD7UYS4zI6PDZakURpqMnWcgxrzTYNeKTaoAb5TJFvrJk0u23TyUVYGhhivq2C3DCBUP8j0GUCEkH9oHTbZTASjgV5q7HV_PVBhzx7iGgaeVy20NCi9AZaGJCECPvwNh6pH030sL88TTRw_saTSShzSaRlmW7tFTQaPeO9UOomRsuyk4sIounG80Qg1sb5s8fom_xQ">
+</div>
+<div>
+<span class="font-headline-md text-headline-md tracking-wider text-primary uppercase block leading-none">BÚNKER BURGUER</span>
+<span class="font-label-badge text-label-badge text-primary-container uppercase tracking-wider block mt-0.5">Panel de Control - Modo Dueño</span>
+</div>
+</div>
+<!-- Trailing actions -->
+<div class="flex items-center gap-space-xs">
+
+<button class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant hover:text-error hover:bg-surface-container transition-colors duration-150 active:scale-95" title="Cerrar sesión">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+</button>
+</div>
+</div>
+</header>
+<!-- MAIN CANVAS -->
+<main class="w-full max-w-7xl mx-auto px-margin pt-space-md flex-1 space-y-space-lg">
+<!-- METRICS & STORE STATUS (Bento Grid 4-col Mobile / Asymmetric) -->
+<section class="grid grid-cols-2 sm:grid-cols-3 gap-space-sm">
+<!-- Card 1: Pedidos Hoy -->
+<div class="bg-surface-container p-space-md rounded-lg border border-white/5 flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-badge text-label-badge uppercase">Pedidos Hoy</span>
+<span class="material-symbols-outlined text-primary text-[18px]">receipt_long</span>
+</div>
+<div class="mt-space-xs flex items-baseline gap-2">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">42</span>
+<span class="font-label-badge text-label-badge text-primary-container">+14% vs ayer</span>
+</div>
+</div>
+<!-- Card 2: Facturación -->
+<div class="bg-surface-container p-space-md rounded-lg border border-white/5 flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-badge text-label-badge uppercase">Facturación</span>
+<span class="material-symbols-outlined text-secondary-fixed text-[18px]">payments</span>
+</div>
+<div class="mt-space-xs">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-wide">$348.500</span>
+</div>
+</div>
+<!-- Card 3: Switch Modo Local (Spans full width on 2-col, single col on tablet) -->
+<div class="col-span-2 sm:col-span-1 bg-surface-container p-space-md rounded-lg border border-primary-container/20 flex flex-col justify-between relative overflow-hidden"><div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-[18px]">storefront</span><span class="font-label-badge text-label-badge uppercase text-on-surface-variant">Estado del Local</span></div><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-headline-md font-bold tracking-wider text-xs uppercase shadow-md select-none" id="store-status-badge"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span></span>ABIERTO</span></div><div class="mt-space-sm flex items-center justify-between gap-2"><div class="leading-tight"><p class="font-body-sm text-body-sm text-primary font-semibold">Local Abierto · Recibiendo pedidos</p></div><label class="relative inline-flex items-center cursor-pointer select-none shrink-0" title="Abrir / Cerrar local"><input checked="" class="sr-only peer" id="toggle-store" type="checkbox"><div class="w-12 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-background after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div></label></div></div>
+</section>
+<!-- ACTIONS & CATEGORY FILTER BAR -->
+<section class="space-y-space-sm">
+<div class="flex flex-col sm:flex-row gap-space-sm items-stretch sm:items-center justify-between"><!-- Search Input -->
+<div class="relative flex-1 amber-ring-focus rounded-full">
+  <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+  <input class="w-full bg-surface-container-low text-on-surface placeholder:text-outline border border-white/10 rounded-full pl-10 pr-4 py-2 text-body-md font-body-md focus:border-primary-container focus:ring-0" placeholder="Buscar producto o promo..." type="text">
+</div>
+<!-- Action Buttons: Agregar Producto & Agregar Promo -->
+<div class="flex items-center gap-space-xs sm:gap-space-sm flex-wrap sm:flex-nowrap">
+  <button class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-headline-md tracking-wider px-space-md py-2 rounded-full amber-halo active:scale-95 transition-all text-sm uppercase">
+    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+    <span class="font-label-lg text-xs font-bold">Producto</span>
+  </button>
+  <button class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-surface-container-high hover:bg-surface-variant text-primary border border-primary-container/40 font-headline-md tracking-wider px-space-md py-2 rounded-full active:scale-95 transition-all text-sm uppercase">
+    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+    <span class="font-label-lg text-xs font-bold">Promoción</span>
+  </button>
+</div></div>
+<!-- Categories Pills -->
+<div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+<button class="bg-primary-container text-surface-container-lowest font-label-badge text-label-badge uppercase px-space-md py-1.5 rounded-full shrink-0">
+          Todas (18)
+        </button>
+<button class="bg-surface-container text-on-surface-variant hover:text-on-surface border border-white/5 font-label-badge text-label-badge uppercase px-space-md py-1.5 rounded-full shrink-0">
+          Smash Burgers
+        </button>
+<button class="bg-surface-container text-on-surface-variant hover:text-on-surface border border-white/5 font-label-badge text-label-badge uppercase px-space-md py-1.5 rounded-full shrink-0">
+          Acompañamientos
+        </button>
+<button class="bg-surface-container text-on-surface-variant hover:text-on-surface border border-white/5 font-label-badge text-label-badge uppercase px-space-md py-1.5 rounded-full shrink-0">
+          Bebidas</button>
+<button class="bg-surface-container text-on-surface-variant hover:text-on-surface border border-white/5 font-label-badge text-label-badge uppercase px-space-md py-1.5 rounded-full shrink-0">
+          Salsas Extra
+        </button>
+</div>
+</section>
+<!-- LIVE MENU CONFIGURATION LIST -->
+<section class="space-y-space-sm">
+<div class="flex items-center justify-between px-1"><div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm w-full">
+  <div>
+    <h2 class="font-headline-md text-headline-md text-on-surface tracking-wide uppercase">
+      Gestión de Precios &amp; Stock
+    </h2>
+    <p class="font-body-sm text-body-sm text-on-surface-variant">Activa, pausa o actualiza precios y ofertas en tiempo real</p>
+  </div>
+  <!-- Tab Switcher Segment -->
+  <div class="inline-flex items-center bg-surface-container-high p-1 rounded-full border border-white/10 self-start sm:self-auto">
+    <button class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container text-surface-container-lowest font-label-badge text-label-badge uppercase font-bold shadow-md transition-all">
+      <span class="material-symbols-outlined text-[16px]">fastfood</span>
+      <span class="">Productos</span>
+      <span class="bg-surface-container-lowest/30 px-1.5 py-0.2 rounded-full text-[10px]">5</span>
+    </button>
+    <button class="flex items-center gap-1.5 px-3 py-1 rounded-full text-on-surface-variant hover:text-primary font-label-badge text-label-badge uppercase font-bold transition-all">
+      <span class="material-symbols-outlined text-[16px]">local_offer</span>
+      <span class="">Promociones</span>
+      <span class="bg-primary-container/20 text-primary px-1.5 py-0.2 rounded-full text-[10px]">3</span>
+    </button>
+  </div>
+</div></div>
+<!-- Products Grid/Stack -->
+<div class="space-y-space-sm">
+<!-- PRODUCT 1: Smash Búnker Doble -->
+<article class="bg-surface-container-low rounded-lg p-space-md border border-white/5 hover:border-primary-container/30 transition-colors">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<!-- Left Info & Thumb -->
+<div class="flex items-center gap-space-md flex-1">
+<div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Extreme close-up of a double smashed beef burger with deep caramelized Maillard crust, melting molten American cheddar cascading down toasted buttery brioche buns under warm atmospheric spot lighting with dark urban textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmtKMGBoKgYwX9KIVNFK-g1exPrMWtQ1a1Q10eACghTxN6s9NPIJCbJJPan96PGdmlhssJICeVAcYpf-qd8yOYDFVJlLD-dQf-vsPYaEo29SZOg5MQVKtcAi5AEfY66TothTpncRWRn-JvCRHCLaNkOt6wkzg7GyvukoH3_DzSacI8sA2B409zyPae2OH__TR3LgztK1HA2ft-Q0Tu3ODEqnTi6Grvkfgrs4GZ8NzY8I0_TNOXj6w">
+<span class="absolute bottom-0 right-0 bg-primary-container text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Smash</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Smash Búnker Doble</h3>
+<span class="text-label-badge font-label-badge uppercase px-1.5 py-0.5 rounded bg-primary-container/10 border border-primary-container/40 text-primary">Top 1</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">2 patties 90g, cuádruple cheddar fundido, cebolla crispy, salsa búnker secreta.</p>
+</div>
+</div>
+<!-- Price Editor & Availability -->
+<div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+<!-- Price input group -->
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="7.800">
+</div>
+<button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Precio">
+                  Guardar
+                </button>
+</div>
+<!-- Switch Available / Out of stock -->
+<div class="flex items-center gap-2 pl-2 border-l border-white/10">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+<span class="font-label-badge text-label-badge uppercase text-green-400 font-semibold select-none hidden xs:inline">Disponible</span>
+</label>
+</div>
+</div>
+</div>
+</article>
+<!-- PRODUCT 2: Oklahoma Onion -->
+<article class="bg-surface-container-low rounded-lg p-space-md border border-white/5 hover:border-primary-container/30 transition-colors">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md flex-1">
+<div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Oklahoma fried onion smash burger with paper-thin sweet onions seared directly into the crispy charred beef patty topped with gooey cheese and artisan mustard against a moody dark studio background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsvE2_AxPEdRz2nyfFJAps_UMq37WsOTnvtawpCsPJ6ZY9psxNLxpaZMPluiiRy3jHh_G0cYGB5Agv55jT_705UkoYPgCIpscTx9k8-qsFFLY8kJKMJwjKRY5YaIIYAYUDXxOGCaPGjyy_8UK2QNGE_UaqjMnZZyHyQ_bSO-Hpl_MgwDJb5pgJlBxzbTPJcWImt8-xdsRdLgtLwyOl6mSCcjSp7zzflVz80e2c8dvsHXVj6jvv-ho">
+<span class="absolute bottom-0 right-0 bg-primary-container text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Smash</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Oklahoma Onion</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">Doble carne aplastada sobre láminas de cebolla dulce caramelizada, doble queso.</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="7.200">
+</div>
+<button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Precio">
+                  Guardar
+                </button>
+</div>
+<div class="flex items-center gap-2 pl-2 border-l border-white/10">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+<span class="font-label-badge text-label-badge uppercase text-green-400 font-semibold select-none hidden xs:inline">Disponible</span>
+</label>
+</div>
+</div>
+</div>
+</article>
+<!-- PRODUCT 3: Triple Beast -->
+<article class="bg-surface-container-low rounded-lg p-space-md border border-white/5 hover:border-primary-container/30 transition-colors">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md flex-1">
+<div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Monstrous triple decker smashed patty cheeseburger with six slices of melted cheddar, smoked bacon strips, and spicy barbecue mayo stacked high inside golden toasted buns on a dark rustic surface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0vK-CXJbtwLTg0b7UrIIv6v28A1JsAM5TCS5d-OTKTNc0ek-gCTBSzaxzGMFSOfdklQM0sWyiT7PYXc2KDvXQI-NGER5NDmIzYg7F3jdQ7HRUSGpictieHeMH-1h1IYjWbu4RdOG0zfUi44IpZSQgYSRJ75xkVb26kCxXsmXUf4rqTdqYBHY-CbaJU2smG8LJ-O_1kvfcrF8D7YEtSudReKyn0OQmpbcITpY2cnZqhuO-X4O6M5Q">
+<span class="absolute bottom-0 right-0 bg-primary-container text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Smash</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Triple Beast</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">3 patties de 90g con extra bacon ahumado, 6 fetas de cheddar y salsa tártara.</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="8.900">
+</div>
+<button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Precio">
+                  Guardar
+                </button>
+</div>
+<div class="flex items-center gap-2 pl-2 border-l border-white/10">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+<span class="font-label-badge text-label-badge uppercase text-green-400 font-semibold select-none hidden xs:inline">Disponible</span>
+</label>
+</div>
+</div>
+</div>
+</article>
+<!-- PRODUCT 4: Papas Cheddar & Bacon (PAUSADO / SIN STOCK) -->
+<article class="bg-surface-container-low rounded-lg p-space-md border border-error-container/40 bg-error-container/5 hover:border-error transition-colors">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md flex-1">
+<div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10 opacity-70">
+<img class="w-full h-full object-cover grayscale-[30%]" data-alt="Crispy thick cut french fries smothered in gooey molten cheddar cheese sauce and chopped crispy bacon bites served in a dark paper basket under moody restaurant bar lights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8x-xwOeER1sB7GkzuSVRBRi3LcEsEku2XhoSuphUjcf1NKfpefSRxPeuoN2qEavFQXe82G92i_nMZh1IeKJBtLctenKgjaqoHMG8_HiOSwzpxiYZ2C28Ej-x0S_fK9DFLlhJfD0Fc3boMeDb31oWJr6KZMARqk4QxBTTiBZyakmyuUAV_WbD1I5EeIJsmR1ors8jpCnTgm9oFXd-TCSMoAwh-LTnEpruyr8EEXRtLWo_tBkcFrRw">
+<span class="absolute bottom-0 right-0 bg-surface-container-high text-on-surface-variant font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Sides</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Papas Cheddar &amp; Bacon</h3>
+<span class="text-label-badge font-label-badge uppercase px-1.5 py-0.5 rounded bg-error-container/30 border border-error/50 text-error">Sin Stock</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">Papas bastón triple cocción con lluvia de panceta crocante y ciboulette.</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="3.500">
+</div>
+<button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Precio">
+                  Guardar
+                </button>
+</div>
+<!-- Switch Out of stock (unchecked) -->
+<div class="flex items-center gap-2 pl-2 border-l border-white/10">
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+<span class="font-label-badge text-label-badge uppercase text-tertiary-container font-semibold select-none hidden xs:inline">Pausado</span>
+</label>
+</div>
+</div>
+</div>
+</article>
+<!-- PRODUCT 5: Cerveza Artesanal IPA 473cc -->
+<article class="bg-surface-container-low rounded-lg p-space-md border border-white/5 hover:border-primary-container/30 transition-colors">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md flex-1">
+<div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Chilled craft IPA beer aluminum can with cold condensation water droplets illuminated by a warm rim light against pitch black background with hop illustrations." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAu1WPEz0eKhAhjbzjIKIUZlT2GUqnJdg3yPc2qxTdDaNze-Kd0vFJSvD_ALtF9xbLzljkWEEi-sCAlMnqcJJfED9NRPqFmdn2XmVMz1pkwtKogsh7GRn2jNw3rs5BM3I3P9OzILBnuwBHjt5TkjJmSUVvvF2qJ_lYqVrVB5A_m_W_pe-jnG57oSQpeYR2pFtxxvuJrCAJdl0tthxA8KlBFP8wIHybDhXopzPzVpzgNpY8T5M8oPM4">
+<span class="absolute bottom-0 right-0 bg-secondary text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Bebida</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Cerveza Artesanal IPA 473cc</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">Lupulada, notas cítricas y amargor balanceado. Lata fría de producción local.</p>
+</div>
+</div>
+<div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="2.800">
+</div>
+<button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Precio">
+                  Guardar
+                </button>
+</div>
+<div class="flex items-center gap-2 pl-2 border-l border-white/10">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+
+</label>
+</div>
+</div>
+</div>
+</article>
+<!-- PROMOTIONS & COMBOS ADMIN SUB-SECTION -->
+<div class="pt-space-md mt-space-sm border-t border-white/10 space-y-space-sm">
+  <div class="flex items-center justify-between px-1">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-[20px]">local_offer</span>
+      <h3 class="font-headline-md text-headline-md text-primary tracking-wide uppercase">
+        Promociones &amp; Combos Activos
+      </h3>
+    </div>
+    
+  </div>
+
+  <!-- PROMO 1: 2x1 Burguer Night -->
+  <article class="bg-surface-container-low rounded-lg p-space-md border border-primary-container/30 bg-primary-container/5 hover:border-primary-container/50 transition-colors">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-md flex-1">
+        <div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-primary-container/40 flex items-center justify-center text-primary-container">
+          <span class="material-symbols-outlined text-[32px]">local_fire_department</span>
+          <span class="absolute bottom-0 right-0 bg-primary-container text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">2x1</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h4 class="font-headline-md text-headline-md text-on-surface leading-tight">2x1 Burguer Night (Jueves y Domingos)</h4>
+            
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">Aplica para Smash Doble y Oklahoma. Válido compras en app hasta agotar stock.</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+        <div class="flex items-center gap-1.5">
+          <div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+            <span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+            <input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="12.500">
+          </div>
+          <button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Promoción">
+            Guardar
+          </button>
+        </div>
+        <div class="flex items-center gap-2 pl-2 border-l border-white/10">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input checked="" class="sr-only peer" type="checkbox">
+            <div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+            <span class="font-label-badge text-label-badge uppercase text-green-400 font-semibold select-none hidden xs:inline">Activa</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- PROMO 2: Combo Smash + IPA Artesanal -->
+  <article class="bg-surface-container-low rounded-lg p-space-md border border-white/5 hover:border-primary-container/30 transition-colors">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-md flex-1">
+        <div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10 flex items-center justify-center text-secondary">
+          <span class="material-symbols-outlined text-[32px]">sports_bar</span>
+          <span class="absolute bottom-0 right-0 bg-secondary text-surface-container-lowest font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Combo</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h4 class="font-headline-md text-headline-md text-on-surface leading-tight">Combo Smash + IPA Artesanal</h4>
+            <span class="text-label-badge font-label-badge uppercase px-1.5 py-0.5 rounded bg-primary-container/10 border border-primary-container/40 text-primary">15% OFF</span>
+            
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">1 Smash Búnker Doble + 1 Lata IPA 473cc con papas chicas incluidas.</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+        <div class="flex items-center gap-1.5">
+          <div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+            <span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+            <input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="9.800">
+          </div>
+          <button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Promoción">
+            Guardar
+          </button>
+        </div>
+        <div class="flex items-center gap-2 pl-2 border-l border-white/10">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input checked="" class="sr-only peer" type="checkbox">
+            <div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+            <span class="font-label-badge text-label-badge uppercase text-green-400 font-semibold select-none hidden xs:inline">Activa</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- PROMO 3: Super Búnker Triple Pack (Pausada) -->
+  <article class="bg-surface-container-low rounded-lg p-space-md border border-error-container/40 bg-error-container/5 hover:border-error transition-colors">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-md flex-1">
+        <div class="relative w-16 h-16 rounded-lg bg-surface-container-highest shrink-0 overflow-hidden border border-white/10 opacity-70 flex items-center justify-center text-on-surface-variant">
+          <span class="material-symbols-outlined text-[32px]">inventory_2</span>
+          <span class="absolute bottom-0 right-0 bg-surface-container-high text-on-surface-variant font-label-badge text-[9px] px-1 rounded-tl font-bold uppercase">Pack</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h4 class="font-headline-md text-headline-md text-on-surface leading-tight">Super Búnker Triple Pack</h4>
+            <span class="text-label-badge font-label-badge uppercase px-1.5 py-0.5 rounded bg-error-container/30 border border-error/50 text-error">Pausada</span>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">3 Burgers a elección + 2 porciones de papas cheddar + salsas exclusivas.</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-space-md pt-space-xs sm:pt-0 border-t border-white/5 sm:border-0">
+        <div class="flex items-center gap-1.5">
+          <div class="relative flex items-center bg-surface-container rounded-lg border border-white/10 px-2 py-1 focus-within:border-primary-container">
+            <span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+            <input class="w-20 bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0 text-left" type="text" value="22.000">
+          </div>
+          <button class="bg-primary-container hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded-lg transition-transform active:scale-95 font-bold" title="Guardar Promoción">
+            Guardar
+          </button>
+        </div>
+        <div class="flex items-center gap-2 pl-2 border-l border-white/10">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input class="sr-only peer" type="checkbox">
+            <div class="w-10 h-5 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+            <span class="font-label-badge text-label-badge uppercase text-tertiary-container font-semibold select-none hidden xs:inline">Pausada</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </article>
+</div></div>
+</section>
+<!-- DELIVERY & LOGISTICS CONFIGURATION SECTION -->
+<section class="bg-surface-container p-space-lg rounded-xl border border-secondary-container/30 relative overflow-hidden">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<!-- Section title & description -->
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+
+<h2 class="font-headline-md text-headline-md text-on-surface uppercase tracking-wide">
+              Ajuste de Costo de Envío
+            </h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Configura el precio del delivery</p>
+</div>
+<!-- Controls Form -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md w-full md:w-auto">
+<!-- Costo Base -->
+<div class="bg-surface-container-low p-space-sm rounded-lg border border-white/10">
+<label class="block font-label-badge text-label-badge uppercase text-on-surface-variant mb-1">
+              Costo de Delivery
+            </label>
+<div class="flex items-center gap-1.5">
+<div class="relative flex items-center bg-surface-container-high rounded px-2.5 py-1.5 flex-1 border border-white/10 focus-within:border-primary-container">
+<span class="text-primary font-price-tag text-price-tag mr-1">$</span>
+<input class="w-full bg-transparent text-on-surface font-price-tag text-price-tag p-0 border-0 focus:ring-0" type="text" value="1.200">
+</div>
+<button class="bg-primary hover:bg-primary-fixed-dim text-surface-container-lowest font-label-badge text-label-badge uppercase px-3 py-2 rounded font-bold transition-all active:scale-95">
+                Actualizar
+              </button>
+</div>
+</div>
+<!-- Radio de Cobertura -->
+
+</div>
+</div>
+<!-- Quick Tips Banner -->
+
+</section>
+</main>
+<!-- BOTTOM NAV BAR (Shared Component Specs - Admin Destination Active) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low shadow-2xl">
+<!-- Item 1: Menú (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]">lunch_dining</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Menú</span>
+</a>
+<!-- Item 2: Carrito (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]">shopping_cart</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Carrito</span>
+</a>
+<!-- Item 3: Checkout (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]">point_of_sale</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Checkout</span>
+</a>
+<!-- Item 4: Admin (Active State mapped from Shared Component JSON) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: &quot;FILL&quot; 1;">tune</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Admin</span>
+</a>
+</nav>
+<!-- Lightweight Script for Local State Switching -->
+<script>
+    const storeToggle = document.getElementById('toggle-store');
+    const storeBadge = document.getElementById('store-status-badge');
+
+    storeToggle.addEventListener('change', (e) => {
+      if(e.target.checked) {
+        storeBadge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-badge font-label-badge bg-green-950/70 border border-green-500/40 text-green-400 uppercase';
+        storeBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Abierto';
+      } else {
+        storeBadge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-badge font-label-badge bg-red-950/70 border border-red-500/40 text-red-400 uppercase';
+        storeBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span> Pausado';
+      }
+    });
+  </script>
+</body></html>

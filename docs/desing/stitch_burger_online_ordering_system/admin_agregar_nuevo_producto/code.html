@@ -1,0 +1,507 @@
+<!DOCTYPE html><html class="dark" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Admin - Agregar Nuevo Producto | Búnker Burguer</title>
+<!-- Google Fonts: Oswald & Space Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Verbatim Tailwind Config Injection -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-fixed-dim": "#ffb95f",
+            "on-secondary-container": "#432100",
+            "on-tertiary": "#68000a",
+            "on-surface-variant": "#d8c3ad",
+            "background": "#131313",
+            "on-error": "#690005",
+            "surface-container": "#201f1f",
+            "surface": "#131313",
+            "secondary": "#ffb77d",
+            "on-secondary-fixed": "#2f1500",
+            "on-tertiary-fixed-variant": "#930013",
+            "on-secondary": "#4d2600",
+            "inverse-on-surface": "#313030",
+            "tertiary-fixed": "#ffdad7",
+            "secondary-container": "#d97707",
+            "secondary-fixed": "#ffdcc3",
+            "tertiary": "#ffbcb7",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "surface-container-highest": "#353534",
+            "surface-tint": "#ffb95f",
+            "surface-variant": "#353534",
+            "on-primary": "#472a00",
+            "secondary-fixed-dim": "#ffb77d",
+            "tertiary-container": "#ff938c",
+            "surface-container-low": "#1c1b1b",
+            "surface-bright": "#393939",
+            "on-secondary-fixed-variant": "#6e3900",
+            "primary": "#ffc174",
+            "on-background": "#e5e2e1",
+            "error": "#ffb4ab",
+            "outline-variant": "#534434",
+            "on-error-container": "#ffdad6",
+            "surface-container-lowest": "#0e0e0e",
+            "on-primary-container": "#613b00",
+            "on-tertiary-fixed": "#410004",
+            "on-primary-fixed": "#2a1700",
+            "on-primary-fixed-variant": "#653e00",
+            "surface-dim": "#131313",
+            "inverse-primary": "#855300",
+            "surface-container-high": "#2a2a2a",
+            "inverse-surface": "#e5e2e1",
+            "on-surface": "#e5e2e1",
+            "primary-container": "#f59e0b",
+            "on-tertiary-container": "#8d0012",
+            "outline": "#a08e7a",
+            "error-container": "#93000a",
+            "primary-fixed": "#ffddb8"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin-tablet": "1.5rem",
+            "gutter": "1rem",
+            "margin-desktop": "2.5rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.5rem",
+            "gutter-desktop": "1.5rem",
+            "space-xl": "2.5rem",
+            "margin": "1rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "body-md": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"],
+            "headline-lg": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "body-lg": ["Space Grotesk"],
+            "display-hero-mobile": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "display-hero": ["Oswald"],
+            "headline-md": ["Oswald"],
+            "headline-lg-mobile": ["Oswald"],
+            "title-sm": ["Oswald"]
+          },
+          "fontSize": {
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+            "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "price-tag": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "display-hero-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "label-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+            "display-hero": ["48px", { "lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "title-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    /* Custom scrollbar suppression for sleek horizontal category chips */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .amber-glow {
+      box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.35);
+    }
+    .amber-subtle-glow {
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-36 font-body-md antialiased selection:bg-primary selection:text-on-primary">
+<!-- Top Header / App Bar (Form-focused context with Cancel/Back & Bunker Identity) -->
+<header class="sticky top-0 z-40 bg-surface-dim shadow-md w-full">
+<div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto">
+<div class="flex items-center gap-space-sm">
+<a aria-label="Volver" class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors active:scale-95 duration-100" href="#cancelar">
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_back">arrow_back</span>
+</a>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md tracking-wider text-primary uppercase leading-tight">NUEVO PRODUCTO</span>
+
+</div>
+</div>
+<!-- Bunker Burguer Badge / Official Emblem -->
+<div class="flex items-center gap-space-xs">
+<div class="w-10 h-10 rounded-full border border-surface-bright overflow-hidden p-0.5 bg-surface-container-lowest">
+<img alt="Búnker Burguer Logo" class="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFeh2VuXwj3QssNkXi_HPzMq7t4oK24Vsvh5Lrw_XpeLk9sY41gKiJfHRJl2E2qKGS3zQArFF6YS_EJWHWIRymrdD8foX7FtAIJnJBThTJQZzt3PN18esgVGbrTG-DoC2Qi6BVwt6jRJrwupfNWPobRs2hMbOkRtAZTb1dqBOaB8j9GIwvREncM7J-2hZj7xiR9X34c7LIewnM6LgUYoIYImhC8vW9hhJEXpGcpE9aLNnv6fDYtybt4nRdBAbrawVg">
+</div>
+</div>
+</div>
+</header>
+<!-- Main Administrative Form Canvas -->
+<main class="w-full max-w-xl mx-auto px-margin pt-space-md space-y-space-lg">
+<!-- 1. Carga Multimedia / Subida de Fotografía -->
+<section class="bg-surface-container-low rounded-lg p-space-md border border-white/5 space-y-space-sm relative overflow-hidden">
+<div class="flex justify-between items-center">
+<label class="font-title-sm text-title-sm text-on-surface uppercase flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="photo_camera">photo_camera</span>
+          Foto del Producto
+        </label>
+<span class="font-label-badge text-label-badge text-primary uppercase">Requerido *</span>
+</div>
+<!-- Drag & Drop Container / Camera Upload Area -->
+<div class="relative border-2 border-dashed border-surface-bright rounded-lg p-space-lg flex flex-col items-center justify-center text-center bg-surface-container-lowest/60 hover:border-primary-container transition-colors cursor-pointer group">
+<input accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" id="fileUploadInput" type="file">
+<div class="w-14 h-14 rounded-full bg-surface-container-high flex items-center justify-center mb-space-sm group-hover:scale-105 transition-transform duration-200">
+<span class="material-symbols-outlined text-primary text-[28px]" data-icon="cloud_upload">cloud_upload</span>
+</div>
+<p class="font-title-sm text-title-sm text-on-surface tracking-wide uppercase">Subir foto del producto</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Formato JPG o PNG cuadrado o 16:9 • Alta resolución</p>
+<!-- Preview Dummy Street Tag -->
+<div class="mt-space-sm flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-surface-container text-outline text-[11px] font-label-badge uppercase">
+<span class="material-symbols-outlined text-[13px] text-primary" data-icon="bolt">bolt</span>
+          Fondo oscuro Maillard recomendado
+        </div>
+</div>
+</section>
+<!-- 2. Información Básica & Categoría -->
+<section class="bg-surface-container-low rounded-lg p-space-md border border-white/5 space-y-space-md">
+<h2 class="font-headline-md text-headline-md text-on-surface uppercase tracking-wide border-b border-surface-bright/50 pb-space-xs flex items-center justify-between"><span class="">Información Básica</span><span class="font-label-badge text-label-badge text-primary uppercase">Requerido *</span></h2>
+<!-- Nombre del Producto -->
+<div class="space-y-space-xs">
+<label class="font-label-lg text-label-lg text-on-surface uppercase" for="prod-name">
+          Nombre del Producto <span class="text-primary">*</span>
+</label>
+<input class="w-full bg-surface-container rounded-lg border border-surface-bright px-space-md py-space-sm text-on-surface font-body-md focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-outline-variant" id="prod-name" placeholder="Ej: Doble Cuarto Smash Crispy" type="text" value="Doble Cuarto Smash Crispy">
+</div>
+<!-- Selector de Categoría (Chips Horizontales) -->
+<div class="space-y-space-sm">
+  <label class="font-label-lg text-label-lg text-on-surface uppercase flex justify-between items-center">
+    <span class="">Producto</span>
+    <span class="text-primary font-label-badge">Selección activa</span>
+  </label>
+  <div class="grid grid-cols-3 gap-space-xs p-1 bg-surface-container rounded-lg border border-surface-bright" id="product-type-tabs">
+  <button type="button" class="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-space-xs rounded bg-primary-container text-surface-container-lowest font-headline-md text-[13px] uppercase shadow-sm transition-all text-center">
+    <span class="material-symbols-outlined text-[18px]" data-icon="lunch_dining">lunch_dining</span>
+    <span class="">Hamburguesa</span>
+  </button>
+  <button type="button" class="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-space-xs rounded text-on-surface-variant font-headline-md text-[13px] uppercase hover:text-primary transition-all text-center">
+    <span class="material-symbols-outlined text-[18px]" data-icon="bakery_dining">bakery_dining</span>
+    <span class="">Sándwich</span>
+  </button>
+  <button type="button" class="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-space-xs rounded text-on-surface-variant font-headline-md text-[13px] uppercase hover:text-primary transition-all text-center">
+    <span class="material-symbols-outlined text-[18px]" data-icon="fastfood">fastfood</span>
+    <span class="">Papas</span>
+  </button>
+</div>
+  <div class="pt-1 space-y-space-xs">
+    <label class="font-label-badge text-label-badge text-on-surface-variant uppercase">Subcategoría en Menú</label>
+    <div class="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-1"><button class="whitespace-nowrap px-space-md py-1.5 rounded-full bg-primary-container text-surface-container-lowest font-label-badge uppercase shadow-sm" type="button">
+  Smash Burgers
+</button>
+<button class="whitespace-nowrap px-space-md py-1.5 rounded-full bg-surface-container border border-surface-bright text-on-surface-variant font-label-badge uppercase hover:border-primary/40 active:scale-95 transition-all" type="button">
+  Dobles &amp; Triples
+</button>
+<button class="whitespace-nowrap px-space-md py-1.5 rounded-full bg-surface-container border border-surface-bright text-on-surface-variant font-label-badge uppercase hover:border-primary/40 active:scale-95 transition-all" type="button">
+  Sándwiches Especiales
+</button>
+<button class="whitespace-nowrap px-space-md py-1.5 rounded-full bg-surface-container border border-surface-bright text-on-surface-variant font-label-badge uppercase hover:border-primary/40 active:scale-95 transition-all" type="button">
+  Papas</button>
+
+</div>
+  </div>
+</div>
+<!-- Descripción & Ingredientes -->
+<div class="space-y-space-xs">
+<label class="font-label-lg text-label-lg text-on-surface uppercase flex justify-between" for="prod-desc">
+<span class="">Descripción e Ingredientes</span>
+<span class="font-body-sm text-body-sm text-outline">Máx 180 car.</span>
+</label>
+<textarea class="w-full bg-surface-container rounded-lg border border-surface-bright px-space-md py-space-sm text-on-surface font-body-md focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-outline-variant" id="prod-desc" placeholder="Detallá los medallones, aderezos caseros, panes y quesos..." rows="3">Dos medallones de carne smash de 110g ultra crocantes, doble cheddar Milkaut fundido, panceta ahumada en leña, cebolla crispy y alioli casero de ajo asado en pan brioche artesanal tostado con manteca.</textarea>
+</div>
+<!-- Precio Base ($) & Visibilidad -->
+<div class="grid grid-cols-1 gap-space-md pt-space-xs">
+<div class="space-y-space-xs">
+<label class="font-label-lg text-label-lg text-primary uppercase" for="prod-price">
+            Precio Base *</label>
+<div class="relative flex items-center">
+<span class="absolute left-space-md font-price-tag text-price-tag text-primary">$</span>
+<input class="w-full bg-surface-container rounded-lg border border-primary-container/40 pl-8 pr-space-md py-space-sm text-primary font-price-tag text-price-tag focus:border-primary-container focus:ring-2 focus:ring-primary-container/30 outline-none" id="prod-price" step="50" type="number" value="8400">
+</div>
+</div>
+<!-- Switch Visible en Menú -->
+
+</div>
+</section>
+<!-- 3. Configuración de Personalización & Extras (Sync con SCREEN_4 Personalizador) -->
+<section class="bg-surface-container-low rounded-lg p-space-md border border-white/5 space-y-space-lg"><div class="border-b border-surface-bright/50 pb-space-xs">
+  <h2 class="font-headline-md text-headline-md text-on-surface uppercase tracking-wide flex items-center gap-space-xs">
+    <span class="material-symbols-outlined text-primary text-[22px]" data-icon="tune">tune</span>
+    Opciones de Personalización
+  </h2>
+  <p class="font-body-sm text-body-sm text-on-surface-variant">Configuración adaptable para medallones smash, sándwiches o porciones de papas .</p>
+</div>
+
+<!-- Selector Contextual de Categoría Activa para Personalización -->
+<div class="space-y-space-sm">
+  <div class="flex items-center justify-between">
+    <h3 class="font-title-sm text-title-sm text-on-surface uppercase flex items-center gap-1.5">
+      <span class="">Personalizador DE:</span>
+    </h3>
+    
+  </div>
+
+  <div class="grid grid-cols-3 gap-space-xs bg-surface-container-lowest p-1 rounded-lg border border-surface-bright/50">
+    <button type="button" class="py-1.5 px-space-xs rounded bg-surface-container text-primary font-label-badge uppercase border border-primary/30 text-center flex items-center justify-center gap-1">
+      <span class="material-symbols-outlined text-[14px]" data-icon="lunch_dining">lunch_dining</span>
+      <span class="">Burgers</span>
+    </button>
+    <button type="button" class="py-1.5 px-space-xs rounded bg-transparent text-on-surface-variant font-label-badge uppercase text-center hover:text-on-surface flex items-center justify-center gap-1">
+      <span class="material-symbols-outlined text-[14px]" data-icon="bakery_dining">bakery_dining</span>
+      <span class="">Sándwiches</span>
+    </button>
+    <button type="button" class="py-1.5 px-space-xs rounded bg-surface-container text-primary-fixed-dim font-label-badge uppercase border border-primary/40 text-center flex items-center justify-center gap-1 shadow-sm">
+      <span class="material-symbols-outlined text-[14px]" data-icon="fastfood">fastfood</span>
+      <span class="">Papas</span>
+    </button>
+  </div>
+</div>
+
+<!-- SUBSECCIÓN CONTEXTUAL: CONFIGURADOR ESPECÍFICO DE PAPAS & GUARNICIONES -->
+<div class="space-y-space-md border border-primary/20 bg-primary-container/5 rounded-lg p-space-md">
+  <div class="flex items-center justify-between border-b border-surface-bright/50 pb-space-xs">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-[20px]" data-icon="fastfood">fastfood</span>
+      <div>
+        <h3 class="font-title-sm text-title-sm text-primary uppercase">Armá las papas bunker&nbsp;</h3>
+        
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- 1. Tamaño / Porción de Papas -->
+  <div class="space-y-space-xs">
+    <div class="flex items-center justify-between">
+      <label class="font-label-lg text-label-lg text-on-surface uppercase flex items-center gap-1.5">
+        <span class="">Tamaño de Porción</span>
+      </label>
+      <span class="font-label-badge text-label-badge text-outline uppercase">Selección Única</span>
+    </div>
+    <div class="grid grid-cols-3 gap-space-xs text-center">
+      <div class="bg-surface-container rounded-lg p-space-sm border border-primary/40 bg-primary-container/10 flex flex-col items-center justify-center cursor-pointer">
+        <span class="font-label-lg text-label-lg text-primary uppercase">Individual</span>
+        <span class="font-body-sm text-body-sm text-outline">200g crocantes</span>
+        <span class="font-label-badge text-label-badge text-primary mt-1">Base ($0)</span>
+      </div>
+      <div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors">
+        <span class="font-label-lg text-label-lg text-on-surface uppercase">Para Compartir</span>
+        <span class="font-body-sm text-body-sm text-outline">400g (2 personas)</span>
+        <span class="font-label-badge text-label-badge text-primary mt-1">+$ 1.200</span>
+      </div>
+      <div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors">
+        <span class="font-label-lg text-label-lg text-on-surface uppercase">Mega Búnker</span>
+        <span class="font-body-sm text-body-sm text-outline">700g banquete</span>
+        <span class="font-label-badge text-label-badge text-primary mt-1">+$ 2.400</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Toppings & Dips para Papas Cargadas -->
+  <div class="space-y-space-xs pt-space-xs">
+    <div class="flex items-center justify-between">
+      <label class="font-label-lg text-label-lg text-on-surface uppercase">Agregados para las papas:</label>
+      
+    </div>
+    <div class="space-y-space-xs"><div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between gap-space-sm">
+        <label class="flex items-center gap-space-sm cursor-pointer flex-1">
+          <input checked="" class="rounded text-primary-container bg-surface-container-highest border-surface-bright focus:ring-0 w-4 h-4" type="checkbox">
+          <div>
+            <span class="font-body-md text-body-md text-on-surface block">Doble Cheddar Líquido Artesanal</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant">Bañado caliente</span>
+          </div>
+        </label>
+        <div class="flex items-center gap-1 shrink-0 bg-surface-container-high rounded border border-surface-bright px-2 py-1">
+          <span class="text-primary font-price-tag text-body-md leading-none">$</span>
+          <input class="w-14 bg-transparent border-0 text-right font-price-tag text-price-tag text-primary p-0 focus:ring-0 outline-none leading-none" type="number" value="850">
+        </div>
+      </div>
+      <button type="button" class="w-full py-space-sm border border-dashed border-primary/40 hover:border-primary text-primary hover:bg-primary-container/10 rounded font-label-lg uppercase tracking-wider text-body-sm flex items-center justify-center gap-space-xs transition-colors mt-space-xs">
+        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+        <span class="">Añadir nuevo agregado</span>
+      </button></div>
+  </div>
+</div>
+
+<!-- VARIANTES DE MEDALLÓN / PROTEÍNA (MODO BURGER/SANDWICH) -->
+<div class="space-y-space-sm pt-space-xs"><div class="flex items-center justify-between">
+    <h3 class="font-title-sm text-title-sm text-on-surface uppercase flex items-center gap-1.5">
+      <span class="">VARIANTES DE MEDALLÓN</span>
+    </h3>
+    <span class="font-label-badge text-label-badge text-outline uppercase">SELECCIÓN ÚNICA</span>
+  </div>
+
+  <div class="space-y-space-xs">
+    <div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between gap-space-sm">
+      <label class="flex items-center gap-space-sm cursor-pointer flex-1">
+        <input checked="" class="rounded text-primary-container bg-surface-container-highest border-surface-bright focus:ring-0 w-4 h-4" type="checkbox">
+        <div>
+          <p class="font-label-lg text-label-lg text-on-surface uppercase">SIMPLE 110G</p>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Incluido en Precio Base</p>
+        </div>
+      </label>
+      <div class="flex items-center justify-end shrink-0">
+        <span class="font-price-tag text-price-tag text-on-surface-variant whitespace-nowrap">$ 0</span>
+      </div>
+    </div>
+    <div class="bg-surface-container rounded-lg p-space-sm border border-primary/30 flex items-center justify-between gap-space-sm bg-primary-container/5">
+      <label class="flex items-center gap-space-sm cursor-pointer flex-1">
+        <input checked="" class="rounded text-primary-container bg-surface-container-highest border-primary focus:ring-0 w-4 h-4" type="checkbox">
+        <div>
+          <p class="font-label-lg text-label-lg text-primary uppercase">DOBLE (2X110G)</p>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">+ Doble cheddar artesanal</p>
+        </div>
+      </label>
+      <div class="flex items-center gap-1 shrink-0 bg-surface-container-high rounded border border-surface-bright px-2 py-1">
+        <span class="text-primary font-price-tag text-body-md whitespace-nowrap leading-none">$&nbsp;</span>
+        <input class="w-16 bg-transparent border-0 text-right font-price-tag text-price-tag text-primary p-0 focus:ring-0 outline-none leading-none" type="number" value="1400">
+      </div>
+    </div>
+    <div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between gap-space-sm">
+      <label class="flex items-center gap-space-sm cursor-pointer flex-1">
+        <input checked="" class="rounded text-primary-container bg-surface-container-highest border-surface-bright focus:ring-0 w-4 h-4" type="checkbox">
+        <div>
+          <p class="font-label-lg text-label-lg text-on-surface uppercase">TRIPLE (3X110G)</p>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">+ Triple cheddar fundido</p>
+        </div>
+      </label>
+      <div class="flex items-center gap-1 shrink-0 bg-surface-container-high rounded border border-surface-bright px-2 py-1">
+        <span class="text-primary font-price-tag text-body-md whitespace-nowrap leading-none">$</span>
+        <input class="w-16 bg-transparent border-0 text-right font-price-tag text-price-tag text-primary p-0 focus:ring-0 outline-none leading-none" type="number" value="2600">
+      </div>
+    </div>
+  </div></div>
+
+<!-- Selección de Tipo de Pan (Hamburguesas / Sándwiches) -->
+
+
+<!-- Botón Añadir Nuevo Extra General -->
+<button class="w-full py-space-sm px-space-md border border-dashed border-primary/40 rounded-lg text-primary hover:bg-primary-container/10 flex items-center justify-center gap-space-xs font-label-lg text-label-lg uppercase transition-all duration-150 active:scale-95" type="button">
+  <span class="material-symbols-outlined text-[18px]" data-icon="add_circle">add_circle</span>
+  Añadir nuevo extra para este producto
+</button></section>
+<!-- 4. Estado Operativo & Stock Inicial -->
+<section class="bg-surface-container-low rounded-lg p-space-md border border-white/5 space-y-space-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface uppercase tracking-wide border-b border-surface-bright/50 pb-space-xs flex items-center justify-between">
+<span class="">Estado y Stock en Cocina</span>
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="skillet" data-stitch-orig-opacity="0">skillet</span>
+</h2>
+<div class="space-y-space-sm">
+<!-- Stock toggle -->
+<div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface uppercase">Disponible Inmediatamente (En Stock)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Si se desactiva, figurará como "Agotado por hoy"</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-dim after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:border-surface-bright after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Destacado badge toggle -->
+<div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface uppercase flex items-center gap-1.5">
+              Destacar en "Las Más Pedidas"
+              <span class="material-symbols-outlined text-primary text-[16px]" data-icon="local_fire_department">local_fire_department</span>
+</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Aparecerá en como principal en el inicio</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-dim after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:border-surface-bright after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<div class="bg-surface-container rounded-lg p-space-sm border border-surface-bright flex items-center justify-between"><div><p class="font-label-lg text-label-lg text-on-surface uppercase flex items-center gap-1.5">Incluye Papas&nbsp;<span class="material-symbols-outlined text-primary text-[16px]" data-icon="fastfood">fastfood</span></p><p class="font-body-sm text-body-sm text-on-surface-variant">Viene con porción de papas sin costo adicional para el cliente</p></div><label class="relative inline-flex items-center cursor-pointer"><input checked="" class="sr-only peer" type="checkbox"><div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-dim after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container after:border-surface-bright after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div></label></div></div>
+</section>
+<!-- Bottom Actions Canvas Trigger -->
+<div class="pt-space-sm pb-space-lg space-y-space-sm">
+<!-- Main Action: Guardar y Publicar -->
+<button class="w-full bg-primary-container hover:bg-primary text-on-primary-container font-label-lg text-label-lg uppercase py-4 rounded-full amber-glow flex items-center justify-center gap-space-xs transition-transform duration-100 active:scale-95 tracking-wider" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="check_circle">check_circle</span>
+        Guardar y Publicar en Menú
+      </button>
+<!-- Secondary Action: Borrador -->
+
+</div>
+</main>
+<!-- Sticky Bottom Navigation Shell (Destination: Admin mode active) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low dark:bg-surface-container-low shadow-2xl">
+<!-- Tab 1: Menú (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#menu">
+<span class="material-symbols-outlined text-[22px]" data-icon="lunch_dining">lunch_dining</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Menú</span>
+</a>
+<!-- Tab 2: Carrito (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#carrito">
+<span class="material-symbols-outlined text-[22px]" data-icon="shopping_cart">shopping_cart</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Carrito</span>
+</a>
+<!-- Tab 3: Checkout (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#checkout">
+<span class="material-symbols-outlined text-[22px]" data-icon="point_of_sale">point_of_sale</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Checkout</span>
+</a>
+<!-- Tab 4: Admin (ACTIVE per semantic match to owner product management screen) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#admin">
+<span class="material-symbols-outlined text-[22px]" data-icon="tune">tune</span>
+<span class="text-label-badge font-label-badge uppercase mt-0.5">Admin</span>
+</a>
+</nav>
+<!-- Interactive Client-side Script for Chips and File Drop Display -->
+<script>
+    // Micro-interaction for Category pills
+    document.querySelectorAll('.no-scrollbar button').forEach(button => {
+      button.addEventListener('click', function() {
+        document.querySelectorAll('.no-scrollbar button').forEach(btn => {
+          btn.className = 'whitespace-nowrap px-space-md py-1.5 rounded-full bg-surface-container border border-surface-bright text-on-surface-variant font-label-badge uppercase hover:border-primary/40 active:scale-95 transition-all';
+        });
+        this.className = 'whitespace-nowrap px-space-md py-1.5 rounded-full bg-primary-container text-surface-container-lowest font-label-badge uppercase shadow-sm';
+      });
+    });
+
+    // File input change micro-feedback
+    const fileInput = document.getElementById('fileUploadInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) {
+          const fileName = e.target.files[0].name;
+          const container = e.target.closest('div');
+          const title = container.querySelector('p');
+          if (title) {
+            title.textContent = "Foto seleccionada: " + fileName;
+            title.classList.add('text-primary');
+          }
+        }
+      });
+    }
+  </script>
+
+
+</body></html>

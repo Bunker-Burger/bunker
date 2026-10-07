@@ -1,0 +1,414 @@
+<!DOCTYPE html><html class="dark" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>BÚNKER BURGUER - Personalizador &amp; Carrito</title>
+<!-- Fonts: Oswald & Space Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<!-- Google Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS with Forms & Container Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#6e3900",
+            "surface-container-lowest": "#0e0e0e",
+            "on-primary": "#472a00",
+            "secondary-fixed-dim": "#ffb77d",
+            "on-tertiary-container": "#8d0012",
+            "surface-dim": "#131313",
+            "surface-container-high": "#2a2a2a",
+            "on-tertiary-fixed-variant": "#930013",
+            "tertiary": "#ffbcb7",
+            "on-background": "#e5e2e1",
+            "inverse-primary": "#855300",
+            "surface": "#131313",
+            "primary-fixed-dim": "#ffb95f",
+            "tertiary-fixed": "#ffdad7",
+            "on-secondary-fixed": "#2f1500",
+            "on-error-container": "#ffdad6",
+            "on-secondary": "#4d2600",
+            "surface-container-low": "#1c1b1b",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "outline": "#a08e7a",
+            "on-primary-fixed-variant": "#653e00",
+            "primary-fixed": "#ffddb8",
+            "surface-variant": "#353534",
+            "background": "#131313",
+            "primary": "#ffc174",
+            "on-secondary-container": "#432100",
+            "inverse-surface": "#e5e2e1",
+            "on-error": "#690005",
+            "secondary-fixed": "#ffdcc3",
+            "secondary": "#ffb77d",
+            "surface-container": "#201f1f",
+            "inverse-on-surface": "#313030",
+            "outline-variant": "#534434",
+            "surface-bright": "#393939",
+            "on-primary-fixed": "#2a1700",
+            "surface-tint": "#ffb95f",
+            "on-tertiary-fixed": "#410004",
+            "secondary-container": "#d97707",
+            "primary-container": "#f59e0b",
+            "error": "#ffb4ab",
+            "on-primary-container": "#613b00",
+            "surface-container-highest": "#353534",
+            "on-tertiary": "#68000a",
+            "error-container": "#93000a",
+            "on-surface-variant": "#d8c3ad",
+            "tertiary-container": "#ff938c",
+            "on-surface": "#e5e2e1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin-tablet": "1.5rem",
+            "margin": "1rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-lg": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "body-lg": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "display-hero": ["Oswald"],
+            "headline-lg-mobile": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"],
+            "body-md": ["Space Grotesk"],
+            "title-sm": ["Oswald"],
+            "display-hero-mobile": ["Oswald"],
+            "headline-md": ["Oswald"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "price-tag": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "display-hero": ["48px", { "lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700" }],
+            "label-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+            "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "title-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "display-hero-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .custom-amber-glow {
+      box-shadow: 0 4px 24px -2px rgba(245, 158, 11, 0.35);
+    }
+    .custom-card-border {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .custom-accent-border {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen selection:bg-primary-container selection:text-on-primary-container pb-44">
+<!-- Top App Bar (Task Sub-Screen Header) -->
+<header class="sticky top-0 z-40 bg-surface-dim/95 backdrop-blur-md shadow-md">
+<div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto">
+<button class="flex items-center gap-1.5 text-on-surface hover:text-primary transition-colors duration-150 active:scale-95" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_back">arrow_back</span>
+<span class="font-label-lg text-label-lg tracking-wide">Seguir pidiendo</span>
+</button>
+<div class="text-center">
+
+</div>
+<div class="w-10 flex justify-end">
+
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="max-w-2xl mx-auto px-margin pt-space-sm space-y-space-md">
+<!-- Hero Card: Product Spotlight -->
+<section class="bg-surface-container rounded-lg custom-card-border overflow-hidden relative shadow-lg">
+<div class="relative w-full h-56 bg-surface-container-lowest overflow-hidden flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Appetizing double smash burger with deeply seared crusty edges, melted overflowing American cheddar cheese, thick smoked bacon strips, and artisanal sauce spilling out of a golden brioche bun set against a pitch dark atmospheric urban street backdrop with warm rim lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-KitbEsZZ-wl8BRBZDEFnrli-usl7BOH6ISCzrZ_q-f_9cMVA7XWRdulxfVzbdrf8nRPCla3VE1WW6ykjZNLBPplDce8WFsjcyzjLkIVsRVOJ_Zp5Hq9gYlGmvxCHNYe6JQ0pUW1UoPFsy1B9T27dJwBAyF25D9okxhIqeZ6GIt-xecn3XrEZLAHqZy7B8haBvRQeSD-QKDJ62gUBij20T3nbeA0RZORz3OcQ5YpC9i86N09efk8">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container via-transparent to-black/30"></div>
+<div class="absolute top-3 left-3 flex gap-2">
+
+
+</div>
+</div>
+<div class="p-space-md space-y-space-xs">
+<div class="flex justify-between items-baseline">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tight">
+            Smash Búnker Doble
+          </h1>
+<span class="font-price-tag text-price-tag text-primary">
+            $7.800
+          </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+          Dos medallones ultracrujientes de 100g con técnica smash Maillard, cuádruple cheddar derretido, panceta ahumada artesanal, cebolla caramelizada al bourbon y aderezo secreto de la casa en pan brioche sellado con manteca clarificada.
+        </p>
+</div>
+</section>
+<!-- Customizer Form / Bento Controls -->
+<div class="space-y-space-md">
+<!-- Size Selector -->
+<section class="bg-surface-container rounded-lg custom-card-border p-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<h2 class="font-title-sm text-title-sm uppercase text-on-surface tracking-wide">
+              Tamaño / Medallones
+            </h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Seleccioná la potencia de tu smash</p>
+</div>
+<span class="font-label-badge text-label-badge px-2 py-0.5 rounded-full bg-surface-container-high text-primary uppercase">
+            Requerido
+          </span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Option 1 (Selected) -->
+<label class="cursor-pointer relative flex flex-col p-3 rounded-lg bg-surface-container-high custom-accent-border transition-transform active:scale-95">
+<input checked="" class="sr-only peer" name="patty_size" type="radio" value="double">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-lg text-label-lg text-primary peer-checked:text-primary">Doble (2x 100g)</span>
+<span class="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Incluido en base</span>
+<span class="mt-2 font-price-tag text-label-lg text-on-surface">$7.800</span>
+</label>
+<!-- Option 2 -->
+<label class="cursor-pointer relative flex flex-col p-3 rounded-lg bg-surface-container-low custom-card-border hover:border-outline-variant transition-transform active:scale-95">
+<input class="sr-only peer" name="patty_size" type="radio" value="triple">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-lg text-label-lg text-on-surface">Triple (3x 100g)</span>
+<span class="w-4 h-4 rounded-full border-2 border-outline-variant flex items-center justify-center"></span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Para destructores</span>
+<span class="mt-2 font-price-tag text-label-lg text-primary">+ $1.600</span>
+</label>
+</div>
+</section>
+<!-- Toppings & Extras -->
+<section class="bg-surface-container rounded-lg custom-card-border p-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<h2 class="font-title-sm text-title-sm uppercase text-on-surface tracking-wide">Extras
+            </h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Mejora tu Búnker Burger</p>
+</div>
+<span class="font-label-badge text-label-badge text-on-surface-variant uppercase">Opcional</span>
+</div>
+<div class="divide-y divide-white/5 space-y-space-xs">
+<!-- Extra Bacon (Checked) -->
+<label class="flex items-center justify-between py-2.5 cursor-pointer group">
+<div class="flex items-center gap-3">
+<input checked="" class="w-5 h-5 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-0 focus:ring-offset-0 cursor-pointer accent-primary-container" type="checkbox">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary transition-colors">Extra Bacon Ahumado</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Crocante, curado en leña</p>
+</div>
+</div>
+<span class="font-price-tag text-label-lg text-primary">+ $900</span>
+</label>
+<!-- Cheddar Fundido (Checked) -->
+<label class="flex items-center justify-between py-2.5 cursor-pointer group">
+<div class="flex items-center gap-3">
+<input checked="" class="w-5 h-5 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-0 focus:ring-offset-0 cursor-pointer accent-primary-container" type="checkbox">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary transition-colors">Cheddar Fundido Doble</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Puro queso derretido en plancha</p>
+</div>
+</div>
+<span class="font-price-tag text-label-lg text-primary">+ $800</span>
+</label>
+<!-- Huevo a la plancha -->
+<label class="flex items-center justify-between py-2.5 cursor-pointer group">
+<div class="flex items-center gap-3">
+<input class="w-5 h-5 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-0 focus:ring-offset-0 cursor-pointer accent-primary-container" type="checkbox">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary transition-colors">Huevo a la plancha</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Yema tierna con borde crocante</p>
+</div>
+</div>
+<span class="font-price-tag text-label-lg text-primary">+ $600</span>
+</label>
+<!-- Cebolla Crispy -->
+<label class="flex items-center justify-between py-2.5 cursor-pointer group">
+<div class="flex items-center gap-3">
+<input class="w-5 h-5 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-0 focus:ring-offset-0 cursor-pointer accent-primary-container" type="checkbox">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary transition-colors">Cebolla Crispy</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Frita al momento con toque cajún</p>
+</div>
+</div>
+<span class="font-price-tag text-label-lg text-primary">+ $500</span>
+</label>
+<!-- Dip Salsa Búnker -->
+<label class="flex items-center justify-between py-2.5 cursor-pointer group">
+<div class="flex items-center gap-3">
+<input class="w-5 h-5 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-0 focus:ring-offset-0 cursor-pointer accent-primary-container" type="checkbox">
+<div>
+<p class="font-label-lg text-label-lg text-on-surface group-hover:text-primary transition-colors">Dip Salsa Búnker</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Pote extra de salsa secreta</p>
+</div>
+</div>
+<span class="font-price-tag text-label-lg text-primary">+ $450</span>
+</label>
+</div>
+</section>
+<!-- Papas & Combo Section -->
+<section class="bg-surface-container rounded-lg custom-card-border p-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<h2 class="font-title-sm text-title-sm uppercase text-on-surface tracking-wide">
+              Papas &amp; Combo
+            </h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Elegí la guarnición perfecta</p>
+</div>
+<span class="font-label-badge text-label-badge px-2 py-0.5 rounded-full bg-surface-container-high text-primary uppercase">
+            1 Selección
+          </span>
+</div>
+<div class="space-y-2">
+<!-- Option Sin papas -->
+<label class="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:border-outline-variant transition-all bg-surface-container-high custom-accent-border">
+<div class="flex items-center gap-3">
+<input class="w-4 h-4 text-primary bg-surface-container-high border-outline-variant focus:ring-0" name="side_fries" type="radio" value="none">
+<span class="font-label-lg text-label-lg text-on-surface">Incluye papas</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">$0</span>
+</label>
+<!-- Option Papas Clasicas -->
+<label class="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:border-outline-variant transition-all bg-surface-container-low custom-card-border"><div class="flex items-center gap-3 flex-1 min-w-0 pr-3"><input class="w-4 h-4 text-primary bg-surface-container-high border-outline-variant focus:ring-0 shrink-0" name="side_fries" type="radio" value="classic"><div><p class="font-label-lg text-label-lg text-on-surface">Sumar Papas Clásicas</p><p class="font-body-sm text-body-sm text-on-surface-variant">Bastones dorados bien crocantes</p></div></div><span class="font-price-tag text-label-lg text-primary whitespace-nowrap shrink-0">+ $1.800</span></label>
+<!-- Option Papas Cheddar & Bacon (Checked) -->
+<label class="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all bg-surface-container-low custom-card-border"><div class="flex items-center gap-3 flex-1 min-w-0 pr-3"><input checked="" class="w-4 h-4 text-primary bg-surface-container-high border-outline-variant focus:ring-0 shrink-0" name="side_fries" type="radio" value="loaded"><div><p class="font-label-lg text-label-lg text-primary">Sumar Papas Cheddar &amp; Bacon</p><p class="font-body-sm text-body-sm text-on-surface-variant">Bañadas en salsa de queso y lluvia de panceta</p></div></div><span class="font-price-tag text-label-lg text-primary whitespace-nowrap shrink-0">+ $2.600</span></label>
+</div>
+</section>
+<!-- Kitchen Notes -->
+<section class="bg-surface-container rounded-lg custom-card-border p-space-md">
+<label class="block font-title-sm text-title-sm uppercase text-on-surface mb-1" for="kitchen-notes">
+          Aclaraciones para la Cocina
+        </label>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-space-sm">
+          Aclaraciones (ej: sin pepinillos, aderezos aparte)
+        </p>
+<textarea class="w-full rounded-lg bg-surface-container-low border border-outline-variant/40 focus:border-primary focus:ring-1 focus:ring-primary text-on-surface placeholder:text-on-surface-variant/50 font-body-md text-body-md p-3" id="kitchen-notes" placeholder="Escribí acá tus preferencias para el equipo..." rows="2"></textarea>
+</section>
+<!-- Cart Breakdown Tray (Layer 2) -->
+<section class="bg-surface-container-low rounded-lg custom-card-border p-space-md shadow-xl relative overflow-hidden">
+<div class="absolute -right-8 -top-8 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="receipt_long">receipt_long</span>
+<span class="font-headline-md text-headline-md uppercase text-on-surface">Resumen de tu Pedido</span>
+</div>
+<span class="font-label-badge text-label-badge bg-primary/20 text-primary px-2.5 py-0.5 rounded-full uppercase">
+            2 Items
+          </span>
+</div>
+<div class="space-y-space-xs font-body-md text-body-md border-b border-white/10 pb-space-sm">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-bold text-on-surface">Smash Búnker Doble</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">+ Extra Bacon, + Cheddar Doble</p>
+</div>
+<span class="font-price-tag text-body-lg text-on-surface">$10.300</span>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<span class="font-bold text-on-surface">Papas Rústicas</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Porción grande con dip</p>
+</div>
+<span class="font-price-tag text-body-lg text-on-surface">$3.500</span>
+</div>
+</div>
+<div class="pt-space-sm flex justify-between items-baseline">
+<span class="font-headline-md text-headline-md text-on-surface uppercase">Subtotal</span>
+<span class="font-price-tag text-headline-lg-mobile text-primary tracking-wide">$13.800</span>
+</div>
+</section>
+<!-- Main Action Button -->
+<div class="pt-space-xs">
+<button class="w-full bg-primary-container text-on-primary-container hover:bg-secondary-container active:scale-[0.98] transition-all duration-150 font-label-lg text-label-lg uppercase tracking-wider py-4 px-6 rounded-full custom-amber-glow flex items-center justify-center gap-2 font-bold shadow-2xl" type="button">
+<span class="">Continuar al Checkout ($13.800)</span>
+<span class="material-symbols-outlined font-bold text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Shared Component Execution) -->
+<!-- Destination Rule: Top Level Nav Shell. Active State: 'Carrito' per semantic cart screen mandate -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low dark:bg-surface-container-low shadow-2xl">
+<!-- Item 1: Menú (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="lunch_dining">lunch_dining</span>
+<span class="text-label-badge font-label-badge mt-0.5">Menú</span>
+</a>
+<!-- Item 2: Carrito (ACTIVE - Exact intent match) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#">
+<div class="relative flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]" data-icon="shopping_cart" style="font-variation-settings: &quot;FILL&quot; 1;">shopping_cart</span>
+<span class="absolute -top-1 -right-2 bg-on-secondary-container text-primary font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center border border-primary">2</span>
+</div>
+<span class="text-label-badge font-label-badge mt-0.5">Carrito</span>
+</a>
+<!-- Item 3: Checkout (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="point_of_sale">point_of_sale</span>
+<span class="text-label-badge font-label-badge mt-0.5">Checkout</span>
+</a>
+<!-- Item 4: Admin (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed dark:hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="tune">tune</span>
+<span class="text-label-badge font-label-badge mt-0.5">Admin</span>
+</a>
+</nav>
+<!-- Interactive Stepper & Selection Micro-Interaction Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Dynamic visual highlighting for inputs
+      const labels = document.querySelectorAll('label:has(input[type="radio"])');
+      labels.forEach(lbl => {
+        const radio = lbl.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.addEventListener('change', () => {
+            const groupName = radio.getAttribute('name');
+            document.querySelectorAll(`input[name="${groupName}"]`).forEach(sibling => {
+              const parent = sibling.closest('label');
+              if (parent) {
+                if (sibling.checked) {
+                  parent.classList.remove('bg-surface-container-low', 'custom-card-border');
+                  parent.classList.add('bg-surface-container-high', 'custom-accent-border');
+                } else {
+                  parent.classList.add('bg-surface-container-low', 'custom-card-border');
+                  parent.classList.remove('bg-surface-container-high', 'custom-accent-border');
+                }
+              }
+            });
+          });
+        }
+      });
+    });
+  </script>
+</body></html>

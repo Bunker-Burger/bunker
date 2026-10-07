@@ -1,0 +1,641 @@
+<!DOCTYPE html><html class="dark" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>BÚNKER BURGUER - Menú Digital</title>
+<!-- Fonts Google -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration Verbatim -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#6e3900",
+            "surface-container-lowest": "#0e0e0e",
+            "on-primary": "#472a00",
+            "secondary-fixed-dim": "#ffb77d",
+            "on-tertiary-container": "#8d0012",
+            "surface-dim": "#131313",
+            "surface-container-high": "#2a2a2a",
+            "on-tertiary-fixed-variant": "#930013",
+            "tertiary": "#ffbcb7",
+            "on-background": "#e5e2e1",
+            "inverse-primary": "#855300",
+            "surface": "#131313",
+            "primary-fixed-dim": "#ffb95f",
+            "tertiary-fixed": "#ffdad7",
+            "on-secondary-fixed": "#2f1500",
+            "on-error-container": "#ffdad6",
+            "on-secondary": "#4d2600",
+            "surface-container-low": "#1c1b1b",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "outline": "#a08e7a",
+            "on-primary-fixed-variant": "#653e00",
+            "primary-fixed": "#ffddb8",
+            "surface-variant": "#353534",
+            "background": "#131313",
+            "primary": "#ffc174",
+            "on-secondary-container": "#432100",
+            "inverse-surface": "#e5e2e1",
+            "on-error": "#690005",
+            "secondary-fixed": "#ffdcc3",
+            "secondary": "#ffb77d",
+            "surface-container": "#201f1f",
+            "inverse-on-surface": "#313030",
+            "outline-variant": "#534434",
+            "surface-bright": "#393939",
+            "on-primary-fixed": "#2a1700",
+            "surface-tint": "#ffb95f",
+            "on-tertiary-fixed": "#410004",
+            "secondary-container": "#d97707",
+            "primary-container": "#f59e0b",
+            "error": "#ffb4ab",
+            "on-primary-container": "#613b00",
+            "surface-container-highest": "#353534",
+            "on-tertiary": "#68000a",
+            "error-container": "#93000a",
+            "on-surface-variant": "#d8c3ad",
+            "tertiary-container": "#ff938c",
+            "on-surface": "#e5e2e1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin-tablet": "1.5rem",
+            "margin": "1rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-lg": ["Oswald"],
+            "body-sm": ["Space Grotesk"],
+            "body-lg": ["Space Grotesk"],
+            "price-tag": ["Oswald"],
+            "display-hero": ["Oswald"],
+            "headline-lg-mobile": ["Oswald"],
+            "label-badge": ["Space Grotesk"],
+            "label-lg": ["Space Grotesk"],
+            "body-md": ["Space Grotesk"],
+            "title-sm": ["Oswald"],
+            "display-hero-mobile": ["Oswald"],
+            "headline-md": ["Oswald"]
+          },
+          "fontSize": {
+            "headline-lg": [
+              "32px",
+              { "lineHeight": "38px", "letterSpacing": "0.01em", "fontWeight": "700" }
+            ],
+            "body-sm": [
+              "12px",
+              { "lineHeight": "16px", "fontWeight": "400" }
+            ],
+            "body-lg": [
+              "16px",
+              { "lineHeight": "24px", "fontWeight": "400" }
+            ],
+            "price-tag": [
+              "20px",
+              { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }
+            ],
+            "display-hero": [
+              "48px",
+              { "lineHeight": "52px", "letterSpacing": "0.02em", "fontWeight": "700" }
+            ],
+            "headline-lg-mobile": [
+              "26px",
+              { "lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "700" }
+            ],
+            "label-badge": [
+              "11px",
+              { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "700" }
+            ],
+            "label-lg": [
+              "14px",
+              { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "700" }
+            ],
+            "body-md": [
+              "14px",
+              { "lineHeight": "20px", "fontWeight": "400" }
+            ],
+            "title-sm": [
+              "18px",
+              { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "600" }
+            ],
+            "display-hero-mobile": [
+              "36px",
+              { "lineHeight": "40px", "letterSpacing": "0.02em", "fontWeight": "700" }
+            ],
+            "headline-md": [
+              "22px",
+              { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "600" }
+            ]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    /* Custom scrollbar suppression for smooth horizontal pills */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background selection:bg-primary-container selection:text-on-primary-container font-body-md antialiased pb-32">
+<!-- TOP APP BAR (Shared Component JSON) -->
+<header class="sticky top-0 z-40 bg-surface-dim shadow-md">
+<div class="flex justify-between items-center w-full px-margin py-space-sm max-w-7xl mx-auto">
+<div class="flex items-center gap-space-sm">
+<img alt="BÚNKER BURGUER Logo" class="w-10 h-10 rounded-full border border-primary-container/40 object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbAIlwAQyd01V9jkDGFyhimsk-mXpvbHL61YlyY-xESy0XpygcZu6sXrinKe7FVs08NLT8EM5WhBt8XGt63HA9hjD7tfZnHNl-s4dPdTfn2q7fMA9RSpPzaYm2rGoLBNb1kf9bAwMqvQuAt3rX4MkVVaE_tcT8R28HdK9Gw4UDBLM8-r5Ya4BYoUT1B0v_jwZAo1GXxtBo7ozi5-mQOrQPkaAlx0cUxRio4bcjpRWz6RWDxwYDjF-o_vjxkzE0cq1W">
+<div>
+<span class="text-headline-md font-headline-md tracking-wider text-primary uppercase leading-tight block">BÚNKER BURGUER</span>
+
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+
+
+</div>
+</div>
+</header>
+<!-- MAIN CANVAS -->
+<main class="max-w-md mx-auto px-margin pt-space-md">
+<!-- HERO RESTAURANT BANNER / STATUS CARD -->
+
+<!-- HORIZONTAL CATEGORIES PILLS SCROLL -->
+
+<!-- SECTION: LAS MÁS PEDIDAS -->
+<section class="mb-space-xl">
+<div class="flex items-baseline justify-between mb-space-md">
+<div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile tracking-wide text-on-surface flex items-center gap-2">
+<span class="">LAS MÁS PEDIDAS</span>
+
+</h2>
+
+</div>
+</div>
+<!-- Food Cards Stack -->
+<div class="flex flex-col gap-space-md">
+<!-- Card 1: Smash Búnker Doble -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-lg hover:border-primary-container/40 transition-all duration-200">
+<div class="relative w-full h-44 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="A mouthwatering double smash cheeseburger close-up in a dark moody street-style setting. Features two charred crispy-edged beef patties dripping with melted golden cheddar cheese, thick crispy smoked bacon strips, and glossy house sauce oozing out between perfectly toasted golden brioche buns. Lit by dramatic warm golden rim lighting against deep matte charcoal shadows." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC28p664-kxsBr_rFkJwx0tehXeyFB6yRv6D_RcGDIcjzIr7vSFAkoNr8xys6bI_FsV3KaDorZV1Jo9MHHtPsvKwIWgq0AU2Ec6G9Vr2vPxtZwNVjuNRRqZwr5PkPPD9it8sZXxDTDSnp61095zB-N7I8s0KaLP7mJBCximCexv_UH3IaWC8GermkC_-5HTPCDspd73lRAe5ZM7g6uwKOdwiDRAo5tml8J-szK6rfV3qco1bOMp93Q">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-black/30"></div>
+
+<div class="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md z-10"><span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 1;">local_fire_department</span></div></div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Smash Búnker Doble</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$7.800</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-md line-clamp-2">
+              Doble medallón smash 100g, doble cheddar milkaut, bacon crocante, salsa búnker secreta y pan de papa tostado en manteca.
+            </p>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Doble Carne • 200g</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all duration-150 font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card 2: Oklahoma Onion -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-lg hover:border-primary-container/40 transition-all duration-200">
+<div class="relative w-full h-44 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Gourmet Oklahoma style smash burger on a dark cast iron plate in an underground artisan eatery. Crispy caramelized wafer-thin white onions pressed directly into sizzling beef crust with blanketed molten yellow cheese, sweet pickled relish slices, and dijon mustard on a toasted bun with ambient amber illumination and high contrast black background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmC3XTe6Z-QDf9StSEqFz5NRqoRdomQAX0EocjB1EtB7jzkwSjxHFZmVTsDjFU7BoHZ-2zwcSZuqHfQybwekjAoio74NZlxa4Y6BDC1RBYWSt6R1Qz6G7rvKrO4VXBZ4SYEBj9QrmF1xd-29I1NNAc1bwjro9X9KcvhOqV39rCN7bYI-hTlZkd3z6lmARRHeJkhw7m4HKipv4TozJjmnXeolhawzAPfhWF6qbLAEIkCIoA7oYQOuk">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-black/30"></div>
+
+<div class="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md z-10"><span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 1;">local_fire_department</span></div></div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Oklahoma Onion</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$7.200</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-md line-clamp-2">
+              Cebolla ultrafina smashada contra la carne, cheddar fundido, pepinillos dulces y mostaza dijon.
+            </p>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Cebolla Caramelizada</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all duration-150 font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card 3: Triple Beast -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-lg hover:border-primary-container/40 transition-all duration-200">
+<div class="relative w-full h-44 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Massive triple decker smash burger towering with three crispy lacy-edge beef patties, three thick molten layers of cheddar cheese, crunchy crispy fried onion straws, and dark smoky barbecue sauce dripping down glossy brioche bun against an atmospheric pitch-black charcoal backdrop with molten amber highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJ-epL1il-yXUf7uPZdKSL78BPUBgnteQm07JEOPfwVOzI1emd-9zuArlhKNXUyrAcBBVQKS_SMlyuQq5VoG2-kBYFt8refyzWEOplPlaAld0PK0D5Ib41WCDiReJcu1oLa7TJtWPE3nFVTRXjlRsQN3ckSZwbcp4emxgpjbAbejjPNZErrJY8r0mUmwsranRBV7MkJKWhUx4_ldCTQATwXQn6gnY5TeiJ9TPkj4JIRLoLMt90uJk">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-black/30"></div>
+
+<div class="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md z-10"><span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 1;">local_fire_department</span></div></div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Triple Beast</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$8.900</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-md line-clamp-2">
+              Triple carne smash, triple cheddar, cebolla crispy y barbacoa ahumada.
+            </p>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Triple Carne • 300g</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all duration-150 font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+</section><section class="mb-space-xl">
+<div class="flex items-baseline justify-between mb-space-md">
+<div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile tracking-wide text-on-surface flex items-center gap-2">
+<span class="">CLÁSICAS</span>
+</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Nuestras Búnker clasicas.</p>
+</div>
+</div>
+<div class="flex flex-col gap-space-md">
+<!-- Card: Búnker Cheese Clásica -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest">
+<img alt="Búnker Cheese Clásica" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-P1ws-4YhPQXf93H3M-SPJ9v_JoMn4lbzPvUjP-I9BI-R7zIplGoHp1iRszWKMAhf1ZNp23fBgvNwluQ_USkAI0OPki8IgEScoS0ofwC6pnvG9yxyqSIsQu4ECbi1H_KAc5axIlGwXcgNBB2Hm_T6qXn2PEGbZizAc6LiuvBf-6nKfd44i1ig9CqCNGbVL64FyPiZyuYxcq1ZDNilmAOZgixyQGQyDJXflO82Pg">
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex flex-wrap items-center gap-1.5">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Búnker Cheese Clásica</h3>
+<span class="text-label-badge font-label-badge bg-primary-container/20 text-primary border border-primary-container/40 px-2 py-0.5 rounded-full uppercase">CLÁSICA</span>
+</div>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$6.200</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Medallón smash 100g, doble queso cheddar americano, salsa búnker, pepinillos en pan brioche tostado.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Simple Smash • 100g</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Bacon Cheeseburger -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest">
+<img alt="Bacon Cheeseburger" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6ZC6NshwcbMQyW6VxRBT2zYpQ5wztW2SLw_mRngWvPumOY37lvBkO2j7AaOZxdq8BeC-FuTgV5hZznzbJQ2YbGzVqFw4XROSRoJHPCW6VUdkxQNkagguJi6cTZEHdgVcf7TM8XV0p-9DkcNqxatV4jQh72sE3Hcuetla6WBxuJ7AilVuNATWUAdAdBLBtHnIov7nBqTLhyZfa6gJRsQgyfeMAIf5z9tAEAvq_Jw">
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Bacon Cheeseburger</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$6.900</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Medallón smash, panceta ahumada crujiente, cheddar fundido, cebolla picada y mostaza dijon.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Bacon Ahumado • 100g</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Smash BBQ & Crispy Onion -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest">
+<img alt="Smash BBQ &amp; Crispy Onion" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTVWXPnEy3LWz3fXx98rcJEKhVED-DHq7wY8SwqDAkDkh4wzX_py8u0dhGFBJSUxS8GLze-NK712zOG7hJ8DgAsH7VqMHHc-tim2p5LRV0ROR8buMQrH2myss36zDOMrNMUE1mQ4D2giSP7SIViHIvYJj4_cKKMWvR0ENJ6rA7rCheVPbolt8hjWdXfC5-Q9bvx6tTHBy3DhlR3YTXsdGXUvSMy1iZHQ5BVLCaHA">
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Smash BBQ &amp; Crispy Onion</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$7.100</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Smash 100g, queso provoleta fundido, aros de cebolla crocantes y salsa barbacoa casera al bourbon.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">BBQ • Cebolla Crispy</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card: Veggie Búnker -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest">
+<img alt="Veggie Búnker" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfRy3-YgjqjP5gBhhs2VZ34U0sGxiqowhObOWPvynMwDZXg3Q7TzcnmEy9HKjUbHTdE-FXGZxFSqyVxOVVH3UgTSuwWf9ViqwvU6EZzF9OtPHehtxsIZKe7jyo9GSbF2d94Jyco1I1jPxh7i1O52-RqPQ4y0AvOqZgysA-HLfnpE6D14RgpWGvUEx_swdgl02Vjj9dyfI5MIM-S9XWJWNvKsbeRJca9AedG0gIYQ">
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex flex-wrap items-center gap-1.5">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Veggie Búnker</h3>
+
+</div>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$6.500</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Medallón a base de gírgolas y garbanzos crispy, lechuga capuchina, tomate y alioli búnker en pan brioche.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">100% Plant Based</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+</section><section class="mb-space-xl">
+<div class="flex items-baseline justify-between mb-space-md">
+<div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile tracking-wide text-on-surface flex items-center gap-2">
+<span class="">SANDWICHES</span>
+</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Nuestros sandwiches a lo Búnker.</p>
+</div>
+</div>
+<div class="flex flex-col gap-space-md">
+<!-- Card 1: Crispy Chicken Búnker -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest">
+<img alt="Crispy Chicken Búnker" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQ84EjE07MFS9STIvVF3hOgTvoKk0vjTzOfG9b5OUKUFfsT7YLar_Yoo9QWSPb3YDmmKSs_QVrFJRy-O0nTXZ9W98ooOkrtzP3nRAmdiWYGb1u9y7XOGuMb73nQLXECxIosME2fm6u3ME47CC9dk4uwCLsrwDke8DtVsOAT-7RdOr_Bf6rvvINck9tyzykXJ_QbjSfQBxfQEe2wNChGlc5hSCoeVvA9vdVDBvx1A">
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex flex-wrap items-center gap-1.5">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Crispy Chicken Búnker</h3>
+
+</div>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$6.800</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Pechuga de pollo extra crujiente marinada 24hs, ensalada coleslaw fresca, pepinillos y salsa honey mustard en pan brioche.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">POLLO CRISPY • 180G</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Card 2: Pulled Pork Búnker -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-md hover:border-primary-container/40 transition-all flex flex-row items-stretch">
+<div class="w-32 shrink-0 relative overflow-hidden self-stretch bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[36px]">lunch_dining</span>
+</div>
+<div class="flex-1 flex flex-col justify-between p-space-md">
+<div>
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex flex-wrap items-center gap-1.5">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">Pulled Pork Búnker</h3>
+
+</div>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$7.400</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-sm line-clamp-2">
+Bondiola de cerdo desmechada braseada a baja temperatura durante 8hs con BBQ artesanal, queso cheddar fundido y cebolla morada encurtida.
+</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5 mt-1">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">CERDO BRASEADO • 200G</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+</section>
+<!-- SECTION: ACOMPAÑAMIENTOS -->
+<section class="mb-space-xl">
+<div class="flex items-baseline justify-between mb-space-md">
+<div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile tracking-wide text-on-surface flex items-center gap-2">
+<span class="">ACOMPAÑAMIENTOS</span>
+</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">El complemento crujiente e indispensable de tu búnker.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-space-md"><!-- Side 1: Papas Rústicas Búnker -->
+<div class="bg-surface-container-low rounded-xl border border-white/10 p-space-sm flex gap-space-md items-center shadow-md">
+<div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-surface-container relative">
+<img class="w-full h-full object-cover" data-alt="Golden crisp rustic cut french fries served in a matte black container smothered in hot melted cheddar sauce and crunchy crumbled bacon bites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfYAz71S0FCTFpmJkE1N9gv_7CSXzk9XBqUOorhDahkZAFnbVc57Hlms9aW-MkAZj-4dkDwV9Z6fNV1C4nL8ZN0wG_eb18o18ClwCKFYVv9S3SxDBiHOUt19eB96akxtyze6H7wHs3xRx2WHcZdPSolMoQtCSr2WpZgTudE5fKT94ZSRfJPQBdVm_balHz4V-2Ugqv7PziRuKsFqU1SO1Du7CKdTcwxZ95JDqnFb1baR_ZBsLiEqI">
+</div>
+<div class="flex flex-col flex-1 justify-between h-full py-0.5">
+<div>
+<h4 class="text-title-sm font-title-sm text-on-surface leading-snug">Papas Rústicas Búnker</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Lluvia de cheddar fundido y bacon crocante.</p>
+</div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-price-tag font-price-tag text-primary">$3.500</span>
+<button class="bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary active:scale-95 border border-primary/30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Side 2: Aros de Cebolla Búnker -->
+<div class="bg-surface-container-low rounded-xl border border-white/10 p-space-sm flex gap-space-md items-center shadow-md">
+<div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[36px]">radio_button_unchecked</span>
+</div>
+<div class="flex flex-col flex-1 justify-between h-full py-0.5">
+<div>
+<h4 class="text-title-sm font-title-sm text-on-surface leading-snug">Aros de Cebolla Búnker</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Rebozado extra crocante con dip de barbacoa casera.</p>
+</div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-price-tag font-price-tag text-primary">$3.200</span>
+<button class="bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary active:scale-95 border border-primary/30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Side 3: Nuggets Caseros x8 -->
+<div class="bg-surface-container-low rounded-xl border border-white/10 p-space-sm flex gap-space-md items-center shadow-md">
+<div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-surface-container relative">
+<img class="w-full h-full object-cover" data-alt="Freshly fried homemade golden chicken nuggets with dip." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaJjd63N_G4hgjeTqCgFAMNuaEQ9X2jhGtw1GV5MZNf3XSc71o9jFcacQTqM4iz5klzCGNp5derK7UzdyyVbdFMoRBf-0KgO_qWMcz-bC5WLUpTK4GUYWMtkh9EFmwakS7UFNU9jc8Ld2qq4EJ1pqQCZArwWd32xjAcwguFHE3ICQrkAwcJX3QItjrlbY_z8qjD9TKvynSVOc90Hz-E_KvZPTGSTPItyVDMN3he1vBrr_JpAcV79c">
+</div>
+<div class="flex flex-col flex-1 justify-between h-full py-0.5">
+<div>
+<h4 class="text-title-sm font-title-sm text-on-surface leading-snug">Nuggets de Pollo Caseros x8</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">100% pechuga crocante con dip de cheddar fundido.</p>
+</div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-price-tag font-price-tag text-primary">$3.800</span>
+<button class="bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary active:scale-95 border border-primary/30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div></div>
+</section><section class="mb-space-xl">
+<div class="flex items-baseline justify-between mb-space-md">
+<div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile tracking-wide text-on-surface flex items-center gap-2">
+<span class="">BEBIDAS&nbsp;</span>
+</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Bebidas frescas para acompañar tu Búnker</p>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-space-md">
+<!-- Drink 1: Craft Beers Spotlight with IMAGE_2 -->
+<article class="bg-surface-container-low rounded-xl border border-white/10 overflow-hidden shadow-lg hover:border-primary-container/40 transition-all">
+<div class="relative w-full h-44 bg-surface-container-highest">
+<img alt="Cervezas artesanales frías IPA en lata" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1XYQRTk_o9YXJbopMQU4lZiBGTO502VPsrFZO5aeda-ZdOBsT_pFkynfnvoKRVeuOPpc1eaBOVEbvWi-K-BdTNbphDVjmlUL6QgEIZopooszv4GL66LMHxMNQGzCskYoRkBHJHhIqEXXaEFg19mpBy7EVapIklj7lerJ4NCvQjFCRBk5gjiHDxI6bTcJpMJ-mXiI5BdQTBdptr4Kzk75fhKVKCfXGOKCjrWYc1fJbzMPvF9e8LtAJd2kg">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-black/30"></div>
+<div class="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md z-10">
+<span class="material-symbols-outlined text-[18px]">sports_bar</span>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2 mb-1">
+<h3 class="text-headline-md font-headline-md text-on-surface leading-tight">IPA Artesanal Búnker (Lata 473ml)</h3>
+<span class="text-price-tag font-price-tag text-primary shrink-0">$2.800</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-space-md">
+Cerveza lupulada de sesión, amargor balanceado con notas a frutos cítricos y tropicales. Bien fría.
+</p>
+<div class="flex items-center justify-between pt-space-xs border-t border-white/5">
+<span class="text-label-badge font-label-badge text-on-surface-variant uppercase tracking-wider">Lata 473ml • 6.2% ABV</span>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all font-bold uppercase">
+<span class="">Agregar</span>
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Drink 2: Golden Ale -->
+<div class="bg-surface-container-low rounded-xl border border-white/10 p-space-sm flex gap-space-md items-center shadow-md">
+<div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[36px]">sports_bar</span>
+</div>
+<div class="flex flex-col flex-1 justify-between h-full py-0.5">
+<div>
+<h4 class="text-title-sm font-title-sm text-on-surface leading-snug">Golden Ale de la Casa</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Rubia suave, refrescante y de final limpio. 473ml.</p>
+</div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-price-tag font-price-tag text-primary">$2.400</span>
+<button class="bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary active:scale-95 border border-primary/30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Drink 3: Coca-Cola 500ml -->
+<div class="bg-surface-container-low rounded-xl border border-white/10 p-space-sm flex gap-space-md items-center shadow-md">
+<div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[36px]">local_drink</span>
+</div>
+<div class="flex flex-col flex-1 justify-between h-full py-0.5">
+<div>
+<h4 class="text-title-sm font-title-sm text-on-surface leading-snug">Coca-Cola 500ml</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Original o Sin Azúcar (indicar en notas).</p>
+</div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-price-tag font-price-tag text-primary">$1.500</span>
+<button class="bg-surface-container hover:bg-primary-container hover:text-on-primary-container text-primary active:scale-95 border border-primary/30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- BRAND STORY CALLOUT / TACTILE BANNER -->
+
+</main>
+<!-- STICKY QUICK-ORDER CART TRAY (Layer 2) -->
+<aside class="fixed bottom-16 left-0 right-0 z-40 px-margin max-w-md mx-auto pointer-events-none">
+<div class="pointer-events-auto rounded-xl p-space-sm border border-primary-container/30 shadow-[0_4px_25px_-2px_rgba(245,158,11,0.3)] flex items-center justify-between transition-transform active:scale-[0.99] bg-surface-container-high">
+<div class="flex items-center gap-space-sm pl-1">
+<div class="w-9 h-9 rounded-full bg-primary-container/20 border border-primary-container/40 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">shopping_cart</span>
+</div>
+<div>
+<span class="text-label-badge font-label-badge text-on-surface-variant block uppercase tracking-wider">2 productos</span>
+<span class="text-price-tag font-price-tag text-primary leading-none">$11.300</span>
+</div>
+</div>
+<button class="bg-primary-container hover:bg-secondary-container active:scale-95 text-on-primary-container font-label-lg text-label-lg px-space-md py-2 rounded-full flex items-center gap-1 shadow-md font-bold uppercase transition-all duration-150">
+<span class="">Ver Pedido</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</aside>
+<!-- BOTTOM NAVIGATION BAR (Shared Component JSON) -->
+<!-- Dest: 4, Labels: Menú, Carrito, Checkout, Admin. Active: Menú -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-space-xs bg-surface-container-low dark:bg-surface-container-low shadow-2xl">
+<!-- Item 1: Menú (ACTIVE) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary font-label-badge rounded-full px-space-md py-space-xs shadow-md active:scale-95 transition-transform duration-150" href="#menu">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: &quot;FILL&quot; 1;">lunch_dining</span>
+<span class="text-label-badge font-label-badge uppercase">Menú</span>
+</a>
+<!-- Item 2: Carrito -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#carrito">
+<span class="material-symbols-outlined text-[20px]">shopping_cart</span>
+<span class="text-label-badge font-label-badge uppercase">Carrito</span>
+</a>
+<!-- Item 3: Checkout -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#checkout">
+<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+<span class="text-label-badge font-label-badge uppercase">Checkout</span>
+</a>
+<!-- Item 4: Admin -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant font-label-badge px-space-sm py-space-xs hover:text-primary-fixed transition-colors duration-150 active:scale-95" href="#admin">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+<span class="text-label-badge font-label-badge uppercase">Admin</span>
+</a>
+</nav>
+
+
+
+
+</body></html>
