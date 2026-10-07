@@ -38,6 +38,9 @@ function priceLine(
     if (selection.length < group.minSelections || selection.length > group.maxSelections) {
       throw new Error(`Cantidad de opciones inválida para ${group.id}`);
     }
+    if (group.selectionMode === "single" && selection.length > 1) {
+      throw new Error(`Grupo de selección única no admite múltiples opciones: ${group.id}`);
+    }
     const optionsById = new Map(group.options.map((option) => [option.id, option]));
     for (const optionId of selection) {
       const option = optionsById.get(optionId);

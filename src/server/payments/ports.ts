@@ -1,3 +1,5 @@
+import type { OptionSelectionMode, ProductType } from "@/domain/types";
+
 export interface AuthoritativeOption {
   id: string;
   name: string;
@@ -7,6 +9,8 @@ export interface AuthoritativeOption {
 
 export interface AuthoritativeOptionGroup {
   id: string;
+  name?: string;
+  selectionMode?: OptionSelectionMode;
   minSelections: number;
   maxSelections: number;
   options: AuthoritativeOption[];
@@ -15,6 +19,7 @@ export interface AuthoritativeOptionGroup {
 export interface AuthoritativeProduct {
   id: string;
   name: string;
+  type?: ProductType;
   priceCents: bigint;
   available: boolean;
   optionGroups: AuthoritativeOptionGroup[];

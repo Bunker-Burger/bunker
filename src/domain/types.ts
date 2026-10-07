@@ -19,6 +19,59 @@ export interface OptionGroup {
   maxSelections: number;
   defaultOptionIds: string[];
   options: ProductOption[];
+  applicableTypes?: ProductType[];
+}
+
+export type OptionSelectionErrorCode =
+  | "UNKNOWN_GROUP"
+  | "UNKNOWN_OPTION"
+  | "OPTION_UNAVAILABLE"
+  | "REQUIRED_GROUP_EMPTY"
+  | "BELOW_MIN_SELECTIONS"
+  | "EXCEEDS_MAX_SELECTIONS"
+  | "SINGLE_SELECT_MULTIPLE_CHOICES"
+  | "INAPPLICABLE_GROUP"
+  | "DUPLICATE_SELECTION";
+
+export interface OptionSelectionError {
+  groupId: string;
+  optionId?: string | undefined;
+  code: OptionSelectionErrorCode;
+  message: string;
+}
+
+export type PublicationErrorCode =
+  | "MISSING_NAME"
+  | "MISSING_SLUG"
+  | "NEGATIVE_PRICE"
+  | "ALCOHOL_BEVERAGE"
+  | "INVALID_CARDINALITY"
+  | "MISSING_DEFAULT_OPTION"
+  | "UNAVAILABLE_DEFAULT_OPTION"
+  | "DEFAULT_BELOW_MIN"
+  | "DEFAULT_EXCEEDS_MAX"
+  | "DEFAULT_DUPLICATES"
+  | "DEFAULT_SINGLE_SELECT_MULTIPLE"
+  | "INAPPLICABLE_OPTION_GROUP"
+  | "INSUFFICIENT_AVAILABLE_OPTIONS";
+
+export interface PublicationError {
+  code: PublicationErrorCode;
+  message: string;
+  groupId?: string | undefined;
+  optionId?: string | undefined;
+}
+
+export interface ValidatedOptionSelection {
+  unitPriceCents: bigint;
+  normalizedSelections: SelectedOptions;
+  selectedDetails: Array<{
+    groupId: string;
+    groupName: string;
+    optionId: string;
+    optionName: string;
+    priceDeltaCents: bigint;
+  }>;
 }
 
 export interface Product {

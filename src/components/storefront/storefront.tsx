@@ -16,7 +16,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FocusEvent } from "react";
 import { addCartLine, parsePersistedCart, serializeCart } from "@/domain/cart";
-import { calculateConfiguredUnitPrice, getDefaultSelection } from "@/domain/catalog";
+import {
+  calculateConfiguredUnitPrice,
+  getApplicableOptionGroups,
+  getDefaultSelection,
+  validateOptionSelection
+} from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
 import type { CartLine, FulfilmentMethod, Product, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
@@ -168,6 +173,11 @@ export function Storefront({
   const addDirect = (product: Product) => {
     if (!product.inStock) return;
     const defaults = getDefaultSelection(product);
+    const validation = validateOptionSelection(product, defaults);
+    if (!validation.ok) {
+      setNotice(`No se puede agregar ${product.name}: configuración incompleta.`);
+      return;
+    }
     setCart((current) => addCartLine(current, makeCartLine(product, defaults, 1, "")));
     setNotice(`${product.name} se agregó al carrito.`);
   };
@@ -323,6 +333,9 @@ function ProductDrawer({ product, onClose, onSubmit }: {
     };
   }, [onClose]);
 
+  const applicableGroups = getApplicableOptionGroups(product);
+  const validation = validateOptionSelection(product, selected);
+  const isValid = validation.ok;
   const unitPrice = calculateConfiguredUnitPrice(product, selected);
 
   return (
@@ -336,20 +349,25 @@ function ProductDrawer({ product, onClose, onSubmit }: {
           <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
           <p>{product.description}</p>
 
-          {product.optionGroups.map((group) => (
+          {applicableGroups.map((group) => (
             <fieldset className="option-group" key={group.id}>
               <legend><span>{group.name}</span><small>{group.required ? "Requerido" : `Hasta ${group.maxSelections}`}</small></legend>
-              {group.options.filter((option) => option.available).map((option) => {
+              {group.options.map((option) => {
                 const checked = (selected[group.id] ?? []).includes(option.id);
-                const inputType = group.maxSelections === 1 ? "radio" : "checkbox";
+                const inputType = group.selectionMode === "single" || group.maxSelections === 1 ? "radio" : "checkbox";
+                const isAvailable = option.available;
                 return (
-                  <label className={checked ? "option-row selected" : "option-row"} key={option.id}>
-                    <span>{option.name}</span>
+                  <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " opacity-50 cursor-not-allowed" : ""}`} key={option.id}>
+                    <span>{option.name}{!isAvailable ? <small> (Sin stock)</small> : null}</span>
                     {option.priceDeltaCents > 0n ? <strong>+ {formatArs(option.priceDeltaCents)}</strong> : <small>Incluido</small>}
                     <input
                       checked={checked}
+                      disabled={!isAvailable}
                       name={group.id}
-                      onChange={() => setSelected((current) => toggleOption(current, group.id, option.id, group.maxSelections))}
+                      onChange={() => {
+                        if (!isAvailable) return;
+                        setSelected((current) => toggleOption(current, group.id, option.id, group.maxSelections, isAvailable));
+                      }}
                       type={inputType}
                     />
                   </label>
@@ -369,7 +387,15 @@ function ProductDrawer({ product, onClose, onSubmit }: {
             <strong>{quantity}</strong>
             <button aria-label="Aumentar cantidad" onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
           </div>
-          <button className="primary-action" onClick={() => onSubmit(makeCartLine(product, selected, quantity, notes))} type="button">
+          <button
+            className="primary-action"
+            disabled={!isValid}
+            onClick={() => {
+              if (!isValid) return;
+              onSubmit(makeCartLine(product, selected, quantity, notes));
+            }}
+            type="button"
+          >
             Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span>
           </button>
         </div>

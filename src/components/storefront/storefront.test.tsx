@@ -83,4 +83,13 @@ describe("Storefront", () => {
     rerender(<Storefront initialProductSlug={null} mercadoPagoEnabled />);
     expect(screen.getByRole("radio", { name: /Mercado Pago/ })).toBeInTheDocument();
   });
+
+  it("shows only applicable option groups for beverages without burger options", async () => {
+    render(<Storefront initialProductSlug="gaseosa-lata" mercadoPagoEnabled={false} />);
+
+    const dialog = screen.getByRole("dialog", { name: "Personalizar Gaseosa Lata 354ml" });
+    expect(within(dialog).getByRole("radio", { name: /Con hielo/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio", { name: /Doble/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Tamaño / medallones")).not.toBeInTheDocument();
+  });
 });
