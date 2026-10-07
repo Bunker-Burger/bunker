@@ -80,6 +80,7 @@ const optionGroupRowSchema = z.object({
   maximum_selections: smallInt,
   is_required: z.boolean(),
   sort_order: smallInt,
+  applicable_category_kinds: z.array(z.enum(enums.category_kind)).optional(),
   options: z.array(optionRowSchema)
 });
 

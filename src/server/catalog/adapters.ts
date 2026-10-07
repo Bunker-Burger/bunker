@@ -9,6 +9,7 @@ import type {
   PromotionRule,
   StoreSettings
 } from "@/domain/types";
+import { resolveOptionGroupApplicability } from "@/domain/options";
 import { ok, type Result } from "@/lib/result";
 import { catalogError, type CatalogError } from "./errors";
 import type { CategoryRow, ProductRow, PromotionRow, StoreRow } from "./rows";
@@ -93,6 +94,10 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
     if (!group) {
       return catalogError("invalid_data", `products.${row.slug}: linked option group is not readable`);
     }
+    const applicableTypes = resolveOptionGroupApplicability(
+      group.id,
+      group.applicable_category_kinds
+    );
     groups.push({
       group: {
         id: group.id,
@@ -102,6 +107,7 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
         minSelections: link.minimum_selections_override ?? group.minimum_selections,
         maxSelections: link.maximum_selections_override ?? group.maximum_selections,
         defaultOptionIds: [...link.default_option_ids],
+        applicableTypes,
         options: [...group.options]
           .sort((a, b) => a.sort_order - b.sort_order || byName(a, b))
           .map((option) => ({

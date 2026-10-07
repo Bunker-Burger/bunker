@@ -1,4 +1,12 @@
 import { describe, expect, it } from "vitest";
+import {
+  getApplicableOptionGroups,
+  isPublishable,
+  validateOptionSelection,
+  validateProductPublication
+} from "@/domain/options";
+import { createAuthoritativeQuote } from "@/server/checkout/quote";
+import type { AuthoritativeProduct, PaymentQuotesPort, PricingRepository } from "@/server/payments/ports";
 import { parseRows, toCategories, toProducts, toPromotionRules, toStoreSettings } from "./adapters";
 import { categoryRowSchema, productRowSchema, promotionRowSchema, storeRowSchema } from "./rows";
 
@@ -336,3 +344,134 @@ describe("sold out", () => {
     expect(result.value[0]?.optionGroups[0]?.options[0]).toMatchObject({ available: false, priceDeltaCents: 80000n });
   });
 });
+
+describe("applicability through Supabase adapter", () => {
+  it("un grupo exclusivo de otra categoría no se renderiza para bebida, no se acepta en selección, impide publicación y es rechazado por el servidor autoritativo", async () => {
+    // 1. Data equivalent to what the real Supabase adapter produces:
+    // A beverage product row erroneously linked to the seed burger group (0199b2c8-40b0-7000-8000-000000000301)
+    const [row] = parsedProducts([
+      productRow({
+        id: "0199b2c8-40b0-7000-8000-000000000202",
+        slug: "gaseosa-lata",
+        name: "Gaseosa lata 354 ml",
+        description: "Bien fría para acompañar tu pedido. Sin alcohol.",
+        category_id: "c-drinks",
+        base_price_cents: "140000",
+        is_published: true,
+        is_available: true,
+        product_option_groups: [
+          {
+            default_option_ids: ["0199b2c8-40b0-7000-8000-000000000401"],
+            minimum_selections_override: null,
+            maximum_selections_override: null,
+            sort_order: 10,
+            option_groups: {
+              id: "0199b2c8-40b0-7000-8000-000000000301", // 'Tamaño / medallones' (burger exclusive)
+              name: "Tamaño / medallones",
+              selection_mode: "single",
+              minimum_selections: 1,
+              maximum_selections: 1,
+              is_required: true,
+              sort_order: 10,
+              options: [
+                {
+                  id: "0199b2c8-40b0-7000-8000-000000000401",
+                  name: "Doble (2× 100 g)",
+                  price_delta_cents: "0",
+                  is_available: true,
+                  sort_order: 10
+                }
+              ]
+            }
+          }
+        ]
+      })
+    ]);
+
+    const result = toProducts([row!], { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    const adaptedBeverage = result.value[0]!;
+
+    expect(adaptedBeverage.type).toBe("beverage");
+    expect(adaptedBeverage.optionGroups[0]?.applicableTypes).toEqual(["burger"]);
+
+    // a) No se renderiza para bebida
+    const applicableGroups = getApplicableOptionGroups(adaptedBeverage);
+    expect(applicableGroups).toHaveLength(0);
+    expect(applicableGroups.some((g) => g.id === "0199b2c8-40b0-7000-8000-000000000301")).toBe(false);
+
+    // b) No se acepta en selección
+    const selection = validateOptionSelection(adaptedBeverage, {
+      "0199b2c8-40b0-7000-8000-000000000301": ["0199b2c8-40b0-7000-8000-000000000401"]
+    });
+    expect(selection.ok).toBe(false);
+    if (!selection.ok) {
+      expect(selection.error.some((err) => err.code === "INAPPLICABLE_GROUP")).toBe(true);
+    }
+
+    // c) Impide configuración/publicación inválida
+    const publication = validateProductPublication(adaptedBeverage);
+    expect(publication.ok).toBe(false);
+    if (!publication.ok) {
+      expect(publication.error.some((err) => err.code === "INAPPLICABLE_OPTION_GROUP")).toBe(true);
+    }
+    expect(isPublishable(adaptedBeverage)).toBe(false);
+
+    // d) También es rechazado por el servidor autoritativo
+    const authoritativeProduct: AuthoritativeProduct = {
+      id: adaptedBeverage.id,
+      name: adaptedBeverage.name,
+      type: adaptedBeverage.type,
+      priceCents: adaptedBeverage.priceCents,
+      available: adaptedBeverage.inStock,
+      optionGroups: adaptedBeverage.optionGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        selectionMode: g.selectionMode,
+        minSelections: g.minSelections,
+        maxSelections: g.maxSelections,
+        applicableTypes: g.applicableTypes,
+        options: g.options
+      }))
+    };
+
+    const repository: PricingRepository = {
+      async findProduct() {
+        return authoritativeProduct;
+      },
+      async getDeliveryFeeCents() {
+        return 0n;
+      },
+      async getApplicableDiscountCents() {
+        return 0n;
+      }
+    };
+    const quotes: PaymentQuotesPort = {
+      async save() {},
+      async findById() {
+        return null;
+      }
+    };
+
+    await expect(
+      createAuthoritativeQuote(
+        {
+          items: [
+            {
+              productId: adaptedBeverage.id,
+              quantity: 1,
+              optionSelections: {
+                "0199b2c8-40b0-7000-8000-000000000301": ["0199b2c8-40b0-7000-8000-000000000401"]
+              },
+              notes: ""
+            }
+          ],
+          fulfilment: "pickup",
+          paymentMethod: "transfer"
+        },
+        { repository, quotes, createId: () => "quote-test", now: () => new Date() }
+      )
+    ).rejects.toThrow(/no es aplicable a productos de tipo 'beverage'/i);
+  });
+});
+

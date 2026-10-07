@@ -1,6 +1,6 @@
 export type ProductType = "burger" | "sandwich" | "fries" | "beverage" | "other";
 
-export interface ProductOption {
+export interface ConfigurableOption {
   id: string;
   name: string;
   priceDeltaCents: bigint;
@@ -10,16 +10,32 @@ export interface ProductOption {
 /** Persisted selection semantics; never inferred from min/max cardinality. */
 export type OptionSelectionMode = "single" | "multiple";
 
-export interface OptionGroup {
+export interface ConfigurableOptionGroup {
   id: string;
   name: string;
   selectionMode: OptionSelectionMode;
-  required: boolean;
+  required?: boolean;
   minSelections: number;
   maxSelections: number;
+  options: readonly ConfigurableOption[];
+  applicableTypes?: readonly ProductType[];
+}
+
+export interface ConfigurableProduct {
+  id: string;
+  name: string;
+  type: ProductType;
+  priceCents: bigint;
+  optionGroups: readonly ConfigurableOptionGroup[];
+}
+
+export type ProductOption = ConfigurableOption;
+
+export interface OptionGroup extends ConfigurableOptionGroup {
+  required: boolean;
   defaultOptionIds: string[];
   options: ProductOption[];
-  applicableTypes?: ProductType[];
+  applicableTypes: readonly ProductType[];
 }
 
 export type OptionSelectionErrorCode =
@@ -43,7 +59,9 @@ export interface OptionSelectionError {
 export type PublicationErrorCode =
   | "MISSING_NAME"
   | "MISSING_SLUG"
+  | "MISSING_DESCRIPTION"
   | "NEGATIVE_PRICE"
+  | "ZERO_OR_NEGATIVE_PRICE"
   | "ALCOHOL_BEVERAGE"
   | "INVALID_CARDINALITY"
   | "MISSING_DEFAULT_OPTION"
@@ -74,14 +92,10 @@ export interface ValidatedOptionSelection {
   }>;
 }
 
-export interface Product {
-  id: string;
+export interface Product extends ConfigurableProduct {
   slug: string;
   categoryId: string;
-  type: ProductType;
-  name: string;
   description: string;
-  priceCents: bigint;
   compareAtPriceCents?: bigint;
   /** Null when the product has no photo yet. */
   imageUrl: string | null;

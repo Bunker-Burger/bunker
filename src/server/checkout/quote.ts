@@ -1,3 +1,4 @@
+import { validateOptionSelection } from "@/domain/options";
 import type { CheckoutRequest } from "./schema";
 import type {
   AuthoritativeProduct,
@@ -25,37 +26,22 @@ function priceLine(
 ): QuoteLine {
   if (!product.available) throw new Error(`Producto no disponible: ${item.productId}`);
 
-  const groupsById = new Map(product.optionGroups.map((group) => [group.id, group]));
-  for (const groupId of Object.keys(item.optionSelections)) {
-    if (!groupsById.has(groupId)) throw new Error(`Grupo de opción inválido: ${groupId}`);
-  }
-
-  const selectedOptions: QuoteLine["selectedOptions"] = [];
-  let unitPriceCents = requireNonNegativeAmount(product.priceCents, "Precio del producto");
-
-  for (const group of product.optionGroups) {
-    const selection = [...new Set(item.optionSelections[group.id] ?? [])];
-    if (selection.length < group.minSelections || selection.length > group.maxSelections) {
-      throw new Error(`Cantidad de opciones inválida para ${group.id}`);
-    }
-    if (group.selectionMode === "single" && selection.length > 1) {
-      throw new Error(`Grupo de selección única no admite múltiples opciones: ${group.id}`);
-    }
-    const optionsById = new Map(group.options.map((option) => [option.id, option]));
-    for (const optionId of selection) {
-      const option = optionsById.get(optionId);
-      if (!option?.available) throw new Error(`Opción inválida o no disponible: ${optionId}`);
-      unitPriceCents += requireNonNegativeAmount(option.priceDeltaCents, "Ajuste de opción");
-      selectedOptions.push({ groupId: group.id, optionId: option.id, optionName: option.name });
-    }
+  const validation = validateOptionSelection(product, item.optionSelections);
+  if (!validation.ok) {
+    const first = validation.error[0]!;
+    throw new Error(`Opción inválida: ${first.message}`);
   }
 
   return {
     productId: product.id,
     productName: product.name,
     quantity: item.quantity,
-    unitPriceCents,
-    selectedOptions,
+    unitPriceCents: validation.value.unitPriceCents,
+    selectedOptions: validation.value.selectedDetails.map((detail) => ({
+      groupId: detail.groupId,
+      optionId: detail.optionId,
+      optionName: detail.optionName
+    })),
     notes: item.notes
   };
 }

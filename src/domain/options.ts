@@ -1,7 +1,9 @@
 import type {
-  OptionGroup,
+  ConfigurableOptionGroup,
+  ConfigurableProduct,
   OptionSelectionError,
   Product,
+  ProductType,
   PublicationError,
   SelectedOptions,
   ValidatedOptionSelection
@@ -9,44 +11,68 @@ import type {
 import { ok, type Result } from "@/lib/result";
 
 /**
+ * Authoritative option group applicability registry.
+ * Maps known option group identifiers (including Supabase seed UUIDs)
+ * to their strictly applicable product types without relying on text heuristics.
+ */
+export const KNOWN_OPTION_GROUP_APPLICABILITY: Record<string, readonly ProductType[]> = {
+  // Authoritative Supabase seed UUIDs
+  "0199b2c8-40b0-7000-8000-000000000301": ["burger"],
+  "0199b2c8-40b0-7000-8000-000000000302": ["burger", "sandwich"],
+  "0199b2c8-40b0-7000-8000-000000000303": ["fries"],
+  // Catalog domain identifiers
+  patty: ["burger"],
+  extras: ["burger", "sandwich"],
+  bread: ["sandwich"],
+  portion: ["fries"],
+  ice: ["beverage"]
+};
+
+/**
+ * Resolves the structured applicable product types for an option group.
+ * Reads explicit category kind overrides or falls back to the authoritative registry.
+ */
+export function resolveOptionGroupApplicability(
+  groupId: string,
+  categoryKinds?: readonly string[]
+): readonly ProductType[] {
+  if (categoryKinds && categoryKinds.length > 0) {
+    const kindsMap: Record<string, ProductType> = {
+      burger: "burger",
+      sandwich: "sandwich",
+      side: "fries",
+      drink: "beverage",
+      other: "other"
+    };
+    return categoryKinds
+      .map((k) => kindsMap[k])
+      .filter((t): t is ProductType => Boolean(t));
+  }
+  return KNOWN_OPTION_GROUP_APPLICABILITY[groupId] ?? [];
+}
+
+/**
  * Checks whether an option group is applicable to a given product.
- * Respects explicit `applicableTypes` configuration, and enforces domain rules
- * (e.g. beverages must never show or accept hamburger/sandwich-specific groups).
+ * Strictly checks structured applicable types without text heuristics.
  */
 export function isGroupApplicableToProduct(
-  group: OptionGroup,
-  product: Pick<Product, "type" | "categoryId">
+  group: Pick<ConfigurableOptionGroup, "id"> & { applicableTypes?: readonly ProductType[] },
+  product: Pick<ConfigurableProduct, "type">
 ): boolean {
-  if (group.applicableTypes && group.applicableTypes.length > 0) {
-    return group.applicableTypes.includes(product.type);
-  }
-
-  // Domain guard: beverages never show or accept burger/meat/sandwich-exclusive groups
-  if (product.type === "beverage" || product.categoryId === "drinks") {
-    const lowerId = group.id.toLowerCase();
-    const lowerName = group.name.toLowerCase();
-    if (
-      lowerId.includes("patty") ||
-      lowerId.includes("medallon") ||
-      lowerId.includes("medallón") ||
-      lowerId.includes("burger") ||
-      lowerName.includes("medallón") ||
-      lowerName.includes("medallon") ||
-      lowerName.includes("hamburguesa") ||
-      lowerId.includes("bread") ||
-      lowerName.includes("pan")
-    ) {
-      return false;
-    }
-  }
-
-  return true;
+  const types =
+    group.applicableTypes && group.applicableTypes.length > 0
+      ? group.applicableTypes
+      : resolveOptionGroupApplicability(group.id);
+  return types.includes(product.type);
 }
 
 /**
  * Returns only the option groups applicable to the specific product and its type.
  */
-export function getApplicableOptionGroups(product: Product): OptionGroup[] {
+export function getApplicableOptionGroups<G extends ConfigurableOptionGroup>(product: {
+  type: ProductType;
+  optionGroups: readonly G[];
+}): G[] {
   return product.optionGroups.filter((group) => isGroupApplicableToProduct(group, product));
 }
 
@@ -69,7 +95,10 @@ export function getDefaultSelection(product: Product): SelectedOptions {
  * Calculates the unit price in cents derived from the product base price and selected options.
  * Negative option adjustments cannot drop the total price below zero.
  */
-export function calculateConfiguredUnitPrice(product: Product, selected: SelectedOptions): bigint {
+export function calculateConfiguredUnitPrice(
+  product: Pick<ConfigurableProduct, "priceCents" | "type" | "optionGroups">,
+  selected: SelectedOptions
+): bigint {
   const applicableGroups = getApplicableOptionGroups(product);
   let totalDelta = 0n;
 
@@ -93,7 +122,7 @@ export function calculateConfiguredUnitPrice(product: Product, selected: Selecte
  * Shared between client and authoritative server verification.
  */
 export function validateOptionSelection(
-  product: Product,
+  product: ConfigurableProduct,
   selected: SelectedOptions
 ): Result<ValidatedOptionSelection, OptionSelectionError[]> {
   const errors: OptionSelectionError[] = [];
@@ -242,8 +271,14 @@ export function validateProductPublication(product: Product): Result<void, Publi
   if (!product.slug || !product.slug.trim()) {
     errors.push({ code: "MISSING_SLUG", message: "El producto debe tener un slug." });
   }
-  if (product.priceCents < 0n) {
-    errors.push({ code: "NEGATIVE_PRICE", message: "El precio base no puede ser negativo." });
+  if (!product.description || !product.description.trim()) {
+    errors.push({ code: "MISSING_DESCRIPTION", message: "El producto debe tener una descripción." });
+  }
+  if (product.priceCents <= 0n) {
+    errors.push({
+      code: product.priceCents < 0n ? "NEGATIVE_PRICE" : "ZERO_OR_NEGATIVE_PRICE",
+      message: "El precio base debe ser mayor a cero para ser publicado."
+    });
   }
   if (product.type === "beverage" && product.containsAlcohol) {
     errors.push({ code: "ALCOHOL_BEVERAGE", message: "Las bebidas con alcohol no están permitidas." });

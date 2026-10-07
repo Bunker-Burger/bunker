@@ -292,6 +292,16 @@ describe("BB-05: Motor de opciones y defaults", () => {
       expect(updated).toEqual({ patty: ["double"] });
     });
 
+    it("rechaza opciones duplicadas dentro del mismo grupo", () => {
+      const selection: SelectedOptions = { patty: ["double"], extras: ["bacon", "bacon"] };
+      const result = validateOptionSelection(burgerProduct, selection);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.some((err) => err.code === "DUPLICATE_SELECTION")).toBe(true);
+      }
+    });
+
     it("rechaza grupos inexistentes en el producto", () => {
       const selection: SelectedOptions = { patty: ["double"], grupoFantasma: ["opt1"] };
       const result = validateOptionSelection(burgerProduct, selection);
@@ -303,7 +313,36 @@ describe("BB-05: Motor de opciones y defaults", () => {
     });
   });
 
-  describe("Criterio 3: Bloqueo de publicación por defaults inválidos o deshabilitados", () => {
+  describe("Criterio 3: Bloqueo de publicación por defaults inválidos, deshabilitados o restricciones de datos", () => {
+    it("un precio base igual a cero impide publicar el producto", () => {
+      const zeroPriceProduct: Product = { ...burgerProduct, priceCents: 0n };
+      const result = validateProductPublication(zeroPriceProduct);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.some((err) => err.code === "ZERO_OR_NEGATIVE_PRICE")).toBe(true);
+      }
+      expect(isPublishable(zeroPriceProduct)).toBe(false);
+    });
+
+    it("una descripción vacía o de solo whitespace impide publicar el producto", () => {
+      const emptyDescProduct: Product = { ...burgerProduct, description: "" };
+      const whitespaceDescProduct: Product = { ...burgerProduct, description: "   \n\t  " };
+
+      const res1 = validateProductPublication(emptyDescProduct);
+      expect(res1.ok).toBe(false);
+      if (!res1.ok) {
+        expect(res1.error.some((err) => err.code === "MISSING_DESCRIPTION")).toBe(true);
+      }
+      expect(isPublishable(emptyDescProduct)).toBe(false);
+
+      const res2 = validateProductPublication(whitespaceDescProduct);
+      expect(res2.ok).toBe(false);
+      if (!res2.ok) {
+        expect(res2.error.some((err) => err.code === "MISSING_DESCRIPTION")).toBe(true);
+      }
+      expect(isPublishable(whitespaceDescProduct)).toBe(false);
+    });
+
     it("un default deshabilitado impide publicar el producto", () => {
       const productWithDisabledDefault: Product = {
         ...burgerProduct,
