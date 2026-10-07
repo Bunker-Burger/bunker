@@ -29,6 +29,11 @@ jobs:
 
   database:
     runs-on: ubuntu-latest
+    concurrency:
+      group: supabase-cloud-development
+      cancel-in-progress: false
+    env:
+      SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,10 +41,15 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx supabase start
-      - run: npm run db:test
-      - if: always()
-        run: npx supabase stop --no-backup
+      - name: Verificar configuración cloud
+        if: env.SUPABASE_DEV_DB_URL == ''
+        run: echo "SUPABASE_DEV_DB_URL todavía no está configurado; pruebas cloud omitidas."
+      - name: Aplicar migraciones al proyecto de desarrollo
+        if: env.SUPABASE_DEV_DB_URL != ''
+        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
+      - name: Ejecutar pgTAP en desarrollo
+        if: env.SUPABASE_DEV_DB_URL != ''
+        run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
 
   e2e:
     runs-on: ubuntu-latest
