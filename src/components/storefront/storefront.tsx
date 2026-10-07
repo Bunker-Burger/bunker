@@ -21,12 +21,16 @@ import { quoteCart } from "@/domain/pricing";
 import type { CartLine, FulfilmentMethod, Product, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { categoryLabels, products, type StoreCategory } from "@/data/catalog";
+import { AppShell, SiteHeader } from "@/components/shell/app-shell";
+import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
+import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
 import {
   changeLineQuantity,
   createWhatsAppUrl,
   toggleOption,
   type PaymentMethod
 } from "./storefront-state";
+import "./storefront.css";
 
 const CART_KEY = "bunker-cart";
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
@@ -161,86 +165,88 @@ export function Storefront({
     setNotice(`${product.name} se agregó al carrito.`);
   };
 
+  const keyboardOpen = useVirtualKeyboardOpen();
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
   const visibleProducts = products.filter((product) => product.categoryId === category && product.published);
 
-  return (
-    <div className="storefront-shell">
-      <header className="site-header">
-        <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
-          <span className="brand-mark" aria-hidden="true">BB</span>
-          <span>BÚNKER BURGER</span>
-        </a>
-        <a className="header-cart" href="#carrito" aria-label={`Carrito, ${itemCount} productos`}>
-          <ShoppingBag size={20} aria-hidden="true" />
-          {itemCount > 0 ? <span>{itemCount}</span> : null}
-        </a>
-      </header>
+  const navItems: BottomNavItem[] = [
+    { href: "#menu", label: "Menú", icon: UtensilsCrossed },
+    { href: "#carrito", label: "Carrito", icon: ShoppingBag, badge: itemCount },
+    { href: "#checkout", label: "Checkout", icon: CircleDollarSign },
+    ...(showAdminNav ? [{ href: "/bunker", label: "Admin", icon: Settings2 }] : [])
+  ];
 
+  return (
+    <AppShell
+      header={
+        <SiteHeader>
+          <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
+            <span className="brand-mark" aria-hidden="true">BB</span>
+            <span>BÚNKER BURGER</span>
+          </a>
+          <a className="header-cart" href="#carrito" aria-label={`Carrito, ${itemCount} productos`}>
+            <ShoppingBag size={20} aria-hidden="true" />
+            {itemCount > 0 ? <span>{itemCount}</span> : null}
+          </a>
+        </SiteHeader>
+      }
+      bottomNav={<BottomNav activeHref="#menu" items={navItems} />}
+    >
       {notice ? <div className="toast" role="status">{notice}</div> : null}
 
-      <main>
-        <section className="menu-section" id="menu" aria-labelledby="menu-title">
-          <div className="menu-intro">
-            <p>Hechas al fuego. Sin vueltas.</p>
-            <h1 id="menu-title">LA CARTA DEL BÚNKER</h1>
+      <section className="menu-section" id="menu" aria-labelledby="menu-title">
+        <div className="menu-intro">
+          <p>Hechas al fuego. Sin vueltas.</p>
+          <h1 id="menu-title">LA CARTA DEL BÚNKER</h1>
+        </div>
+
+        <div className="category-tabs" aria-label="Categorías">
+          {categories.map((key) => (
+            <button
+              className={category === key ? "category-tab active" : "category-tab"}
+              key={key}
+              onClick={() => setCategory(key)}
+              type="button"
+            >
+              {categoryLabels[key]}
+            </button>
+          ))}
+        </div>
+
+        <div className="section-heading">
+          <div>
+            <span>{category === "burgers" ? "LAS MÁS PEDIDAS" : "ELEGÍ TU FAVORITO"}</span>
+            <h2>{categoryLabels[category]}</h2>
           </div>
+          <span>{visibleProducts.length} opciones</span>
+        </div>
 
-          <div className="category-tabs" aria-label="Categorías">
-            {categories.map((key) => (
-              <button
-                className={category === key ? "category-tab active" : "category-tab"}
-                key={key}
-                onClick={() => setCategory(key)}
-                type="button"
-              >
-                {categoryLabels[key]}
-              </button>
-            ))}
-          </div>
+        <div className="product-grid">
+          {visibleProducts.map((product, index) => (
+            <ProductCard
+              featured={category === "burgers" && index === 0}
+              key={product.id}
+              onAdd={() => addDirect(product)}
+              onOpen={() => openProduct(product)}
+              product={product}
+            />
+          ))}
+        </div>
+      </section>
 
-          <div className="section-heading">
-            <div>
-              <span>{category === "burgers" ? "LAS MÁS PEDIDAS" : "ELEGÍ TU FAVORITO"}</span>
-              <h2>{categoryLabels[category]}</h2>
-            </div>
-            <span>{visibleProducts.length} opciones</span>
-          </div>
+      <CartSection cart={cart} onChange={setCart} subtotal={subtotal} />
+      <CheckoutSection
+        cart={cart}
+        mercadoPagoEnabled={mercadoPagoEnabled}
+      />
 
-          <div className="product-grid">
-            {visibleProducts.map((product, index) => (
-              <ProductCard
-                featured={category === "burgers" && index === 0}
-                key={product.id}
-                onAdd={() => addDirect(product)}
-                onOpen={() => openProduct(product)}
-                product={product}
-              />
-            ))}
-          </div>
-        </section>
-
-        <CartSection cart={cart} onChange={setCart} subtotal={subtotal} />
-        <CheckoutSection
-          cart={cart}
-          mercadoPagoEnabled={mercadoPagoEnabled}
-        />
-      </main>
-
-      {itemCount > 0 ? (
+      {itemCount > 0 && !keyboardOpen ? (
         <a className="cart-tray" href="#carrito">
           <span><strong>{itemCount}</strong> {itemCount === 1 ? "producto" : "productos"}</span>
           <strong>{formatArs(subtotal)} <ChevronRight size={18} aria-hidden="true" /></strong>
         </a>
       ) : null}
-
-      <nav className="bottom-nav" aria-label="Navegación principal">
-        <a className="active" href="#menu"><UtensilsCrossed aria-hidden="true" /><span>Menú</span></a>
-        <a href="#carrito"><ShoppingBag aria-hidden="true" /><span>Carrito</span>{itemCount > 0 ? <b>{itemCount}</b> : null}</a>
-        <a href="#checkout"><CircleDollarSign aria-hidden="true" /><span>Checkout</span></a>
-        {showAdminNav ? <a href="/bunker"><Settings2 aria-hidden="true" /><span>Admin</span></a> : null}
-      </nav>
 
       {activeProduct ? (
         <ProductDrawer product={activeProduct} onClose={closeProduct} onSubmit={(line) => {
@@ -249,7 +255,7 @@ export function Storefront({
           closeProduct();
         }} />
       ) : null}
-    </div>
+    </AppShell>
   );
 }
 
