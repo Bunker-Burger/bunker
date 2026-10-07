@@ -66,22 +66,62 @@ describe("money as bigint", () => {
   });
 
   it("maps option deltas, delivery fee and fixed promotion prices to bigint", () => {
-    const store = parseRows("stores", storeRowSchema, [
-      {
-        id: "s-1",
-        name: "Búnker Burger",
-        slug: "bunker-burger",
-        whatsapp_e164: "+5493865207458",
-        timezone: "America/Argentina/Buenos_Aires",
-        currency: "ARS",
-        is_open: true,
-        is_public: true,
-        delivery_fee_cents: "120000",
-        business_hours: {},
-        store_payment_methods: []
-      }
-    ]);
+    const store = parseRows("stores", storeRowSchema, [storeRow()]);
     expect(store.ok && store.value[0] && toStoreSettings(store.value[0]).deliveryFeeCents).toBe(120000n);
+  });
+});
+
+function storeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "s-1",
+    name: "Búnker Burger",
+    slug: "bunker-burger",
+    whatsapp_e164: "+5493865207458",
+    timezone: "America/Argentina/Tucuman",
+    currency: "ARS",
+    status_override: "auto",
+    is_public: true,
+    delivery_fee_cents: "120000",
+    store_business_hours: [],
+    store_payment_methods: [],
+    ...overrides
+  };
+}
+
+describe("store operating settings", () => {
+  it("maps the override, a missing fee as null, and the weekly hours in day/opening order", () => {
+    const parsed = parseRows("stores", storeRowSchema, [
+      storeRow({
+        status_override: "paused",
+        delivery_fee_cents: null,
+        store_business_hours: [
+          { day_of_week: 5, opens_at: "19:30:00", closes_at: "01:30:00" },
+          { day_of_week: 0, opens_at: "20:00:00", closes_at: "00:00:00" },
+          { day_of_week: 0, opens_at: "12:00:00", closes_at: "15:00:00" }
+        ]
+      })
+    ]);
+    if (!parsed.ok || !parsed.value[0]) throw new Error("expected a parsed store row");
+    expect(toStoreSettings(parsed.value[0])).toMatchObject({
+      statusOverride: "paused",
+      deliveryFeeCents: null,
+      timezone: "America/Argentina/Tucuman",
+      businessHours: [
+        { dayOfWeek: 0, opensAt: "12:00:00", closesAt: "15:00:00" },
+        { dayOfWeek: 0, opensAt: "20:00:00", closesAt: "00:00:00" },
+        { dayOfWeek: 5, opensAt: "19:30:00", closesAt: "01:30:00" }
+      ]
+    });
+  });
+
+  it.each([
+    ["an unknown time zone", { timezone: "America/Atlantis" }, "stores[0].timezone"],
+    ["an unknown override", { status_override: "maybe" }, "stores[0].status_override"],
+    ["a malformed shift", { store_business_hours: [{ day_of_week: 9, opens_at: "19:30", closes_at: "23:00" }] }, "store_business_hours"]
+  ])("rejects %s as invalid_data", (_case, overrides, path) => {
+    const parsed = parseRows("stores", storeRowSchema, [storeRow(overrides)]);
+    expect(parsed).toMatchObject({ ok: false, error: { code: "invalid_data" } });
+    if (!parsed.ok) expect(parsed.error.message).toContain(path);
   });
 });
 

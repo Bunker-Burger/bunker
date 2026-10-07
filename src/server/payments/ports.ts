@@ -41,7 +41,6 @@ export interface PaymentQuote {
 
 export interface PricingRepository {
   findProduct(productId: string): Promise<AuthoritativeProduct | null>;
-  getDeliveryFeeCents(): Promise<bigint>;
   getApplicableDiscountCents(lines: readonly QuoteLine[], now: Date): Promise<bigint>;
 }
 

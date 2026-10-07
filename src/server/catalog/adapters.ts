@@ -51,10 +51,12 @@ export function toStoreSettings(row: StoreRow): StoreSettings {
     whatsappE164: row.whatsapp_e164,
     timezone: row.timezone,
     currency: row.currency,
-    isOpen: row.is_open,
+    statusOverride: row.status_override,
     isPublic: row.is_public,
     deliveryFeeCents: row.delivery_fee_cents,
-    businessHours: row.business_hours,
+    businessHours: row.store_business_hours
+      .map((window) => ({ dayOfWeek: window.day_of_week, opensAt: window.opens_at, closesAt: window.closes_at }))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt)),
     paymentMethods: row.store_payment_methods
       .map((method) => ({
         method: method.method,

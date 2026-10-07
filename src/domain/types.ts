@@ -1,3 +1,5 @@
+import type { BusinessHoursWindow, StoreStatusOverride } from "./store-status";
+
 export type ProductType = "burger" | "sandwich" | "fries" | "beverage" | "other";
 
 export interface ProductOption {
@@ -102,10 +104,11 @@ export interface StoreSettings {
   whatsappE164: string;
   timezone: string;
   currency: string;
-  isOpen: boolean;
+  statusOverride: StoreStatusOverride;
   isPublic: boolean;
-  deliveryFeeCents: bigint;
-  businessHours: Record<string, unknown>;
+  /** Fixed delivery fee; null until configured, which keeps orders disabled. */
+  deliveryFeeCents: bigint | null;
+  businessHours: BusinessHoursWindow[];
   paymentMethods: PaymentMethodSetting[];
 }
 
