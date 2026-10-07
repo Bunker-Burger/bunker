@@ -11,6 +11,7 @@ Este documento traduce el plan maestro a tareas autosuficientes. Cada tarea corr
 - Nunca confiar precios, promociones, stock ni referencias enviadas por el navegador.
 - No crear tablas ni flujos de pedidos, cocina, reparto, zonas, clientes o facturas.
 - No agregar bebidas alcohólicas ni contenido de alérgenos.
+- Supabase se usa exclusivamente en la nube: un proyecto de desarrollo y otro de producción. No se usa Docker ni stack local.
 - Cada agente debe trabajar en una rama propia, respetar cambios ajenos, escribir pruebas primero cuando corresponda y abrir PR contra `main`.
 - Antes del PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea.
 - Una tarea no puede darse por terminada si solo deja mocks, TODOs o una interfaz visual sin integrar.
@@ -38,7 +39,7 @@ Dejar una base reproducible que compile y permita a todos los demás agentes tra
 - Resolver incompatibilidades reales entre TypeScript y `typescript-eslint` usando la versión estable más nueva compatible; documentar cualquier excepción a “latest”.
 - Configurar Tailwind CSS 4.3 y shadcn/ui (`components.json`, utilidades y componentes base).
 - Mantener `.env.example` sin secretos.
-- CI: `npm ci`, lint, typecheck, unitarias, build, DB tests y Playwright.
+- Gates sin GitHub Actions: verificación local reproducible y build de Vercel Preview antes de fusionar.
 - Añadir scripts de desarrollo y documentación mínima.
 
 ### Criterios de aceptación
@@ -100,12 +101,13 @@ Implementar la fuente de verdad segura para catálogo, administración, promocio
 - Bucket público de catálogo; escrituras solo admin; JPEG/PNG/WebP/AVIF, sin SVG.
 - Función de validación de defaults y bloqueo de publicación inválida.
 - Retención/purga de datos mínimos de pagos a 90 días.
-- Seed local y pruebas pgTAP de matriz anon/admin/no autorizado.
+- Seed controlado en el proyecto cloud de desarrollo y pruebas pgTAP de matriz anon/admin/no autorizado ejecutadas con `supabase test db --linked`.
 
 ### Criterios de aceptación
 
-- `supabase db reset` recrea todo desde cero.
-- `supabase test db` pasa.
+- `supabase db push --dry-run` permite revisar las migraciones antes de aplicarlas al proyecto enlazado.
+- `supabase test db --linked` pasa contra el proyecto cloud de desarrollo.
+- No se utiliza `supabase start`, Docker ni `db reset --linked`.
 - Un usuario autenticado no administrador no gana permisos extra.
 - Datos privados de pagos nunca son legibles por `anon`.
 - No existen tablas de pedidos, clientes, cocina, reparto, zonas o facturas.
@@ -121,7 +123,7 @@ Implementar la fuente de verdad segura para catálogo, administración, promocio
 
 ### Objetivo
 
-Aislar Supabase detrás de repositorios tipados y ofrecer datos locales coherentes para desarrollo y pruebas.
+Aislar Supabase detrás de repositorios tipados y ofrecer datos semilla coherentes en el proyecto cloud de desarrollo.
 
 ### Alcance
 
@@ -130,7 +132,7 @@ Aislar Supabase detrás de repositorios tipados y ofrecer datos locales coherent
 - Repositorios para tienda, categorías, productos, opciones y promociones.
 - Catálogo semilla con los cuatro tipos y únicamente bebidas sin alcohol.
 - Lecturas públicas cacheables; lecturas administrativas autenticadas y sin cache sensible.
-- Manejo explícito de entorno sin Supabase para tests, sin simular producción silenciosamente.
+- Separación explícita de credenciales cloud de desarrollo y producción; los tests unitarios usan repositorios inyectados sin simular una conexión productiva.
 
 ### Criterios de aceptación
 
@@ -509,7 +511,7 @@ Convertir la matriz de aceptación del plan en pruebas repetibles y evidencia de
 
 ### Criterios de aceptación
 
-- CI bloquea regresiones críticas.
+- El script local de verificación y el build de Vercel Preview bloquean regresiones críticas antes de fusionar.
 - Selectores accesibles, sin depender de estructura CSS frágil.
 - Se adjuntan screenshots/traces en fallos.
 - Cada caso del plan maestro queda mapeado a test o checklist manual justificado.
@@ -559,7 +561,7 @@ Publicar con entornos separados, previews seguras y un proceso de rollback docum
 
 - Vincular repositorio privado `Lautaro073/bunker` a Vercel.
 - Previews por PR sin secretos/recursos de producción peligrosos.
-- Supabase cloud producción separado del local; migraciones reproducibles.
+- Dos proyectos Supabase cloud separados: desarrollo y producción; migraciones reproducibles promovidas primero a desarrollo.
 - Variables por entorno, dominios/callbacks/webhook MP y rotación documentada.
 - Checklist de backup, migración, smoke test, observabilidad y rollback.
 - Crear manual de operación corto para el dueño.
