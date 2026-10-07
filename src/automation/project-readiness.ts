@@ -6,7 +6,7 @@ export type IssueState = "OPEN" | "CLOSED";
 type AvailabilityInput = {
   issueState: IssueState;
   status?: string;
-  blockerStates: IssueState[];
+  openBlockerCount: number;
 };
 
 export type ProjectIssueSnapshot = AvailabilityInput & {
@@ -29,9 +29,8 @@ type GraphField = {
   options?: Array<{ id?: string; name?: string }>;
 };
 
-type GraphFieldValue = {
+type GraphNamedFieldValue = {
   name?: string;
-  field?: { name?: string };
 };
 
 type GraphProjectItem = {
@@ -41,9 +40,13 @@ type GraphProjectItem = {
     number?: number;
     state?: IssueState;
     repository?: { nameWithOwner?: string };
-    blockedBy?: { nodes?: Array<{ state?: IssueState }> };
+    issueDependenciesSummary?: {
+      blockedBy?: number;
+      totalBlockedBy?: number;
+    };
   };
-  fieldValues?: { nodes?: GraphFieldValue[] };
+  statusField?: GraphNamedFieldValue;
+  availabilityField?: GraphNamedFieldValue;
 };
 
 type GraphProject = {
@@ -57,11 +60,11 @@ const availabilityValues: Availability[] = ["Lista", "Bloqueada", "En curso", "T
 export function deriveAvailability({
   issueState,
   status,
-  blockerStates,
+  openBlockerCount,
 }: AvailabilityInput): Availability {
   if (issueState === "CLOSED") return "Terminada";
   if (status === "In Progress") return "En curso";
-  return blockerStates.every((state) => state === "CLOSED") ? "Lista" : "Bloqueada";
+  return openBlockerCount === 0 ? "Lista" : "Bloqueada";
 }
 
 export function planAvailabilityUpdates(
@@ -115,15 +118,15 @@ export function parseProjectSnapshot(project: GraphProject) {
       return [];
     }
 
-    const values = content.blockedBy?.nodes ?? [];
-    const blockerStates = values.flatMap<IssueState>((blocker) =>
-      blocker.state ? [blocker.state] : [],
-    );
-    const fields = item.fieldValues?.nodes ?? [];
-    const status = fields.find((value) => value.field?.name === "Status")?.name;
-    const availability = fields.find(
-      (value) => value.field?.name === "Disponibilidad",
-    )?.name as Availability | undefined;
+    const openBlockerCount = content.issueDependenciesSummary?.blockedBy;
+    if (typeof openBlockerCount !== "number" || openBlockerCount < 0) {
+      throw new Error(
+        `GitHub no devolvió el resumen completo de dependencias para BB-${String(content.number).padStart(2, "0")}.`,
+      );
+    }
+
+    const status = item.statusField?.name;
+    const availability = item.availabilityField?.name as Availability | undefined;
 
     return [
       {
@@ -131,7 +134,7 @@ export function parseProjectSnapshot(project: GraphProject) {
         issueNumber: content.number,
         repository: content.repository.nameWithOwner,
         issueState: content.state,
-        blockerStates,
+        openBlockerCount,
         ...(status ? { status } : {}),
         ...(availability ? { availability } : {}),
       },
@@ -175,19 +178,19 @@ const projectQuery = `
                 number
                 state
                 repository { nameWithOwner }
-                blockedBy(first: 50) {
-                  nodes { state }
+                issueDependenciesSummary {
+                  blockedBy
                 }
               }
             }
-            fieldValues(first: 50) {
-              nodes {
-                ... on ProjectV2ItemFieldSingleSelectValue {
-                  name
-                  field {
-                    ... on ProjectV2SingleSelectField { name }
-                  }
-                }
+            statusField: fieldValueByName(name: "Status") {
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
+              }
+            }
+            availabilityField: fieldValueByName(name: "Disponibilidad") {
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
               }
             }
           }

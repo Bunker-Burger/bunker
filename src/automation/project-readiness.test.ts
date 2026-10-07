@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,7 +15,7 @@ describe("deriveAvailability", () => {
       deriveAvailability({
         issueState: "CLOSED",
         status: "Todo",
-        blockerStates: ["OPEN"],
+        openBlockerCount: 1,
       }),
     ).toBe("Terminada");
   });
@@ -22,17 +25,17 @@ describe("deriveAvailability", () => {
       deriveAvailability({
         issueState: "OPEN",
         status: "In Progress",
-        blockerStates: ["CLOSED"],
+        openBlockerCount: 1,
       }),
     ).toBe("En curso");
   });
 
-  it("marks an open issue as ready when every dependency is closed", () => {
+  it("marks an open issue as ready when the dependency summary has no open blockers", () => {
     expect(
       deriveAvailability({
         issueState: "OPEN",
         status: "Todo",
-        blockerStates: ["CLOSED", "CLOSED"],
+        openBlockerCount: 0,
       }),
     ).toBe("Lista");
   });
@@ -42,17 +45,17 @@ describe("deriveAvailability", () => {
       deriveAvailability({
         issueState: "OPEN",
         status: "Todo",
-        blockerStates: [],
+        openBlockerCount: 0,
       }),
     ).toBe("Lista");
   });
 
-  it("keeps an issue blocked while any dependency remains open", () => {
+  it("keeps an issue blocked when the complete summary reports an open blocker", () => {
     expect(
       deriveAvailability({
         issueState: "OPEN",
         status: "Todo",
-        blockerStates: ["CLOSED", "OPEN"],
+        openBlockerCount: 1,
       }),
     ).toBe("Bloqueada");
   });
@@ -67,7 +70,7 @@ describe("planAvailabilityUpdates", () => {
           issueNumber: 3,
           repository: "Bunker-Burger/bunker",
           issueState: "CLOSED",
-          blockerStates: ["CLOSED"],
+          openBlockerCount: 0,
           status: "Done",
           availability: "Lista",
         },
@@ -76,7 +79,7 @@ describe("planAvailabilityUpdates", () => {
           issueNumber: 4,
           repository: "Bunker-Burger/bunker",
           issueState: "OPEN",
-          blockerStates: ["CLOSED"],
+          openBlockerCount: 0,
           status: "Todo",
           availability: "Bloqueada",
         },
@@ -85,7 +88,7 @@ describe("planAvailabilityUpdates", () => {
           issueNumber: 5,
           repository: "Bunker-Burger/bunker",
           issueState: "OPEN",
-          blockerStates: ["OPEN"],
+          openBlockerCount: 1,
           status: "Todo",
           availability: "Bloqueada",
         },
@@ -94,7 +97,7 @@ describe("planAvailabilityUpdates", () => {
           issueNumber: 99,
           repository: "another/repository",
           issueState: "CLOSED",
-          blockerStates: [],
+          openBlockerCount: 0,
           status: "Done",
           availability: "Lista",
         },
@@ -110,7 +113,7 @@ describe("planAvailabilityUpdates", () => {
 });
 
 describe("parseProjectSnapshot", () => {
-  it("extracts real issue state, blockers and project fields from GraphQL data", () => {
+  it("extracts the complete blocker summary and named project fields", () => {
     const snapshot = parseProjectSnapshot({
       id: "project-id",
       fields: {
@@ -136,16 +139,24 @@ describe("parseProjectSnapshot", () => {
               number: 4,
               state: "OPEN",
               repository: { nameWithOwner: "Bunker-Burger/bunker" },
-              blockedBy: { nodes: [{ state: "CLOSED" }] },
+              issueDependenciesSummary: { blockedBy: 1, totalBlockedBy: 101 },
             },
-            fieldValues: {
-              nodes: [
-                { name: "Todo", field: { name: "Status" } },
-                { name: "Bloqueada", field: { name: "Disponibilidad" } },
-              ],
-            },
+            statusField: { name: "Todo" },
+            availabilityField: { name: "Lista" },
           },
-          { id: "draft", content: { __typename: "DraftIssue" }, fieldValues: { nodes: [] } },
+          {
+            id: "item-5",
+            content: {
+              __typename: "Issue",
+              number: 5,
+              state: "OPEN",
+              repository: { nameWithOwner: "Bunker-Burger/bunker" },
+              issueDependenciesSummary: { blockedBy: 0, totalBlockedBy: 0 },
+            },
+            statusField: { name: "In Progress" },
+            availabilityField: { name: "Lista" },
+          },
+          { id: "draft", content: { __typename: "DraftIssue" } },
         ],
       },
     });
@@ -165,11 +176,42 @@ describe("parseProjectSnapshot", () => {
           issueNumber: 4,
           repository: "Bunker-Burger/bunker",
           issueState: "OPEN",
-          blockerStates: ["CLOSED"],
+          openBlockerCount: 1,
           status: "Todo",
-          availability: "Bloqueada",
+          availability: "Lista",
+        },
+        {
+          itemId: "item-5",
+          issueNumber: 5,
+          repository: "Bunker-Burger/bunker",
+          issueState: "OPEN",
+          openBlockerCount: 0,
+          status: "In Progress",
+          availability: "Lista",
         },
       ],
     });
+
+    expect(
+      planAvailabilityUpdates(snapshot.items, "Bunker-Burger/bunker"),
+    ).toEqual([
+      { itemId: "item-4", issueNumber: 4, from: "Lista", to: "Bloqueada" },
+      { itemId: "item-5", issueNumber: 5, from: "Lista", to: "En curso" },
+    ]);
+  });
+
+  it("queries complete dependency counts and fields by name instead of truncated connections", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/automation/project-readiness.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("issueDependenciesSummary");
+    expect(source).not.toMatch(/blockedBy\s*\(\s*first\s*:/);
+    expect(source).not.toMatch(/fieldValues\s*\(\s*first\s*:/);
+    expect(source).toContain('statusField: fieldValueByName(name: "Status")');
+    expect(source).toContain(
+      'availabilityField: fieldValueByName(name: "Disponibilidad")',
+    );
   });
 });
