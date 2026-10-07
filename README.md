@@ -4,11 +4,12 @@ Carta, carrito y checkout para Búnker Burger, Aguilares (Tucumán). La operaci�
 
 ## Desarrollo
 
-1. Instalar Node.js 22 (`.nvmrc`) y Docker Desktop.
+1. Instalar Node.js 22 (`.nvmrc`).
 2. Copiar `.env.example` a `.env.local` y completar las claves disponibles.
 3. Ejecutar `npm ci`.
-4. Ejecutar `npm run db:start` para el entorno local de datos.
-5. Ejecutar `npm run dev`.
+4. Enlazar la CLI con el proyecto Supabase cloud de desarrollo mediante `npx supabase link --project-ref <ref>`.
+5. Revisar migraciones con `npm run db:push:dry` y aplicarlas con `npm run db:push`.
+6. Ejecutar `npm run dev`.
 
 Mercado Pago se oculta automáticamente si falta cualquiera de sus variables requeridas. Las claves secretas nunca llevan prefijo `NEXT_PUBLIC_`.
 
@@ -22,9 +23,9 @@ Mercado Pago se oculta automáticamente si falta cualquiera de sus variables req
 | `npm run typecheck` | `tsc --noEmit` en modo estricto. |
 | `npm test` / `npm run test:watch` | Pruebas unitarias con Vitest. |
 | `npm run test:e2e` | Playwright (mobile + desktop, Chromium) contra el build de producción; correr `npm run build` antes. |
-| `npm run db:start` / `db:stop` / `db:reset` / `db:test` | Supabase local y pruebas pgTAP. |
+| `npm run db:push:dry` / `db:push` / `db:test` | Migraciones y pgTAP contra Supabase cloud de desarrollo. |
 
-Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea. CI (`.github/workflows/ci.yml`) corre además build, pruebas de base de datos y Playwright.
+Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea. Como no se usan GitHub Actions, el build de Vercel Preview y el checklist del PR son los gates remotos.
 
 ## UI
 
