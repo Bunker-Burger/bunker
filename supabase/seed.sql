@@ -84,14 +84,17 @@ insert into public.options (
 on conflict (id) do nothing;
 
 insert into public.product_option_groups (
-  product_id, option_group_id, store_id, sort_order
+  product_id, option_group_id, store_id, default_option_ids, sort_order
 ) values (
   '0199b2c8-40b0-7000-8000-000000000201',
   '0199b2c8-40b0-7000-8000-000000000301',
   '0199b2c8-40b0-7000-8000-000000000001',
+  array['0199b2c8-40b0-7000-8000-000000000401'::uuid],
   10
 )
-on conflict (product_id, option_group_id) do nothing;
+on conflict (product_id, option_group_id) do update set
+  default_option_ids = excluded.default_option_ids,
+  sort_order = excluded.sort_order;
 
 insert into public.store_payment_methods (
   store_id, method, display_name, public_instructions, is_enabled, sort_order

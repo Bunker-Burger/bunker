@@ -89,13 +89,16 @@ insert into public.products (
 ) values
   ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Visible', 'visible', 'Producto visible', 100000, true, true, false, 0, false),
   ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000002', 'Oculto', 'oculto', 'Producto oculto', 100000, true, true, false, 0, false),
-  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000003', 'Gaseosa', 'gaseosa', 'Bebida sin alcohol', 100000, true, true, false, 0, false);
+  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000003', 'Gaseosa', 'gaseosa', 'Bebida sin alcohol', 100000, true, true, false, 0, false),
+  ('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Agotado', 'agotado', 'Producto publicado sin stock', 100000, true, false, false, 0, false);
 
 set local role anon;
 select results_eq(
-  $$select slug from public.products order by slug$$,
-  $$values ('gaseosa'::text), ('visible'::text)$$,
-  'anon reads only published products in visible categories of public stores'
+  $$select slug from public.products
+    where store_id = '10000000-0000-0000-0000-000000000001'
+    order by slug$$,
+  $$values ('agotado'::text), ('gaseosa'::text), ('visible'::text)$$,
+  'anon reads published products, including unavailable items, in visible categories of public stores'
 );
 select throws_ok(
   $$select count(*) from public.payment_attempts$$,
@@ -177,20 +180,31 @@ select ok(
 );
 select is(
   obj_description('private.purge_expired_payment_data()'::regprocedure, 'pg_proc'),
-  'Deletes Mercado Pago attempt data older than the 90-day operational retention period.',
+  'Deletes quotes, Mercado Pago attempts, and webhook events older than the 90-day operational retention period.',
   'payment retention policy is documented on the purge function'
 );
 
+insert into public.payment_quotes (
+  id, store_id, lines, subtotal_cents, discount_cents, delivery_cents,
+  total_cents, currency, fulfillment_channel, expires_at, created_at
+) values (
+  '51000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000001',
+  '[{"productId":"30000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb,
+  100000, 0, 0, 100000, 'ARS', 'pickup',
+  now() - interval '90 days', now() - interval '91 days'
+);
 insert into public.payment_attempts (
-  id, store_id, amount_cents, currency, idempotency_key, external_reference,
+  id, quote_id, store_id, amount_cents, currency, idempotency_key, external_reference,
   status, created_at, updated_at
 ) values (
   '50000000-0000-0000-0000-000000000001',
+  '51000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001', 100000, 'ARS',
   'old-idempotency-key', 'old-external-reference', 'rejected',
   now() - interval '91 days', now() - interval '91 days'
 );
-select is(private.purge_expired_payment_data(), 1::bigint, 'purge removes payment data older than 90 days');
+select is(private.purge_expired_payment_data(), 2::bigint, 'purge removes payment data older than 90 days');
 select is(
   (select count(*)::bigint from public.payment_attempts where id = '50000000-0000-0000-0000-000000000001'),
   0::bigint,
