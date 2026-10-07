@@ -26,7 +26,8 @@ export function createActiveSectionStore(ids: readonly string[]) {
   };
 
   const fromHash = () => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
+    const rawHash = window.location.hash.slice(1);
+    const id = rawHash ? decodeURIComponent(rawHash) : fallback;
     if (!ids.includes(id)) return false;
     followLink = true;
     set(id);

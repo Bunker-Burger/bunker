@@ -102,6 +102,14 @@ describe("createActiveSectionStore", () => {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     expect(store.getSnapshot()).toBe("menu");
 
+    // Back to the original URL removes the hash; the first section must become current again.
+    window.history.replaceState({}, "", "#carrito");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(store.getSnapshot()).toBe("carrito");
+    window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(store.getSnapshot()).toBe("menu");
+
     unsubscribe();
     expect(removeSpy.mock.calls.map(([type]) => type)).toEqual(
       expect.arrayContaining(["hashchange", "scroll", "wheel", "touchmove", "keydown"])
