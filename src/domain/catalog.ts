@@ -1,5 +1,6 @@
 export {
   calculateConfiguredUnitPrice,
+  clearOptionGroup,
   getApplicableOptionGroups,
   getDefaultSelection,
   isGroupApplicableToProduct,

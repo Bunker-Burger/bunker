@@ -11,7 +11,7 @@ export function changeLineQuantity(lines: CartLine[], id: string, delta: number)
   });
 }
 
-export { toggleOption } from "@/domain/options";
+export { clearOptionGroup, toggleOption } from "@/domain/options";
 
 export function validateCashAmount(value: string, totalCents: bigint): boolean {
   if (!/^\d+$/.test(value)) return false;

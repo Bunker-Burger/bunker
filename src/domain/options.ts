@@ -381,22 +381,37 @@ export function isPublishable(product: Product): boolean {
 }
 
 /**
+ * Clears any selection in the specified option group, returning an updated SelectedOptions.
+ */
+export function clearOptionGroup(
+  selected: SelectedOptions,
+  groupId: string
+): SelectedOptions {
+  return { ...selected, [groupId]: [] };
+}
+
+/**
  * Pure state toggle helper for client selection state.
- * Respects single vs multiple selection modes, maximum limits, and availability.
+ * Respects single vs multiple selection modes, maximum limits, required constraints, and availability.
  * Selection mode is determined strictly by selectionMode, never inferred from maxSelections.
+ * For optional single-select groups (required === false), toggling the currently selected option clears it.
  */
 export function toggleOption(
   selected: SelectedOptions,
   groupId: string,
   optionId: string,
   maxSelections: number,
-  isAvailable = true,
-  selectionMode: OptionSelectionMode = "multiple"
+  isAvailable: boolean,
+  selectionMode: OptionSelectionMode,
+  required: boolean
 ): SelectedOptions {
   if (!isAvailable) return selected;
   const current = selected[groupId] ?? [];
 
   if (selectionMode === "single") {
+    if (!required && current.includes(optionId)) {
+      return { ...selected, [groupId]: [] };
+    }
     return { ...selected, [groupId]: [optionId] };
   }
 

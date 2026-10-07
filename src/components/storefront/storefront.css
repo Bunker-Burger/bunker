@@ -117,6 +117,9 @@
 .drawer-content > p { margin: .55rem 0 1.1rem; color: var(--color-muted); }
 .option-group { margin: 0 0 .8rem; padding: .8rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
 .option-group legend { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 .15rem; font-family: var(--font-display); font-size: var(--text-title); font-weight: 600; text-transform: uppercase; }
+.option-group-meta { display: flex; align-items: center; gap: .5rem; }
+.clear-option-button { border: none; background: transparent; color: var(--color-muted); font-family: var(--font-sans); font-size: var(--text-badge); font-weight: 600; text-transform: none; text-decoration: underline; cursor: pointer; }
+.clear-option-button:hover { color: var(--color-foreground); }
 .option-group legend small { padding: .2rem .5rem; border: 1px solid var(--color-accent-border); border-radius: var(--radius-full); background: var(--color-accent-soft); color: var(--color-primary); font-family: var(--font-sans); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); }
 .option-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .55rem; min-height: var(--spacing-tap); margin-top: .45rem; padding: .6rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; }
 .option-row.selected { border-color: var(--color-accent-border); background: var(--color-accent-soft); }

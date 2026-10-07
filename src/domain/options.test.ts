@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateConfiguredUnitPrice,
+  clearOptionGroup,
   getApplicableOptionGroups,
   getDefaultSelection,
   isGroupApplicableToProduct,
@@ -287,23 +288,45 @@ describe("BB-05: Motor de opciones y defaults", () => {
 
     it("opción deshabilitada: toggleOption no permite seleccionar una opción no disponible", () => {
       const current: SelectedOptions = { patty: ["double"] };
-      const updated = toggleOption(current, "patty", "quad", 1, false, "single");
+      const updated = toggleOption(current, "patty", "quad", 1, false, "single", true);
 
       expect(updated).toEqual({ patty: ["double"] });
     });
 
     it("respeta selectionMode multiple con maxSelections 1: permite seleccionar, impide seleccionar una segunda y permite deseleccionar", () => {
       // 1. Permite seleccionar una opción
-      const step1 = toggleOption({}, "extras", "bacon", 1, true, "multiple");
+      const step1 = toggleOption({}, "extras", "bacon", 1, true, "multiple", false);
       expect(step1).toEqual({ extras: ["bacon"] });
 
       // 2. Impide seleccionar una segunda opción mientras ya hay una elegida
-      const step2 = toggleOption(step1, "extras", "cheddar", 1, true, "multiple");
+      const step2 = toggleOption(step1, "extras", "cheddar", 1, true, "multiple", false);
       expect(step2).toEqual({ extras: ["bacon"] });
 
       // 3. Permite deseleccionar la opción actual
-      const step3 = toggleOption(step1, "extras", "bacon", 1, true, "multiple");
+      const step3 = toggleOption(step1, "extras", "bacon", 1, true, "multiple", false);
       expect(step3).toEqual({ extras: [] });
+    });
+
+    it("single opcional (required: false): permite seleccionar y deseleccionar la opción al volver a tocarla", () => {
+      // Inicialmente vacío
+      const empty: SelectedOptions = {};
+      // Seleccionar opción
+      const selected = toggleOption(empty, "sauce", "mayo", 1, true, "single", false);
+      expect(selected).toEqual({ sauce: ["mayo"] });
+      // Toggling nuevamente la misma opción limpia la selección a vacío
+      const cleared = toggleOption(selected, "sauce", "mayo", 1, true, "single", false);
+      expect(cleared).toEqual({ sauce: [] });
+    });
+
+    it("single requerido (required: true): no permite limpiar la opción seleccionada al volver a tocarla", () => {
+      const selected: SelectedOptions = { patty: ["double"] };
+      const attemptedClear = toggleOption(selected, "patty", "double", 1, true, "single", true);
+      expect(attemptedClear).toEqual({ patty: ["double"] });
+    });
+
+    it("clearOptionGroup: limpia explícitamente cualquier selección del grupo", () => {
+      const current: SelectedOptions = { sauce: ["mayo"], extras: ["bacon"] };
+      expect(clearOptionGroup(current, "sauce")).toEqual({ sauce: [], extras: ["bacon"] });
     });
 
     it("rechaza opciones duplicadas dentro del mismo grupo", () => {
