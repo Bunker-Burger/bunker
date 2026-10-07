@@ -9,15 +9,16 @@ const workflow = readFileSync(
 );
 
 describe("project readiness workflow trust boundary", () => {
-  it("never runs the secret-bearing workflow for pull requests", () => {
+  it("never exposes the secret-bearing workflow to branch-controlled triggers", () => {
     expect(workflow).toContain("PROJECT_SYNC_TOKEN");
     expect(workflow).not.toMatch(/^\s*pull_request\s*:/m);
+    expect(workflow).not.toMatch(/^\s*pull_request_target\s*:/m);
+    expect(workflow).not.toMatch(/^\s*workflow_dispatch\s*:/m);
   });
 
-  it("allows manual synchronization only from the trusted main ref", () => {
-    expect(workflow).toMatch(/^\s*workflow_dispatch\s*:/m);
-    expect(workflow).toContain(
-      "github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'",
+  it("runs push reconciliation only for main", () => {
+    expect(workflow).toMatch(
+      /^\s*push\s*:\s*\r?\n\s*branches\s*:\s*\[main\]\s*$/m,
     );
   });
 });
