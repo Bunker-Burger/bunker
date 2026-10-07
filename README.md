@@ -29,7 +29,13 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 
 ## UI
 
-Tailwind CSS 4.3 se carga desde `src/app/globals.css`. shadcn/ui está configurado en `components.json` (alias `@/components/ui`, utilidad `cn` en `src/lib/utils.ts`); agregar componentes con `npx shadcn@latest add <componente>`.
+Tailwind CSS 4.3 se carga desde `src/app/globals.css`, que es la única fuente de tokens (colores, tipografía, radios, sombras, `tap` de 44 px y ancho `content` de 1280 px). La paleta por defecto de Tailwind está deshabilitada: usar solo utilidades de tokens (`bg-surface`, `text-primary`, `text-headline-md`, `rounded-lg`, `min-h-tap`…) o `var(--color-*)` en CSS. Oswald (títulos y precios) y Space Grotesk (cuerpo y controles) se cargan con `next/font`.
+
+- Primitives en `src/components/ui`: Button, Card, Badge, Dialog, Drawer, Tabs, Input, Textarea, Select, Switch, Label, Skeleton, EmptyState/ErrorState y Toaster (`toast` de sonner).
+- Shell en `src/components/shell`: `AppShell`, `SiteHeader`, `Container` y la única `BottomNav`, que respeta safe areas y se oculta mientras el teclado virtual está abierto.
+- `/design-system` muestra todos los primitives y estados; se sirve en local y previews, nunca en producción (`VERCEL_ENV=production`). Playwright la audita con axe (WCAG 2.1 AA), teclado y targets de 44 px, y `tests/e2e/responsive.spec.ts` recorre carta y demo a 320, 390, 768 y 1280 px.
+- `src/test/design-tokens.test.ts` falla si aparecen colores, familias, tamaños, tracking o radios hardcodeados fuera de `globals.css` (la geometría de layout queda fuera a propósito).
+- shadcn/ui está configurado en `components.json`. Al agregar componentes con `npx shadcn@latest add <componente>`, adaptarlos a los tokens; si se suman tokens nuevos, registrarlos también en `src/lib/utils.ts` para que `cn` los combine bien.
 
 ## Excepciones de versiones
 
