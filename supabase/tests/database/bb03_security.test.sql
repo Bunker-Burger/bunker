@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(45);
 
 select has_table('public', 'payment_quotes', 'payment_quotes exists');
 select has_table('public', 'payment_webhook_events', 'payment_webhook_events exists');
@@ -64,6 +64,40 @@ select ok(
 select ok(
   not has_table_privilege('authenticated', 'public.payment_webhook_events', 'SELECT'),
   'browser-authenticated users cannot inspect webhook events'
+);
+select ok(
+  has_schema_privilege('service_role', 'private', 'USAGE'),
+  'service_role can resolve the private payment purge function'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'private.purge_expired_payment_data()',
+    'EXECUTE'
+  ),
+  'service_role can execute the payment retention purge'
+);
+select ok(
+  not has_schema_privilege('anon', 'private', 'USAGE')
+  and not has_schema_privilege('authenticated', 'private', 'USAGE'),
+  'browser roles cannot resolve functions in the private schema'
+);
+select ok(
+  not exists (
+    select 1
+    from pg_proc function_definition
+    join pg_namespace function_schema
+      on function_schema.oid = function_definition.pronamespace
+    where function_schema.nspname = 'private'
+      and function_definition.oid
+        <> 'private.purge_expired_payment_data()'::regprocedure
+      and has_function_privilege(
+        'service_role',
+        function_definition.oid,
+        'EXECUTE'
+      )
+  ),
+  'service_role cannot execute private validation or trigger functions'
 );
 select ok(
   not exists (
@@ -383,10 +417,18 @@ insert into public.payment_webhook_events (
   'bb03-event-1', 'bb03-payment-1', 'failed', now() - interval '91 days'
 );
 
+create temporary table purge_results (deleted_count bigint not null);
+grant select, insert on table purge_results to service_role;
+
+set local role service_role;
+insert into purge_results (deleted_count)
+select private.purge_expired_payment_data();
+reset role;
+
 select is(
-  private.purge_expired_payment_data(),
+  (select deleted_count from purge_results),
   3::bigint,
-  'purge reports every expired payment row it removes'
+  'service_role can invoke the purge and it reports every expired payment row'
 );
 select is(
   (select count(*)::bigint from public.payment_quotes
@@ -405,6 +447,15 @@ select is(
    where event_id = 'bb03-event-1'),
   0::bigint,
   'purge removes expired webhook events'
+);
+select is(
+  (select count(*)::bigint from public.payment_quotes
+   where id = '96000000-0000-0000-0000-000000000002')
+    +
+  (select count(*)::bigint from public.payment_attempts
+   where id = '97000000-0000-0000-0000-000000000002'),
+  2::bigint,
+  'purge preserves current quotes and attempts'
 );
 
 select ok(
