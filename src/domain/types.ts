@@ -1,4 +1,4 @@
-export type ProductType = "burger" | "sandwich" | "fries" | "beverage";
+export type ProductType = "burger" | "sandwich" | "fries" | "beverage" | "other";
 
 export interface ProductOption {
   id: string;
@@ -26,7 +26,8 @@ export interface Product {
   description: string;
   priceCents: bigint;
   compareAtPriceCents?: bigint;
-  imageUrl: string;
+  /** Null when the product has no photo yet. */
+  imageUrl: string | null;
   imageAlt?: string;
   published: boolean;
   featured: boolean;
@@ -70,3 +71,74 @@ export interface Quote {
   promotion: Promotion | null;
 }
 
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: string;
+  type: ProductType;
+  sortOrder: number;
+  visible: boolean;
+}
+
+export type PaymentMethodKind = "cash" | "bank_transfer" | "mercado_pago";
+
+export interface PaymentMethodSetting {
+  method: PaymentMethodKind;
+  displayName: string;
+  instructions: string;
+  enabled: boolean;
+  sortOrder: number;
+}
+
+export interface StoreSettings {
+  id: string;
+  slug: string;
+  name: string;
+  whatsappE164: string;
+  timezone: string;
+  currency: string;
+  isOpen: boolean;
+  isPublic: boolean;
+  deliveryFeeCents: bigint;
+  businessHours: Record<string, unknown>;
+  paymentMethods: PaymentMethodSetting[];
+}
+
+export type PromotionMechanic =
+  | { type: "fixed_price"; fixedPriceCents: bigint }
+  | { type: "percent_off"; percentOff: number }
+  | { type: "buy_x_get_y"; buyQuantity: number; getQuantity: number }
+  | { type: "free_delivery" };
+
+export interface PromotionWindow {
+  /** 0 = Sunday … 6 = Saturday, in the store timezone. */
+  dayOfWeek: number;
+  /** Local wall-clock time, "HH:MM:SS". */
+  startsAt: string;
+  endsAt: string;
+}
+
+/** Promotion as configured in the database; evaluation lives in the pricing engine. */
+export interface PromotionRule {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  badgeText: string | null;
+  priority: number;
+  active: boolean;
+  startsAt: Date;
+  endsAt: Date;
+  mechanic: PromotionMechanic;
+  channels: FulfilmentMethod[];
+  items: Array<{ productId: string; quantity: number }>;
+  schedule: PromotionWindow[];
+}
+
+export interface Catalog {
+  store: StoreSettings;
+  categories: Category[];
+  products: Product[];
+  promotions: PromotionRule[];
+}

@@ -13,11 +13,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run src/server/catalog/supabase-catalog-repository.integration.test.ts",
     "test:e2e": "playwright test",
     "db:push": "supabase db push --linked",
     "db:push:dry": "supabase db push --linked --dry-run",
     "db:diff": "supabase db diff --linked",
-    "db:test": "supabase test db --linked"
+    "db:test": "supabase test db --linked",
+    "db:types": "node --env-file-if-exists=.env.local scripts/generate-db-types.mjs",
+    "db:types:check": "node --env-file-if-exists=.env.local scripts/generate-db-types.mjs --check"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.15",
@@ -35,6 +38,7 @@
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "server-only": "0.0.1",
     "serwist": "9.5.13",
     "sonner": "2.0.7",
     "tailwind-merge": "3.3.1",
