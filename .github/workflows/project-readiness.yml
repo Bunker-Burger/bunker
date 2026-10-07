@@ -1,0 +1,35 @@
+name: Sincronizar disponibilidad del Project
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  push:
+    branches: [main]
+  schedule:
+    # Reconciliación de respaldo para cambios manuales de dependencias o del Project.
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-readiness-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: main
+    timeout-minutes: 5
+    env:
+      PROJECT_SYNC_TOKEN: ${{ secrets.PROJECT_SYNC_TOKEN }}
+      PROJECT_ORGANIZATION: Bunker-Burger
+      PROJECT_NUMBER: "1"
+      PROJECT_REPOSITORY: Bunker-Burger/bunker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Recalcular disponibilidad desde dependencias reales
+        run: node --experimental-strip-types src/automation/project-readiness.ts
