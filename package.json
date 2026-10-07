@@ -14,10 +14,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:test": "supabase test db"
+    "db:push": "supabase db push --linked",
+    "db:push:dry": "supabase db push --linked --dry-run",
+    "db:diff": "supabase db diff --linked",
+    "db:test": "supabase test db --linked"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.15",
