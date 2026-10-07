@@ -3,6 +3,7 @@ import { Home, ShoppingBag } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell, SiteHeader } from "./app-shell";
 import { BottomNav } from "./bottom-nav";
+import { createActiveSectionStore } from "./use-active-section";
 import { isTextEntry } from "./use-virtual-keyboard";
 
 const items = [
@@ -35,10 +36,10 @@ describe("AppShell", () => {
 });
 
 describe("BottomNav", () => {
-  it("marks the active item and announces badges", () => {
+  it("marks the active in-page anchor as the current location and announces badges", () => {
     render(<BottomNav activeHref="#menu" items={items} />);
     const nav = screen.getByRole("navigation", { name: "Navegación principal" });
-    expect(screen.getByRole("link", { name: "Menú" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Menú" })).toHaveAttribute("aria-current", "location");
     const cartLink = screen.getByRole("link", { name: /^Carrito/ });
     expect(cartLink).toHaveAccessibleName(/^Carrito\s*\(2\)$/);
     expect(cartLink).not.toHaveAttribute("aria-current");
@@ -73,6 +74,40 @@ describe("BottomNav", () => {
     );
     act(() => screen.getByRole("textbox", { name: "Nombre" }).focus());
     expect(screen.getByRole("navigation", { name: "Navegación principal" })).toBeVisible();
+  });
+
+  it("marks a real route as the current page", () => {
+    render(<BottomNav activeHref="/bunker" items={[...items, { href: "/bunker", label: "Admin", icon: Home }]} />);
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Menú" })).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("createActiveSectionStore", () => {
+  it("follows link activation and back/forward, and removes its listeners when unused", () => {
+    document.body.innerHTML = '<a href="#carrito">Carrito</a><section id="menu"></section><section id="carrito"></section>';
+    const store = createActiveSectionStore(["menu", "carrito"]);
+    const listener = vi.fn();
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+
+    expect(store.getServerSnapshot()).toBe("menu");
+    const unsubscribe = store.subscribe(listener);
+    expect(store.getSnapshot()).toBe("menu");
+
+    document.querySelector("a")?.click();
+    expect(store.getSnapshot()).toBe("carrito");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    window.location.hash = "#menu";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(store.getSnapshot()).toBe("menu");
+
+    unsubscribe();
+    expect(removeSpy.mock.calls.map(([type]) => type)).toEqual(
+      expect.arrayContaining(["hashchange", "scroll", "wheel", "touchmove", "keydown"])
+    );
+    window.location.hash = "";
+    document.body.innerHTML = "";
   });
 });
 

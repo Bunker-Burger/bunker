@@ -32,13 +32,13 @@ function AppShell({ header, bottomNav, children, className }: AppShellProps) {
     <div
       className={cn(
         "flex min-h-dvh flex-col",
-        bottomNav ? "pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+1.5rem)] lg:pb-8" : "pb-[env(safe-area-inset-bottom)]",
+        bottomNav ? "pb-(--fixed-bottom-clearance)" : "pb-[env(safe-area-inset-bottom)]",
         className
       )}
     >
       <a
         href="#contenido"
-        className="sr-only z-50 rounded-full bg-primary px-4 py-3 font-bold text-on-primary focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-full bg-primary font-bold text-on-primary focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:min-h-tap focus:px-4 focus:py-3"
       >
         Saltar al contenido
       </a>

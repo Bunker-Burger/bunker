@@ -13,3 +13,8 @@ if (!window.matchMedia) {
     dispatchEvent: () => false
   });
 }
+
+// jsdom does not lay out, so scrolling is a no-op there.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => undefined;
+}

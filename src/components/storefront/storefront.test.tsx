@@ -59,6 +59,21 @@ describe("Storefront", () => {
     expect(onInvalidProduct).toHaveBeenCalledOnce();
   });
 
+  it("marks exactly the section being navigated to as current in the bottom bar", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const nav = screen.getByRole("navigation", { name: "Navegación principal" });
+    const currentItems = () =>
+      within(nav).getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "location");
+
+    for (const label of ["Menú", "Carrito", "Checkout"]) {
+      await user.click(within(nav).getByRole("link", { name: new RegExp(`^${label}`) }));
+      expect(currentItems()).toHaveLength(1);
+      expect(currentItems()[0]).toHaveAccessibleName(new RegExp(`^${label}`));
+    }
+    window.location.hash = "";
+  });
+
   it("only shows Mercado Pago when the public capability is enabled", () => {
     const { rerender } = render(
       <Storefront initialProductSlug={null} mercadoPagoEnabled={false} />

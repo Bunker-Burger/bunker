@@ -4,6 +4,7 @@ import { CircleDollarSign, Plus, Settings2, ShoppingBag, UtensilsCrossed } from 
 import { useState, type ReactNode } from "react";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { useActiveSection } from "@/components/shell/use-active-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,8 +65,10 @@ const typeScale = [
   ["text-body-lg", "Cuerpo grande para descripciones y formularios."],
   ["text-body text-muted", "Cuerpo para listas de ingredientes y metadata."],
   ["text-body-sm text-muted", "Cuerpo chico para notas al pie."],
-  ["text-label font-bold uppercase tracking-[0.05em]", "Etiqueta de control"]
+  ["text-label font-bold uppercase tracking-label", "Etiqueta de control"]
 ] as const;
+
+const SHOWCASE_SECTIONS = ["tokens", "componentes", "estados", "overlays"] as const;
 
 const radii = [
   ["sm", "rounded-sm"],
@@ -87,6 +90,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 export function DesignSystemShowcase() {
   const [loading, setLoading] = useState(false);
   const [pickup, setPickup] = useState(true);
+  const activeSection = useActiveSection(SHOWCASE_SECTIONS);
 
   const simulateLoading = () => {
     setLoading(true);
@@ -97,13 +101,13 @@ export function DesignSystemShowcase() {
     <AppShell
       header={
         <SiteHeader>
-          <span className="font-display text-title font-bold tracking-[0.04em] text-primary">BÚNKER BURGER</span>
+          <span className="font-display text-title font-bold tracking-display text-primary">BÚNKER BURGER</span>
           <Badge variant="neutral">Sistema visual</Badge>
         </SiteHeader>
       }
       bottomNav={
         <BottomNav
-          activeHref="#componentes"
+          activeHref={`#${activeSection}`}
           items={[
             { href: "#tokens", label: "Tokens", icon: Settings2 },
             { href: "#componentes", label: "Componentes", icon: UtensilsCrossed },
@@ -114,7 +118,7 @@ export function DesignSystemShowcase() {
       }
     >
       <div className="grid gap-2 py-8">
-        <p className="m-0 text-badge font-bold uppercase tracking-[0.12em] text-primary">Streetcraft</p>
+        <p className="m-0 text-badge font-bold uppercase tracking-eyebrow text-primary">Streetcraft</p>
         <h1 className="m-0 font-display text-hero font-bold uppercase lg:text-hero-lg">Sistema visual</h1>
         <p className="m-0 max-w-2xl text-body-lg text-muted">
           Tokens, primitives y estados compartidos. Todo color, tipografía y radio sale de <code>globals.css</code>.

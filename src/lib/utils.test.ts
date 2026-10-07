@@ -16,5 +16,6 @@ describe("cn", () => {
     expect(cn("rounded-md", "rounded-xl")).toBe("rounded-xl");
     expect(cn("shadow-glow", "shadow-overlay")).toBe("shadow-overlay");
     expect(cn("min-h-12", "min-h-tap")).toBe("min-h-tap");
+    expect(cn("tracking-label", "tracking-badge")).toBe("tracking-badge");
   });
 });

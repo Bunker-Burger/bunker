@@ -14,7 +14,7 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FocusEvent } from "react";
 import { addCartLine, parsePersistedCart, serializeCart } from "@/domain/cart";
 import { calculateConfiguredUnitPrice, getDefaultSelection } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
@@ -22,6 +22,7 @@ import type { CartLine, FulfilmentMethod, Product, SelectedOptions } from "@/dom
 import { formatArs } from "@/lib/money";
 import { categoryLabels, products, type StoreCategory } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
+import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
 import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
 import {
@@ -33,6 +34,7 @@ import {
 import "./storefront.css";
 
 const CART_KEY = "bunker-cart";
+const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const categories = Object.keys(categoryLabels) as StoreCategory[];
 
@@ -68,6 +70,11 @@ function setCart(next: CartLine[] | ((current: CartLine[]) => CartLine[])) {
   const lines = typeof next === "function" ? next(readCart()) : next;
   localStorage.setItem(CART_KEY, serializeCart(lines));
   cartListeners.forEach((listener) => listener());
+}
+
+// Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
+function revealInScroller(event: FocusEvent<HTMLElement>) {
+  event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 function isKnownSlug(slug: string) {
@@ -166,6 +173,7 @@ export function Storefront({
   };
 
   const keyboardOpen = useVirtualKeyboardOpen();
+  const activeSection = useActiveSection(SECTION_IDS);
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
   const visibleProducts = products.filter((product) => product.categoryId === category && product.published);
@@ -191,7 +199,7 @@ export function Storefront({
           </a>
         </SiteHeader>
       }
-      bottomNav={<BottomNav activeHref="#menu" items={navItems} />}
+      bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
     >
       {notice ? <div className="toast" role="status">{notice}</div> : null}
 
@@ -207,6 +215,7 @@ export function Storefront({
               className={category === key ? "category-tab active" : "category-tab"}
               key={key}
               onClick={() => setCategory(key)}
+              onFocus={revealInScroller}
               type="button"
             >
               {categoryLabels[key]}

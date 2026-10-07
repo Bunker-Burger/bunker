@@ -36,6 +36,7 @@
   --font-sans: var(--font-space-grotesk), "Segoe UI", system-ui, sans-serif;
   --font-display: var(--font-oswald), "Arial Narrow", sans-serif;
 
+  --text-*: initial;
   --text-hero: 2.25rem;
   --text-hero--line-height: 2.5rem;
   --text-hero-lg: 3rem;
@@ -61,10 +62,20 @@
   --text-badge: 0.6875rem;
   --text-badge--line-height: 0.875rem;
 
+  /* Letter spacing from DESIGN.md: display/title/price 0.02em, label 0.05em, badge 0.08em; eyebrow kickers 0.12em. */
+  --tracking-*: initial;
+  --tracking-normal: 0em;
+  --tracking-display: 0.02em;
+  --tracking-label: 0.05em;
+  --tracking-badge: 0.08em;
+  --tracking-eyebrow: 0.12em;
+
+  --radius-*: initial;
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
+  --radius-full: 9999px;
 
   --shadow-glow: 0 4px 20px -2px rgb(245 158 11 / 0.35);
   --shadow-overlay: 0 1rem 3rem rgb(0 0 0 / 0.6);
@@ -76,16 +87,26 @@
 }
 
 :root {
-  --bottom-nav-height: 4.5rem;
   --header-height: 4.25rem;
+  --bottom-nav-height: 4.5rem;
+  /* Gap between the bottom nav and the viewport edge: flush on mobile, floating pill on desktop. */
+  --bottom-nav-offset: 0rem;
+  /* Height of extra fixed bars stacked above the nav (e.g. the cart tray); set where they render. */
+  --fixed-bottom-extra: 0rem;
+  /* Everything fixed at the bottom; content padding and focus scrolling keep clear of it. */
+  --fixed-bottom-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + 1rem);
   color-scheme: dark;
+}
+
+@media (min-width: 64rem) {
+  :root { --bottom-nav-offset: 1.5rem; }
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
     scroll-padding-top: calc(var(--header-height) + 0.75rem);
-    scroll-padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 1rem);
+    scroll-padding-bottom: var(--fixed-bottom-clearance);
   }
 
   body {

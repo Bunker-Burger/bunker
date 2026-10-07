@@ -16,12 +16,17 @@ function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.L
   );
 }
 
-function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
+function TabsTrigger({ className, onFocus, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
+      onFocus={(event) => {
+        // The list scrolls horizontally; keep the focused tab fully visible.
+        event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+        onFocus?.(event);
+      }}
       className={cn(
-        "min-h-tap shrink-0 cursor-pointer rounded-full border border-border-strong bg-surface px-4 text-body-sm font-bold uppercase tracking-[0.05em] text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-glow",
+        "min-h-tap shrink-0 cursor-pointer rounded-full border border-border-strong bg-surface px-4 text-body-sm font-bold uppercase tracking-label text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-on-primary data-[state=active]:shadow-glow",
         className
       )}
       {...props}

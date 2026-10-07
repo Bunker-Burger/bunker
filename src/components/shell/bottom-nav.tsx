@@ -30,19 +30,21 @@ export function BottomNav({ items, activeHref, label = "Navegación principal" }
       hidden={keyboardOpen}
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-glass pb-[env(safe-area-inset-bottom)] shadow-overlay backdrop-blur-lg",
-        "lg:inset-x-auto lg:right-6 lg:bottom-6 lg:rounded-full lg:border lg:border-border-strong lg:pb-0"
+        "lg:inset-x-auto lg:right-(--bottom-nav-offset) lg:bottom-(--bottom-nav-offset) lg:rounded-full lg:border lg:border-border-strong lg:pb-0"
       )}
     >
       <ul className="m-0 mx-auto flex h-(--bottom-nav-height) max-w-xl list-none items-stretch justify-around gap-1 p-1.5 lg:gap-0">
         {items.map(({ href, label: itemLabel, icon: Icon, badge }) => {
           const active = href === activeHref;
+          // In-page anchors mark the current location; real routes mark the current page.
+          const current = href.startsWith("#") ? "location" : "page";
           return (
             <li key={href} className="flex flex-1 lg:w-24 lg:flex-none">
               <a
                 href={href}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? current : undefined}
                 className={cn(
-                  "relative flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-badge font-bold uppercase tracking-[0.06em] no-underline transition-colors hover:text-foreground",
+                  "relative flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-badge font-bold uppercase tracking-badge no-underline transition-colors hover:text-foreground",
                   active ? "text-primary" : "text-muted"
                 )}
               >
