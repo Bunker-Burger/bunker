@@ -143,6 +143,7 @@ export function validateMigrationInputs(
 
 export interface ValidateBranchOptions {
   branch?: string | undefined;
+  headRef?: string | undefined;
   allowedBranches?: string[] | undefined;
 }
 
@@ -154,8 +155,12 @@ export type ValidateBranchResult =
  * Validates that the git ref / branch is allowed for migration workflows.
  */
 export function validateBranch(options: ValidateBranchOptions = {}): ValidateBranchResult {
-  const rawBranch = options.branch || "";
-  const normalized = rawBranch.replace(/^refs\/heads\//, "").trim();
+  const headRef = (options.headRef !== undefined ? options.headRef : (process.env.GITHUB_HEAD_REF || "")).trim();
+  const rawBranch = options.branch !== undefined ? options.branch : (headRef || process.env.GITHUB_REF || "");
+  const normalized = (headRef || rawBranch)
+    .replace(/^refs\/heads\//, "")
+    .replace(/^refs\/pull\/\d+\/merge$/, "")
+    .trim();
   const allowed = options.allowedBranches || ALLOWED_MIGRATION_BRANCHES;
 
   if (!normalized || !allowed.includes(normalized)) {
@@ -171,6 +176,7 @@ export function validateBranch(options: ValidateBranchOptions = {}): ValidateBra
 export interface ValidateTrustBoundaryOptions {
   eventName?: string | undefined;
   ref?: string | undefined;
+  headRef?: string | undefined;
   sha?: string | undefined;
   headSha?: string | undefined;
   verifiedSha?: string | undefined;
@@ -198,7 +204,8 @@ export function validateTrustBoundary(
   }
 
   const eventName = options.eventName !== undefined ? options.eventName : (process.env.GITHUB_EVENT_NAME || "");
-  const ref = options.ref !== undefined ? options.ref : (process.env.GITHUB_REF || "");
+  const headRef = (options.headRef !== undefined ? options.headRef : (process.env.GITHUB_HEAD_REF || "")).trim();
+  const ref = options.ref !== undefined ? options.ref : (headRef || process.env.GITHUB_REF || "");
   const sha = (options.sha !== undefined ? options.sha : (process.env.GITHUB_SHA || "")).trim();
   const headSha = (options.headSha !== undefined ? options.headSha : (process.env.GITHUB_HEAD_SHA || "")).trim();
   const verifiedSha = (
@@ -207,7 +214,10 @@ export function validateTrustBoundary(
       : (process.env.VERIFIED_SHA || process.env.INPUT_VERIFIED_SHA || "")
   ).trim();
   const allowedBranches = options.allowedBranches || ALLOWED_MIGRATION_BRANCHES;
-  const normalizedBranch = rawNormalize(ref);
+  const normalizedBranch = (headRef || ref)
+    .replace(/^refs\/heads\//, "")
+    .replace(/^refs\/pull\/\d+\/merge$/, "")
+    .trim();
 
   // 1. Trusted main workflow: push on main
   if (eventName === "push" && normalizedBranch === "main") {

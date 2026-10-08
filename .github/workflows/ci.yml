@@ -41,7 +41,8 @@ jobs:
       cancel-in-progress: false
     env:
       SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
-      GITHUB_REF: ${{ github.event.pull_request.head.ref || github.ref }}
+      GITHUB_HEAD_REF: ${{ github.head_ref }}
+      GITHUB_REF: ${{ github.ref }}
       GITHUB_SHA: ${{ github.sha }}
       GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       GITHUB_EVENT_NAME: ${{ github.event_name }}
