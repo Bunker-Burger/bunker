@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluateStoreStatus, StoreNotAcceptingOrdersError, type StoreOperatingSettings } from "@/domain/store-status";
+import type { PromotionRule } from "@/domain/types";
+import { parseUntrustedCheckout } from "./schema";
 import type { AuthoritativeProduct, PaymentQuotesPort, PricingRepository } from "../payments/ports";
 import { createAuthoritativeQuote } from "./quote";
 
@@ -76,14 +78,44 @@ function storeStatusFor(overrides: Partial<StoreOperatingSettings> = {}) {
   return async () => evaluateStoreStatus(settings, STATUS_NOW);
 }
 
-function createTestContext(product: AuthoritativeProduct = burgerFixture, status: Partial<StoreOperatingSettings> = {}) {
+/** Persisted promotion rule, as the repository returns it. */
+function promotionRule(overrides: Partial<PromotionRule> & Pick<PromotionRule, "id" | "priority" | "mechanic">): PromotionRule {
+  return {
+    slug: overrides.id,
+    name: overrides.id,
+    description: "",
+    badgeText: null,
+    active: true,
+    startsAt: new Date("2026-01-01T00:00:00Z"),
+    endsAt: new Date("2027-01-01T00:00:00Z"),
+    channels: ["delivery", "pickup"],
+    items: [],
+    schedule: [],
+    ...overrides
+  };
+}
+
+/** Default rule: each unit of the product at 50.000 below its base price (a one-item combo). */
+const unitCombo = (product: AuthoritativeProduct) =>
+  promotionRule({
+    id: `combo-${product.id}`,
+    priority: 1,
+    mechanic: { type: "fixed_price", fixedPriceCents: product.priceCents - 50000n },
+    items: [{ productId: product.id, quantity: 1 }]
+  });
+
+function createTestContext(
+  product: AuthoritativeProduct = burgerFixture,
+  status: Partial<StoreOperatingSettings> = {},
+  promotions: readonly PromotionRule[] = [unitCombo(product)]
+) {
   const repository: PricingRepository = {
     async findProduct(id) {
       if (id === product.id) return product;
       return null;
     },
-    async getApplicableDiscountCents() {
-      return 100000n;
+    async listPromotions() {
+      return promotions;
     }
   };
   const saved = new Map();
@@ -401,7 +433,8 @@ describe("createAuthoritativeQuote", () => {
       { repository, quotes, storeStatus, createId: () => "q", now: () => new Date() }
     );
 
-    expect(quote.totalCents).toBe(780000n - 100000n);
+    // One unit under the default one-item combo: 50.000 off the base price.
+    expect(quote.totalCents).toBe(780000n - 50000n);
   });
 });
 
@@ -454,5 +487,80 @@ describe("createAuthoritativeQuote — store status (BB-08)", () => {
     ).rejects.toBeInstanceOf(StoreNotAcceptingOrdersError);
     expect(saved.size).toBe(0);
     expect(productLookups).toBe(0);
+  });
+});
+
+describe("createAuthoritativeQuote — promotions (BB-09)", () => {
+  // Tuesday 2026-10-06 21:00 in Tucumán (UTC-3).
+  const TUESDAY_NIGHT = new Date("2026-10-07T00:00:00Z");
+  const order = (fulfilment: "delivery" | "pickup", quantity = 2) => ({
+    items: [{ productId: "burger-1", quantity, optionSelections: { size: ["triple"] }, notes: "" }],
+    fulfilment,
+    paymentMethod: "cash_exact" as const
+  });
+  const tuesdaySmash = promotionRule({
+    id: "martes",
+    name: "Martes de Smash",
+    priority: 10,
+    mechanic: { type: "percent_off", percentOff: 15 },
+    items: [{ productId: "burger-1", quantity: 1 }],
+    schedule: [{ dayOfWeek: 2, startsAt: "18:00:00", endsAt: "23:59:00" }]
+  });
+  const tenPercent = promotionRule({ id: "diez", priority: 5, mechanic: { type: "percent_off", percentOff: 10 } });
+  const freeDelivery = promotionRule({ id: "envio", priority: 20, mechanic: { type: "free_delivery" }, active: false });
+
+  async function quoteAt(now: Date, promotions: readonly PromotionRule[], fulfilment: "delivery" | "pickup" = "pickup") {
+    const { repository, quotes, saved, storeStatus } = createTestContext(burgerFixture, {}, promotions);
+    const quote = await createAuthoritativeQuote(order(fulfilment), { repository, quotes, storeStatus, createId: () => "q", now: () => now });
+    return { quote, saved };
+  }
+
+  it("applies one persisted promotion, computed on the server, and stores it in the quote snapshot", async () => {
+    const { quote, saved } = await quoteAt(TUESDAY_NIGHT, [tenPercent, tuesdaySmash, freeDelivery]);
+
+    // 2 × (780.000 + 160.000) = 1.880.000; 15% = 282.000. The 10% does not stack; the paused
+    // free-delivery rule is ignored.
+    expect(quote).toMatchObject({ subtotalCents: 1_880_000n, discountCents: 282_000n, deliveryCents: 0n, totalCents: 1_598_000n });
+    expect(quote.promotion).toMatchObject({
+      promotionId: "martes",
+      name: "Martes de Smash",
+      explanation: "15% de descuento en productos seleccionados",
+      productDiscountCents: 282_000n,
+      deliveryDiscountCents: 0n
+    });
+    expect(saved.get("q")).toEqual(quote);
+  });
+
+  it("evaluates the weekly window in the store time zone at quote time", async () => {
+    // Wednesday 2026-10-07 20:00 local: the Tuesday promotion is over; the 10% applies.
+    const { quote } = await quoteAt(new Date("2026-10-07T23:00:00Z"), [tenPercent, tuesdaySmash]);
+    expect(quote.promotion?.promotionId).toBe("diez");
+    expect(quote.discountCents).toBe(188_000n);
+  });
+
+  it("follows a pause persisted between two quotes", async () => {
+    const promotions = [tuesdaySmash];
+    expect((await quoteAt(TUESDAY_NIGHT, promotions)).quote.promotion?.promotionId).toBe("martes");
+    const paused = [{ ...tuesdaySmash, active: false }];
+    expect((await quoteAt(TUESDAY_NIGHT, paused)).quote).toMatchObject({ promotion: null, discountCents: 0n, totalCents: 1_880_000n });
+  });
+
+  it("waives the delivery fee once with free delivery, which then replaces any other promotion", async () => {
+    const { quote } = await quoteAt(TUESDAY_NIGHT, [tuesdaySmash, { ...freeDelivery, active: true }], "delivery");
+    expect(quote).toMatchObject({ deliveryCents: 120_000n, discountCents: 120_000n, totalCents: 1_880_000n });
+    expect(quote.promotion?.promotionId).toBe("envio");
+  });
+
+  it.each([
+    ["a promotion id", { promotionId: "martes" }],
+    ["a discount", { discountCents: "999999" }],
+    ["a total", { totalCents: "1" }]
+  ])("rejects a checkout that carries %s from the browser", (_case, extra) => {
+    expect(() => parseUntrustedCheckout({ ...order("pickup"), ...extra })).toThrow();
+  });
+
+  it("rejects line prices sent by the browser", () => {
+    const tampered = { ...order("pickup"), items: [{ ...order("pickup").items[0], unitPriceCents: "1" }] };
+    expect(() => parseUntrustedCheckout(tampered)).toThrow();
   });
 });

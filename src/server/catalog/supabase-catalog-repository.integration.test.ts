@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { catalogImageBaseUrl, readSupabaseConfig } from "@/server/supabase/config";
 import type { Database } from "@/server/supabase/database.types";
 import { loadPublicCatalog } from "./catalog-service";
-import { getAdminCatalog, getStoreStatus } from "./index";
+import { quoteCart } from "@/domain/pricing";
+import { toPromotionRule } from "@/domain/public-promotions";
+import { getAdminCatalog, getPromotionsForQuote, getPublicPromotions, getStoreStatus } from "./index";
 import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
 /*
@@ -140,6 +142,45 @@ describe.skipIf(!enabled)("Supabase catalog (cloud development project)", () => 
 
     it("returns not_found for an unknown store", async () => {
       expect(await getStoreStatus("tienda-inexistente")).toMatchObject({ ok: false, error: { code: "not_found" } });
+    });
+  });
+
+  describe("promotions for quoting via getPromotionsForQuote()", () => {
+    const SMASH_ID = "0199b2c8-40b0-7000-8000-000000000201";
+    const smash = (quantity: number) => [{ productId: SMASH_ID, quantity, unitPriceCents: 780000n, basePriceCents: 780000n }];
+    const context = (now: string) => ({ now: new Date(now), timezone: "America/Argentina/Tucuman" });
+
+    it("reads only active rules and applies the seed's Tuesday promotion inside its window", async () => {
+      const rules = await getPromotionsForQuote("bunker-burger");
+      if (!rules.ok) throw new Error(`${rules.error.code}: ${rules.error.message}`);
+      // "envio-gratis" is paused in the seed: RLS does not even return it to anonymous reads.
+      expect(rules.value.map((rule) => rule.slug)).toEqual(["martes-de-smash"]);
+
+      // Tuesday 2026-10-13 21:00 local: 15% on 2 × 780.000.
+      const tuesday = quoteCart(smash(2), rules.value, "pickup", 120000n, context("2026-10-14T00:00:00Z"));
+      expect(tuesday).toMatchObject({ discountCents: 234000n, totalCents: 1326000n });
+      expect(tuesday.promotion).toMatchObject({ slug: "martes-de-smash", explanation: "15% de descuento en productos seleccionados" });
+
+      // Wednesday 2026-10-14 21:00 local: outside the weekly window.
+      expect(quoteCart(smash(2), rules.value, "pickup", 120000n, context("2026-10-15T00:00:00Z"))).toMatchObject({ promotion: null, discountCents: 0n });
+    });
+
+    it("publishes the same rules to the menu, by product slug and without admin text, quoting the same", async () => {
+      const [published, rules] = await Promise.all([getPublicPromotions("bunker-burger"), getPromotionsForQuote("bunker-burger")]);
+      if (!published.ok) throw new Error(`${published.error.code}: ${published.error.message}`);
+      if (!rules.ok) throw new Error(`${rules.error.code}: ${rules.error.message}`);
+      expect(published.value).toMatchObject([{ slug: "martes-de-smash", items: [{ productSlug: "smash-bunker-doble", quantity: 1 }] }]);
+      expect(JSON.stringify(published.value)).not.toMatch(/Fixture de demostración|15% OFF/);
+
+      // The storefront resolves the slug to its own product id; the result matches the quote.
+      const menuRules = published.value.map((promotion) => toPromotionRule(promotion, new Map([["smash-bunker-doble", SMASH_ID]])));
+      const tuesday = context("2026-10-14T00:00:00Z");
+      const { promotion: menuPromotion, ...menuTotals } = quoteCart(smash(2), menuRules, "pickup", 120000n, tuesday);
+      const { promotion: serverPromotion, ...serverTotals } = quoteCart(smash(2), rules.value, "pickup", 120000n, tuesday);
+      expect(menuTotals).toEqual(serverTotals);
+      expect(menuTotals).toMatchObject({ discountCents: 234000n, totalCents: 1326000n });
+      // Same promotion and amounts; only the badge text, which is never published, is absent.
+      expect(menuPromotion).toEqual({ ...serverPromotion, badgeText: null });
     });
   });
 

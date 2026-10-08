@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublicStoreStatus } from "@/domain/store-status";
 import { Storefront } from "./storefront";
+import { PROMOTIONS_ENDPOINT } from "./use-public-promotions";
 import { STORE_STATUS_ENDPOINT } from "./use-store-status";
 
 /*
@@ -98,7 +99,8 @@ describe("checkout with the real store status", () => {
     await waitFor(() => expect(screen.getByTestId("store-status")).toHaveTextContent(message));
     expect(within(checkout).getByRole("button", { name: "No se pueden enviar pedidos ahora" })).toBeDisabled();
     expectNoSendAction(checkout);
-    expect(statusRequests).toEqual([STORE_STATUS_ENDPOINT]);
+    // The status, plus the promotions read for the estimate (BB-09); nothing else.
+    expect(statusRequests).toEqual([STORE_STATUS_ENDPOINT, PROMOTIONS_ENDPOINT]);
 
     // The cart stays persisted and the menu stays usable.
     expect(localStorage.getItem("bunker-cart")).toContain("smash-doble");

@@ -34,6 +34,9 @@
 .product-title-row { display: flex; align-items: start; justify-content: space-between; gap: .5rem; }
 .product-title-row h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-title); font-weight: 600; line-height: 1.15; text-transform: uppercase; }
 .product-title-row strong { flex: 0 0 auto; color: var(--color-primary); font-family: var(--font-display); font-size: var(--text-price); }
+.product-price { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; }
+.compare-at { color: var(--color-muted); font-size: var(--text-body-sm); }
+.promo-note { display: block; color: var(--color-primary); font-size: var(--text-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .product-copy p { display: -webkit-box; overflow: hidden; margin: .45rem 0 .6rem; color: var(--color-muted); font-size: var(--text-body-sm); line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .product-meta { color: var(--color-muted); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); }
 .add-button { position: absolute; right: .7rem; bottom: .65rem; display: inline-flex; align-items: center; gap: .25rem; min-height: var(--spacing-tap); padding: .35rem 1rem; border: 0; border-radius: var(--radius-full); background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-body-sm); font-weight: 700; text-transform: uppercase; cursor: pointer; }
@@ -108,6 +111,8 @@
 .whatsapp-button { width: 100%; }
 .whatsapp-button:disabled { background: var(--color-surface-high); color: var(--color-muted); box-shadow: none; cursor: not-allowed; }
 .summary-card > small { display: block; margin-top: .55rem; color: var(--color-muted); text-align: center; }
+.summary-promotion { margin: .25rem 0; color: var(--color-primary); }
+.summary-promotion small { display: block; color: var(--color-muted); font-size: var(--text-body-sm); }
 .store-status-note { margin: 0 0 .75rem; color: var(--color-foreground); font-size: var(--text-body-sm); text-align: center; }
 
 /* While the tray is on screen, reserve its height (min-height + borders + gap) in the shell's bottom clearance. */

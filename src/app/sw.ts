@@ -18,9 +18,11 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Store status (BB-08) must always come from the server: never answer it from a cache.
+    // Store status (BB-08) and promotions (BB-09) must always come from the server: never
+    // answer them from a cache.
     {
-      matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname === "/api/store/status",
+      matcher: ({ sameOrigin, url: { pathname } }) =>
+        sameOrigin && (pathname === "/api/store/status" || pathname === "/api/store/promotions"),
       handler: new NetworkOnly()
     },
     ...defaultCache

@@ -29,10 +29,12 @@ import {
   validateOptionSelection
 } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
-import type { CartLine, FulfilmentMethod, Product, SelectedOptions } from "@/domain/types";
+import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
+import { toPromotionRule } from "@/domain/public-promotions";
+import type { CartLine, FulfilmentMethod, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useCart } from "@/lib/cart-store";
-import { categoryLabels, products, type StoreCategory } from "@/data/catalog";
+import { categoryLabels, products, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -43,7 +45,9 @@ import {
   toggleOption,
   type PaymentMethod
 } from "./storefront-state";
-import { describeStoreStatus, useStoreStatus } from "./use-store-status";
+import { useNow } from "./use-now";
+import { usePublicPromotions } from "./use-public-promotions";
+import { describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import "./storefront.css";
 
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
@@ -72,6 +76,9 @@ interface StorefrontProps {
   onInvalidProduct?: () => void;
 }
 
+/** Promotion items name products by slug; the cart uses the storefront's product ids. */
+const PRODUCT_ID_BY_SLUG: ReadonlyMap<string, string> = new Map(products.map((product) => [product.slug, product.id]));
+
 function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string): CartLine {
   return {
     id: product.id,
@@ -91,6 +98,22 @@ export function Storefront({
   showAdminNav = false,
   onInvalidProduct
 }: StorefrontProps) {
+  const now = useNow();
+  const storeStatus = useStoreStatus();
+  const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
+  // Rules published by the server (fresh read, same as the quote); never a static copy.
+  const publicPromotions = usePublicPromotions();
+  const promotions = useMemo(
+    () => publicPromotions.map((promotion) => toPromotionRule(promotion, PRODUCT_ID_BY_SLUG)),
+    [publicPromotions]
+  );
+  const deliveryFeeCents =
+    storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
+  const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
+  // The card price is what this product alone would cost with the selected fulfilment.
+  const cardContext = now
+    ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
+    : null;
   const [category, setCategory] = useState<StoreCategory>("burgers");
   const [cart, setCart] = useCart();
   const [editingLine, setEditingLine] = useState<CartLine | null>(null);
@@ -246,6 +269,7 @@ export function Storefront({
         <div className="product-grid">
           {visibleProducts.map((product, index) => (
             <ProductCard
+              promotion={cardContext ? promotionalPrice(product, promotions, cardContext) : null}
               featured={category === "burgers" && index === 0}
               key={product.id}
               onAdd={() => addDirect(product)}
@@ -260,6 +284,13 @@ export function Storefront({
       <CheckoutSection
         cart={cart}
         mercadoPagoEnabled={mercadoPagoEnabled}
+        deliveryFeeCents={deliveryFeeCents}
+        fulfilment={fulfilment}
+        now={now}
+        onFulfilmentChange={setFulfilment}
+        promotions={promotions}
+        storeStatus={storeStatus}
+        timezone={timezone}
       />
 
       {itemCount > 0 && !keyboardOpen ? (
@@ -298,8 +329,9 @@ export function Storefront({
   );
 }
 
-function ProductCard({ product, featured, onOpen, onAdd }: {
+function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
   product: Product;
+  promotion: PromotionalPrice | null;
   featured: boolean;
   onOpen: () => void;
   onAdd: () => void;
@@ -317,8 +349,12 @@ function ProductCard({ product, featured, onOpen, onAdd }: {
         <div className="product-copy">
           <div className="product-title-row">
             <h3>{product.name}</h3>
-            <strong>{formatArs(product.priceCents)}</strong>
+            <span className="product-price">
+              {promotion ? <s className="compare-at"><span className="sr-only">Antes </span>{formatArs(promotion.compareAtPriceCents)}</s> : null}
+              <strong>{formatArs(promotion?.priceCents ?? product.priceCents)}</strong>
+            </span>
           </div>
+          {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
           <p>{product.description}</p>
           <span className="product-meta">{product.type === "burger" ? "SMASH • 200G" : categoryLabels[product.categoryId as StoreCategory]}</span>
         </div>
@@ -525,16 +561,53 @@ function CartSection({
   );
 }
 
-function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; mercadoPagoEnabled: boolean }) {
-  const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
+/** Cart lines as the promotion engine reads them; base prices come from the catalog, not the cart. */
+function toPromotionLines(cart: CartLine[]): PromotionLine[] {
+  return cart.map((line) => {
+    const basePriceCents = products.find((product) => product.id === line.productId)?.priceCents ?? line.unitPriceCents;
+    return {
+      productId: line.productId,
+      quantity: line.quantity,
+      unitPriceCents: line.unitPriceCents,
+      basePriceCents: basePriceCents > line.unitPriceCents ? line.unitPriceCents : basePriceCents
+    };
+  });
+}
+
+function CheckoutSection({
+  cart,
+  mercadoPagoEnabled,
+  now,
+  promotions,
+  fulfilment,
+  onFulfilmentChange: setFulfilment,
+  storeStatus,
+  deliveryFeeCents,
+  timezone
+}: {
+  cart: CartLine[];
+  mercadoPagoEnabled: boolean;
+  now: Date | null;
+  promotions: readonly PromotionRule[];
+  fulfilment: FulfilmentMethod;
+  onFulfilmentChange: (fulfilment: FulfilmentMethod) => void;
+  storeStatus: StoreStatusView;
+  deliveryFeeCents: bigint | null;
+  timezone: string;
+}) {
   const [selectedPayment, setPayment] = useState<PaymentMethod>(mercadoPagoEnabled ? "mercado-pago" : "transfer");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const storeStatus = useStoreStatus();
-  const deliveryFeeCents =
-    storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
-  // Display-only estimate; the authoritative quote is computed on the server.
-  const quote = useMemo(() => quoteCart(cart, [], fulfilment, deliveryFeeCents ?? 0n), [cart, fulfilment, deliveryFeeCents]);
+  const nowMs = now?.getTime() ?? null;
+  // Display-only estimate with the same engine the server quote uses; the server recomputes it.
+  const quote = useMemo(
+    () =>
+      quoteCart(toPromotionLines(cart), nowMs === null ? [] : promotions, fulfilment, deliveryFeeCents ?? 0n, {
+        now: new Date(nowMs ?? 0),
+        timezone
+      }),
+    [cart, fulfilment, deliveryFeeCents, promotions, nowMs, timezone]
+  );
   const payment = !mercadoPagoEnabled && selectedPayment === "mercado-pago" ? "transfer" : selectedPayment;
   const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
@@ -572,6 +645,12 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
           <div className="summary-rule" />
           <div className="summary-line muted"><span>Subtotal</span><strong>{formatArs(quote.subtotalCents)}</strong></div>
           <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending ? "A confirmar" : quote.deliveryCents === 0n ? "$0" : formatArs(quote.deliveryCents)}</strong></div>
+          {quote.promotion ? (
+            <div className="summary-promotion" data-testid="applied-promotion">
+              <div className="summary-line"><span>Promoción: {quote.promotion.name}</span><strong>-{formatArs(quote.discountCents)}</strong></div>
+              <small>{quote.promotion.explanation}. No se acumula con otras promociones.</small>
+            </div>
+          ) : null}
           <div className="summary-total"><span>Total estimado</span><strong>{formatArs(quote.totalCents)}</strong></div>
           <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
           {!hasValidLines ? (
