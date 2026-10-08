@@ -38,6 +38,7 @@ jobs:
       INPUT_BRANCH: ${{ github.ref }}
       GITHUB_REF: ${{ github.ref }}
       GITHUB_SHA: ${{ github.sha }}
+      GITHUB_HEAD_SHA: ${{ github.sha }}
       GITHUB_EVENT_NAME: ${{ github.event_name }}
       VERIFIED_SHA: ${{ inputs.verified_sha || vars.AUTHORIZED_DEV_DB_SHA }}
     steps:

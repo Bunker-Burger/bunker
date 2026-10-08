@@ -172,6 +172,7 @@ export interface ValidateTrustBoundaryOptions {
   eventName?: string | undefined;
   ref?: string | undefined;
   sha?: string | undefined;
+  headSha?: string | undefined;
   verifiedSha?: string | undefined;
   allowedBranches?: string[] | undefined;
   isCi?: boolean | undefined;
@@ -199,6 +200,7 @@ export function validateTrustBoundary(
   const eventName = options.eventName !== undefined ? options.eventName : (process.env.GITHUB_EVENT_NAME || "");
   const ref = options.ref !== undefined ? options.ref : (process.env.GITHUB_REF || "");
   const sha = (options.sha !== undefined ? options.sha : (process.env.GITHUB_SHA || "")).trim();
+  const headSha = (options.headSha !== undefined ? options.headSha : (process.env.GITHUB_HEAD_SHA || "")).trim();
   const verifiedSha = (
     options.verifiedSha !== undefined
       ? options.verifiedSha
@@ -209,32 +211,35 @@ export function validateTrustBoundary(
 
   // 1. Trusted main workflow: push on main
   if (eventName === "push" && normalizedBranch === "main") {
-    return { ok: true, reason: "trusted-main", sha };
+    return { ok: true, reason: "trusted-main", sha: sha || headSha };
   }
 
   // 2. Explicit verified SHA check (manual maintainer dispatch or repository variable)
-  if (verifiedSha.length >= 7 && sha.length >= 7) {
-    const normSha = sha.toLowerCase();
+  const candidateShas = [headSha, sha].filter((s) => s.length >= 7).map((s) => s.toLowerCase());
+  if (verifiedSha.length >= 7 && candidateShas.length > 0) {
     const normVerified = verifiedSha.toLowerCase();
-    if (normSha.startsWith(normVerified) || normVerified.startsWith(normSha)) {
+    const matchingSha = candidateShas.find(
+      (cand) => cand.startsWith(normVerified) || normVerified.startsWith(cand)
+    );
+    if (matchingSha) {
       if (normalizedBranch && !allowedBranches.includes(normalizedBranch)) {
         return {
           ok: false,
           error: `Ejecución cloud bloqueada: la rama '${normalizedBranch}' no está en la lista de ramas autorizadas (${allowedBranches.join(", ")}).`,
         };
       }
-      return { ok: true, reason: "verified-sha", sha };
+      return { ok: true, reason: "verified-sha", sha: matchingSha };
     }
     return {
       ok: false,
-      error: `Ejecución cloud bloqueada: el commit '${sha}' no coincide con el SHA autorizado ('${verifiedSha}').`,
+      error: `Ejecución cloud bloqueada: el commit '${candidateShas[0]}' no coincide con el SHA autorizado ('${verifiedSha}').`,
     };
   }
 
   // 3. Untrusted event or unverified SHA
   return {
     ok: false,
-    error: `Ejecución cloud bloqueada: el commit '${sha.slice(0, 7) || "desconocido"}' en '${ref || "desconocido"}' no cuenta con autorización verificada de un mantenedor para acceder a credenciales cloud.`,
+    error: `Ejecución cloud bloqueada: el commit '${(candidateShas[0] || sha).slice(0, 7) || "desconocido"}' en '${ref || "desconocido"}' no cuenta con autorización verificada de un mantenedor para acceder a credenciales cloud.`,
   };
 }
 
