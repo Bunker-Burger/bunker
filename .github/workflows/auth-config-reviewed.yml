@@ -1,0 +1,44 @@
+name: Supabase Auth — registro público deshabilitado (main)
+
+# Evidencia reproducible de BB-11: el proyecto cloud rechaza registros directos a Auth y
+# mantiene el login por email para admins aprovisionados. Solo corre código de main.
+# No toca la base, no crea usuarios: el probe de signUp se envía únicamente si
+# /auth/v1/settings ya informa disable_signup=true (ver scripts/check-auth-signup.mjs).
+on:
+  workflow_dispatch:
+    inputs:
+      expected_project_ref:
+        description: "Ref del proyecto que deben apuntar los secretos (development: zokkgocmcaqcujltfkjf)"
+        required: true
+        type: string
+        default: zokkgocmcaqcujltfkjf
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-auth-config
+  cancel-in-progress: false
+
+jobs:
+  auth-signup-disabled:
+    name: Auth sin registro público (cloud)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout exclusivo de main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Verificar configuración de Auth (sin imprimir claves)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPECTED_PROJECT_REF: ${{ inputs.expected_project_ref }}
+        run: node scripts/check-auth-signup.mjs
