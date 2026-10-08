@@ -38,6 +38,8 @@ export const accounts = {
   metadataAdmin: { id: "u-meta", email: "meta@bunker.test", password: "clave-meta", userMetadata: { role: "admin", is_admin: true, store: STORE.slug }, memberships: [] },
   // Admin of a different store: cross access must be refused.
   otherStore: { id: "u-other", email: "otra@tienda.test", password: "clave-otra", memberships: [{ storeId: "store-2", storeSlug: "otra-tienda", role: "owner", active: true }] },
+  // No membership, and a profile big enough that @supabase/ssr stores the session in chunks.
+  largeProfile: { id: "u-large", email: "grande@bunker.test", password: "clave-grande", userMetadata: { bio: "x".repeat(4000) }, memberships: [] },
   // Membership switched off by the owner.
   inactive: { id: "u-inactive", email: "baja@bunker.test", password: "clave-baja", memberships: [{ storeId: STORE.id, storeSlug: STORE.slug, role: "admin", active: false }] }
 } satisfies Record<string, FakeUser>;

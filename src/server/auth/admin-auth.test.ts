@@ -1,3 +1,4 @@
+import { AuthRetryableFetchError } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { signIn, signOut } from "@/app/bunker/actions";
 import {
@@ -21,10 +22,13 @@ import { getAdminSession, hasAdminSession, requireAdminSession } from "./session
  */
 
 const jar = vi.hoisted(() => new Map<string, string>());
+/** Every cookie name ever written with a value during the test. */
+const written = vi.hoisted(() => new Set<string>());
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     getAll: () => [...jar].map(([name, value]) => ({ name, value })),
     set: (name: string, value: string, options: { maxAge?: number } = {}) => {
+      if (value !== "" && options.maxAge !== 0) written.add(name);
       if (value === "" || options.maxAge === 0) jar.delete(name);
       else jar.set(name, value);
     }
@@ -33,14 +37,22 @@ vi.mock("next/headers", () => ({
 // getAdminSession memoizes per render pass with React's cache(); each test is its own request.
 vi.mock("react", async (importOriginal) => ({ ...(await importOriginal<typeof import("react")>()), cache: <T,>(fn: T) => fn }));
 
-const sessionClient = vi.hoisted(() => ({ fail: false }));
+/**
+ * Fault injection on the session client. `fail`: building it throws. `signOut`: replaces its
+ * `auth.signOut` with an SDK that does NOT drop the local session (as other @supabase versions
+ * do on failure, supabase-js#2501): "error" resolves with a retryable error, "throws" rejects.
+ */
+const sessionClient = vi.hoisted(() => ({ fail: false, signOut: "real" as "real" | "error" | "throws" }));
 vi.mock("@/server/supabase/clients", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/server/supabase/clients")>();
   return {
     ...original,
     createSessionClient: async (...args: Parameters<typeof original.createSessionClient>) => {
       if (sessionClient.fail) throw new Error("simulated failure building the session client");
-      return original.createSessionClient(...args);
+      const client = await original.createSessionClient(...args);
+      if (sessionClient.signOut === "error") client.auth.signOut = async () => ({ error: new AuthRetryableFetchError("fetch failed", 0) });
+      if (sessionClient.signOut === "throws") client.auth.signOut = async () => Promise.reject(new Error("socket hang up"));
+      return client;
     }
   };
 });
@@ -49,7 +61,9 @@ let fake: FakeSupabase;
 
 beforeEach(() => {
   jar.clear();
+  written.clear();
   sessionClient.fail = false;
+  sessionClient.signOut = "real";
   stubSupabaseEnv();
   fake = installFakeSupabase();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -94,6 +108,44 @@ describe("signing in (/bunker)", () => {
     expect(jar.size).toBe(0);
     expect(fake.requests.some(({ path }) => path.startsWith("/auth/v1/logout"))).toBe(true);
     expect(fake.sessions.every((session) => session.revoked)).toBe(true);
+  });
+
+  describe.each([
+    ["Auth answers 500 to the logout", { path: "/logout", status: 500 }],
+    ["the logout request fails on the network", { path: "/logout", status: "network" }]
+  ] as const)("when the rejection's sign-out fails (%s)", (_failure, failure) => {
+    it.each([
+      ["no membership (user_metadata claims admin)", accounts.metadataAdmin],
+      ["admin of another store", accounts.otherStore],
+      ["inactive membership", accounts.inactive],
+      ["no membership, session stored in chunked cookies", accounts.largeProfile]
+    ])("still refuses %s with the same message and leaves no auth cookie", async (_case, user) => {
+      fake.failAuth = failure;
+
+      expect(await signInAdmin(user.email, user.password)).toEqual({ ok: false, message: INVALID_CREDENTIALS });
+      // Sign-in did store a session first (chunked for the large profile)…
+      expect([...written].some((name) => name.startsWith(AUTH_COOKIE))).toBe(true);
+      if (user === accounts.largeProfile) expect(written.has(`${AUTH_COOKIE}.1`)).toBe(true);
+      // …and none of it survives, although Supabase never confirmed the revocation.
+      expect([...jar.keys()].filter((name) => name.startsWith(AUTH_COOKIE))).toEqual([]);
+      expect(fake.sessions.some((session) => !session.revoked)).toBe(true);
+      expect(await hasAdminSession()).toBe(false);
+    });
+  });
+
+  it.each([
+    ["resolves with an error", "error"],
+    ["throws", "throws"]
+  ] as const)("expires the cookies itself when the SDK's sign-out %s and keeps the local session", async (_case, behavior) => {
+    sessionClient.signOut = behavior;
+    for (const user of [accounts.metadataAdmin, accounts.otherStore, accounts.inactive, accounts.largeProfile]) {
+      jar.clear();
+      written.clear();
+      expect(await signInAdmin(user.email, user.password)).toEqual({ ok: false, message: INVALID_CREDENTIALS });
+      expect([...written].some((name) => name.startsWith(AUTH_COOKIE))).toBe(true);
+      expect([...jar.keys()].filter((name) => name.startsWith(AUTH_COOKIE))).toEqual([]);
+      expect(await hasAdminSession()).toBe(false);
+    }
   });
 
   it("validates input before calling Supabase", async () => {
@@ -235,6 +287,14 @@ describe("signing out", () => {
     expect(await getAdminSession()).toMatchObject({ ok: false, error: { code: "unauthorized" } });
     // Nothing pretends the server-side session ended.
     expect(fake.sessions.some((issued) => !issued.revoked)).toBe(true);
+  });
+
+  it("when the SDK's sign-out fails without dropping the session: clears this device anyway", async () => {
+    signedInAs(accounts.admin);
+    sessionClient.signOut = "error";
+
+    expect(await signedOutVia()).toBe("/bunker?sesion=local");
+    expect(authCookies()).toEqual([]);
   });
 
   it("without Supabase configuration: clears this device and says the revocation was not confirmed", async () => {

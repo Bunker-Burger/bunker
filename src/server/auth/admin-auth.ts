@@ -43,8 +43,18 @@ export async function signInAdmin(email: string, password: string): Promise<{ ok
 
   const membership = await createSupabaseAdminAccess(client).requireStoreAdmin(STORE_SLUG);
   if (!membership.ok) {
-    // Never leave a session behind for someone who is not an admin of this store.
-    await client.auth.signOut({ scope: "local" });
+    // Never leave a session behind for someone who is not an admin of this store: revoke it,
+    // and expire this device's cookies ourselves whatever the SDK did (it may keep them when the
+    // sign-out fails or throws).
+    // The answer stays the same either way, so it reveals nothing about the account.
+    try {
+      const { error: signOutError } = await client.auth.signOut({ scope: "local" });
+      if (signOutError) reportCatalogError("admin", fromAuthError(signOutError).error);
+    } catch (thrown) {
+      reportCatalogError("admin", fromAuthError(thrown).error);
+    } finally {
+      await clearAuthCookies();
+    }
     if (membership.error.code !== "unauthorized") reportCatalogError("admin", membership.error);
     return { ok: false, message: membership.error.code === "unauthorized" ? INVALID_CREDENTIALS : AUTH_UNAVAILABLE };
   }
@@ -66,10 +76,11 @@ async function clearAuthCookies() {
 }
 
 /**
- * Ends this device's session. Supabase is asked to revoke it, but its client keeps the cookies
- * when that call fails (5xx, network): the auth cookies are therefore always expired here as
- * well, and the outcome says whether the revocation was confirmed, so the UI never claims more
- * than what happened. A failure to clear the cookies throws: it is never reported as signed out.
+ * Ends this device's session. Supabase is asked to revoke it, but the SDK does not always drop
+ * the local session on failure (e.g. when it cannot refresh an expired session first, or when
+ * the call throws): the auth cookies are therefore always expired here as well, and the outcome
+ * says whether the revocation was confirmed, so the UI never claims more than what happened.
+ * A failure to clear the cookies throws: it is never reported as signed out.
  */
 export async function signOutAdmin(): Promise<SignOutOutcome> {
   let revoked = false;

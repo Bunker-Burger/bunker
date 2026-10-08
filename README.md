@@ -75,7 +75,7 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 - **`/bunker/admin`** llama a `requireAdminSession()`: quien no es admin va al login. Si la verificación no puede ejecutarse, muestra un error y no da acceso.
 - **Login** (Server Action): si la cuenta no es admin de la tienda, la sesión recién creada se cierra en el acto. Hay un único mensaje para credenciales incorrectas y para falta de acceso. Solo redirige a rutas dentro de `/bunker/admin` (`safeAdminPath`), así que no hay open redirects.
 - **Cookies.** `src/proxy.ts` (antes "middleware") renueva la sesión vencida una vez por request en `/` y `/bunker/**` y entrega los tokens rotados a la página y al navegador, que es el patrón de `@supabase/ssr`. No es autorización.
-- **Cierre de sesión:** pide a Supabase revocar la sesión (`scope: "local"`) y **siempre** expira las cookies de Auth de este dispositivo (todos los chunks), porque el SDK las conserva si la revocación falla.
+- **Cierre de sesión:** pide a Supabase revocar la sesión (`scope: "local"`) y **siempre** expira las cookies de Auth de este dispositivo (todos los chunks): no depende de que el SDK descarte la sesión local, porque no lo hace en todos los casos (por ejemplo, si no puede refrescar una sesión vencida antes del logout, o si la llamada lanza). Lo mismo se aplica cuando el login se rechaza por falta de membresía.
   - Si Supabase confirmó la revocación, el login dice "Cerraste sesión".
   - Si no (5xx, red, configuración), dice que solo se borró este dispositivo y que la revocación no se confirmó (`?sesion=local`).
   - `/bunker` además purga del Cache Storage cualquier respuesta de `/bunker/**`.
