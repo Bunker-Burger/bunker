@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils";
 
 const Tabs = TabsPrimitive.Root;
 
-function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
+function TabsList({ className, tabIndex = 0, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
+      tabIndex={tabIndex}
       className={cn("-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]", className)}
       {...props}
     />

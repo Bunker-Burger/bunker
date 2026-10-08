@@ -1,15 +1,25 @@
+import {
+  changeCartLineQuantity,
+  clearCart,
+  editCartLine,
+  removeCartLine,
+  updateCartLineNotes,
+  updateCartLineQuantity
+} from "@/domain/cart";
 import type { CartLine, FulfilmentMethod } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 
 export type PaymentMethod = "cash" | "transfer" | "mercado-pago";
 
-export function changeLineQuantity(lines: CartLine[], id: string, delta: number): CartLine[] {
-  return lines.flatMap((line) => {
-    if (line.id !== id) return [line];
-    const quantity = line.quantity + delta;
-    return quantity > 0 ? [{ ...line, quantity }] : [];
-  });
-}
+export const changeLineQuantity = changeCartLineQuantity;
+export {
+  changeCartLineQuantity,
+  clearCart,
+  editCartLine,
+  removeCartLine,
+  updateCartLineNotes,
+  updateCartLineQuantity
+};
 
 export { clearOptionGroup, toggleOption } from "@/domain/options";
 
