@@ -28,6 +28,9 @@ on:
         type: string
         default: ""
 
+  issue_comment:
+    types: [created]
+
 permissions:
   contents: read
   pull-requests: read
@@ -40,23 +43,36 @@ concurrency:
 jobs:
   authorize:
     name: Autorizar SHA desde main (sin secretos)
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/verify-db ')))
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.verify.outputs.sha }}
       pr: ${{ steps.verify.outputs.pr }}
+      operation: ${{ steps.verify.outputs.operation }}
     steps:
       - name: Verificar PR abierta, SHA completo y confirmación
         id: verify
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pr_number }}
           REVIEWED_SHA: ${{ inputs.reviewed_sha }}
-          OPERATION: ${{ inputs.operation }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ACTOR_LOGIN: ${{ github.actor }}
+          OPERATION: ${{ inputs.operation || 'pgTAP' }}
           CONFIRM_PROJECT: ${{ inputs.confirm_project }}
         run: |
           set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "issue_comment" ]]; then
+            [[ "$COMMENT_BODY" =~ ^/verify-db[[:space:]]+([0-9a-fA-F]{40})[[:space:]]*$ ]] || {
+              echo "::error::Formato esperado: /verify-db seguido de SHA completo"; exit 1;
+            }
+            REVIEWED_SHA="${BASH_REMATCH[1]}"
+            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR_LOGIN/permission" --jq '.permission')"
+            [[ "$permission" == "admin" || "$permission" == "maintain" ]] || {
+              echo "::error::Solo un administrador/mantenedor puede autorizar ejecución cloud"; exit 1;
+            }
+          fi
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Número de PR inválido"; exit 1; }
           [[ "$REVIEWED_SHA" =~ ^[a-fA-F0-9]{40}$ ]] || { echo "::error::Se exige SHA completo de 40 caracteres"; exit 1; }
           REVIEWED_SHA="${REVIEWED_SHA,,}"
@@ -75,6 +91,7 @@ jobs:
           }
           echo "sha=$REVIEWED_SHA" >> "$GITHUB_OUTPUT"
           echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
           echo "SHA de PR verificado; no se leyó ningún secreto ni ejecutó código de PR"
 
   database:
@@ -102,7 +119,7 @@ jobs:
         env:
           PR_NUMBER: ${{ needs.authorize.outputs.pr }}
           REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
-          OPERATION: ${{ inputs.operation }}
+          OPERATION: ${{ needs.authorize.outputs.operation }}
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "refs/pull/$PR_NUMBER/head"
@@ -166,23 +183,23 @@ jobs:
             }
           '
       - name: Ejecutar pgTAP real sobre development
-        if: inputs.operation == 'pgTAP'
+        if: needs.authorize.outputs.operation == 'pgTAP'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
         run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
       - name: Previsualizar migraciones (sin escritura)
-        if: inputs.operation == 'dry-run'
+        if: needs.authorize.outputs.operation == 'dry-run'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
         run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL" --dry-run
       - name: Aplicar migraciones a development (confirmación previa obligatoria)
-        if: inputs.operation == 'apply' && inputs.confirm_project == 'zokkgocmcaqcujltfkjf'
+        if: needs.authorize.outputs.operation == 'apply' && inputs.confirm_project == 'zokkgocmcaqcujltfkjf'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
         run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
 
       - name: Registrar resultado de pgTAP para el SHA revisado
-        if: inputs.operation == 'pgTAP' && success()
+        if: needs.authorize.outputs.operation == 'pgTAP' && success()
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
