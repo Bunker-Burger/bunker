@@ -1,0 +1,213 @@
+name: Cloud DB — ejecución revisada (main)
+
+# El workflow privilegiado SOLO se ejecuta desde el código de main.
+# No ejecutar desde una PR ni copiar scripts JS/npm de su checkout.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR revisada (ej. 27)"
+        required: true
+        type: number
+      reviewed_sha:
+        description: "SHA completo de 40 caracteres que el mantenedor revisó"
+        required: true
+        type: string
+      operation:
+        description: "pgTAP, migraciones dry-run o apply explícito"
+        required: true
+        type: choice
+        default: pgTAP
+        options:
+          - pgTAP
+          - dry-run
+          - apply
+      confirm_project:
+        description: "Solo para apply: escribir exactamente zokkgocmcaqcujltfkjf"
+        required: false
+        type: string
+        default: ""
+
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: supabase-cloud-development
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Autorizar SHA desde main (sin secretos)
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/verify-db ')))
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.verify.outputs.sha }}
+      pr: ${{ steps.verify.outputs.pr }}
+      operation: ${{ steps.verify.outputs.operation }}
+    steps:
+      - name: Verificar PR abierta, SHA completo y confirmación
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pr_number }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ACTOR_LOGIN: ${{ github.actor }}
+          OPERATION: ${{ inputs.operation || 'pgTAP' }}
+          CONFIRM_PROJECT: ${{ inputs.confirm_project }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "issue_comment" ]]; then
+            [[ "$COMMENT_BODY" =~ ^/verify-db[[:space:]]+([0-9a-fA-F]{40})[[:space:]]*$ ]] || {
+              echo "::error::Formato esperado: /verify-db seguido de SHA completo"; exit 1;
+            }
+            REVIEWED_SHA="${BASH_REMATCH[1]}"
+            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR_LOGIN/permission" --jq '.permission')"
+            [[ "$permission" == "admin" || "$permission" == "maintain" ]] || {
+              echo "::error::Solo un administrador/mantenedor puede autorizar ejecución cloud"; exit 1;
+            }
+          fi
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Número de PR inválido"; exit 1; }
+          [[ "$REVIEWED_SHA" =~ ^[a-fA-F0-9]{40}$ ]] || { echo "::error::Se exige SHA completo de 40 caracteres"; exit 1; }
+          REVIEWED_SHA="${REVIEWED_SHA,,}"
+          if [[ "$OPERATION" == "apply" && "$CONFIRM_PROJECT" != "zokkgocmcaqcujltfkjf" ]]; then
+            echo "::error::Apply requiere confirmación exacta del proyecto development"
+            exit 1
+          fi
+          response="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          state="$(jq -r '.state' <<< "$response")"
+          actual="$(jq -r '.head.sha' <<< "$response")"
+          base="$(jq -r '.base.ref' <<< "$response")"
+          source_repo="$(jq -r '.head.repo.full_name' <<< "$response")"
+          [[ "$state" == "open" && "$base" == "main" && "$source_repo" == "$GITHUB_REPOSITORY" && "$actual" == "$REVIEWED_SHA" ]] || {
+            echo "::error::La PR no está abierta hacia main desde este repositorio o el SHA ya cambió"
+            exit 1
+          }
+          echo "sha=$REVIEWED_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
+          echo "SHA de PR verificado; no se leyó ningún secreto ni ejecutó código de PR"
+
+  database:
+    name: SQL revisado (sin scripts de PR)
+    needs: authorize
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout exclusivo de código confiable en main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Setup Node desde main
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Instalar dependencias confiables de main
+        run: npm ci
+
+      - name: Recuperar solamente archivos SQL del SHA exacto y verificar su identidad
+        shell: bash
+        env:
+          PR_NUMBER: ${{ needs.authorize.outputs.pr }}
+          REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+          OPERATION: ${{ needs.authorize.outputs.operation }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "refs/pull/$PR_NUMBER/head"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$REVIEWED_SHA" ]] || {
+            echo "::error::La PR cambió de SHA entre la autorización y el fetch"
+            exit 1
+          }
+          if [[ "$OPERATION" == "pgTAP" ]]; then
+            directory="supabase/tests/database"
+          else
+            directory="supabase/migrations"
+          fi
+          mkdir -p "$directory"
+          # Reemplazar solo los SQL confiados expresamente en el SHA aprobado.
+          find "$directory" -type f -name '*.sql' -delete
+          count=0
+          while IFS= read -r -d '' path; do
+            [[ "$path" =~ ^supabase/(tests/database|migrations)/[a-zA-Z0-9_.-]+\.sql$ ]] || {
+              echo "::error::Ruta SQL fuera de lo permitido"
+              exit 1
+            }
+            [[ "$path" == "$directory/"* ]] || exit 1
+            mode="$(git ls-tree "$REVIEWED_SHA" -- "$path" | awk '{print $1}')"
+            [[ "$mode" == "100644" ]] || {
+              echo "::error::Solo se permiten blobs SQL regulares (sin symlinks)"
+              exit 1
+            }
+            git show "$REVIEWED_SHA:$path" > "$path"
+            count=$((count+1))
+          done < <(git ls-tree -r -z --name-only "$REVIEWED_SHA" -- "$directory")
+          [[ "$count" -gt 0 ]] || { echo "::error::No existen SQL para revisar en el commit"; exit 1; }
+          echo "SQL de SHA aprobado: $count archivos, directorio $directory"
+          # NO ejecutar scripts, npm ni otros artefactos del SHA de la PR.
+
+      - name: Confirmar presencia de credencial cloud (sin revelar valor)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+        run: |
+          if [[ -z "$DB_URL" ]]; then
+            echo "::error::No está disponible el secreto de desarrollo en environment main"
+            exit 1
+          fi
+      - name: Validar destino development antes de cualquier SQL
+        shell: bash
+        env:
+          SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+        run: |
+          node --input-type=module -e '
+            const ref = "zokkgocmcaqcujltfkjf";
+            try {
+              const u = new URL(process.env.SUPABASE_DEV_DB_URL || "");
+              const host = u.hostname.toLowerCase();
+              const user = decodeURIComponent(u.username);
+              const direct = host === `db.${ref}.supabase.co` && user === "postgres";
+              const pooler = /^aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(host) && user === `postgres.${ref}`;
+              if (!["postgres:", "postgresql:"].includes(u.protocol) || !(direct || pooler)) throw Error();
+              console.log("Destino development validado");
+            } catch {
+              console.error("::error::La URL no identifica el proyecto development autorizado");
+              process.exit(1);
+            }
+          '
+      - name: Ejecutar pgTAP real sobre development
+        if: needs.authorize.outputs.operation == 'pgTAP'
+        env:
+          SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+        run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
+      - name: Previsualizar migraciones (sin escritura)
+        if: needs.authorize.outputs.operation == 'dry-run'
+        env:
+          SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL" --dry-run
+      - name: Aplicar migraciones a development (confirmación previa obligatoria)
+        if: needs.authorize.outputs.operation == 'apply' && inputs.confirm_project == 'zokkgocmcaqcujltfkjf'
+        env:
+          SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
+
+      - name: Registrar resultado de pgTAP para el SHA revisado
+        if: needs.authorize.outputs.operation == 'pgTAP' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$REVIEWED_SHA" \
+            -f state=success \
+            -f context=cloud/pgTAP-reviewed \
+            -f description="pgTAP cloud real ejecutado sobre SHA revisado" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
