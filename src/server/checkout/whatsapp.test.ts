@@ -14,6 +14,17 @@ const order = {
 };
 
 describe("WhatsApp checkout helpers", () => {
+  it("states the single promotion of the quote, from its generated explanation", () => {
+    const text = new URL(
+      buildExactCashWhatsAppUrl({
+        ...order,
+        promotion: { name: "Martes de Smash", explanation: "15% de descuento en productos seleccionados", productDiscountCents: 282_000n, deliveryDiscountCents: 0n }
+      })
+    ).searchParams.get("text");
+    expect(text).toContain("Promoción: Martes de Smash (15% de descuento en productos seleccionados), -$2.820");
+    expect(new URL(buildExactCashWhatsAppUrl(order)).searchParams.get("text")).not.toContain("Promoción");
+  });
+
   it("labels exact cash without claiming payment", () => {
     const url = new URL(buildExactCashWhatsAppUrl(order));
     expect(url.hostname).toBe("wa.me");

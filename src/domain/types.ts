@@ -124,27 +124,6 @@ export interface CartLine {
 
 export type FulfilmentMethod = "pickup" | "delivery";
 
-export interface Promotion {
-  id: string;
-  name: string;
-  priority: number;
-  kind: "percentage" | "fixed";
-  value: number;
-  active: boolean;
-  productIds?: string[];
-  startsAt?: string;
-  endsAt?: string;
-}
-
-export interface Quote {
-  subtotalCents: bigint;
-  discountCents: bigint;
-  deliveryCents: bigint;
-  totalCents: bigint;
-  promotion: Promotion | null;
-}
-
-
 export interface Category {
   id: string;
   slug: string;

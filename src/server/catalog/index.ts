@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { StoreStatus } from "@/domain/store-status";
-import type { Catalog } from "@/domain/types";
+import type { Catalog, PromotionRule } from "@/domain/types";
 import type { Result } from "@/lib/result";
 import { createOperationalReadClient, createPublicReadClient, createSessionClient } from "@/server/supabase/clients";
 import { catalogImageBaseUrl, readSupabaseConfig } from "@/server/supabase/config";
@@ -52,6 +52,27 @@ export async function getStoreStatus(
   const status = await loadStoreStatus(repository, storeSlug, now);
   if (!status.ok) reportCatalogError("public", status.error);
   return status;
+}
+
+/**
+ * Promotion rules to quote with: read fresh on every call (never from the catalog cache), so a
+ * paused or edited promotion applies to the next quote. RLS only exposes active rules inside
+ * their date range; the quote still re-checks window, schedule, channel and priority.
+ */
+export async function getPromotionsForQuote(storeSlug: string = STORE_SLUG): Promise<Result<PromotionRule[], CatalogError>> {
+  const config = readSupabaseConfig();
+  if (!config.ok) {
+    reportCatalogError("public", config.error);
+    return config;
+  }
+  const repository = createSupabaseCatalogRepository(createOperationalReadClient(config.value), {
+    scope: "public",
+    imageBaseUrl: catalogImageBaseUrl(config.value)
+  });
+  const store = await repository.getStoreBySlug(storeSlug);
+  const promotions = store.ok ? await repository.listPromotions(store.value.id) : store;
+  if (!promotions.ok) reportCatalogError("public", promotions.error);
+  return promotions;
 }
 
 /**

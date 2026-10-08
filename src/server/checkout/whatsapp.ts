@@ -3,6 +3,8 @@ interface WhatsAppOrder {
   quoteId: string;
   totalCents: bigint;
   lines: Array<{ name: string; quantity: number }>;
+  /** From the authoritative quote (`PaymentQuote.promotion`); never from the browser. */
+  promotion?: { name: string; explanation: string; productDiscountCents: bigint; deliveryDiscountCents: bigint } | null;
 }
 
 function formatArs(cents: bigint): string {
@@ -16,6 +18,12 @@ function buildUrl(order: WhatsAppOrder, paymentLine: string): string {
   const message = [
     `Pedido ${order.quoteId}`,
     lines,
+    ...(order.promotion
+      ? [
+          `Promoción: ${order.promotion.name} (${order.promotion.explanation}), ` +
+            `-${formatArs(order.promotion.productDiscountCents + order.promotion.deliveryDiscountCents)}`
+        ]
+      : []),
     `Total cotizado: ${formatArs(order.totalCents)}`,
     `Pago: ${paymentLine}`,
     "Solicitud enviada por WhatsApp; el local debe confirmar el pedido."

@@ -1,9 +1,11 @@
+import type { AppliedPromotion } from "@/domain/promotions";
 import type {
   ConfigurableOption,
   ConfigurableOptionGroup,
   ConfigurableProduct,
   OptionSelectionMode,
-  ProductType
+  ProductType,
+  PromotionRule
 } from "@/domain/types";
 
 export type AuthoritativeOption = ConfigurableOption;
@@ -33,6 +35,8 @@ export interface QuoteLine {
   productName: string;
   quantity: number;
   unitPriceCents: bigint;
+  /** Product base price without options; combo and "lleve X" promotions discount at this price. */
+  basePriceCents: bigint;
   selectedOptions: Array<{ groupId: string; optionId: string; optionName: string }>;
   notes: string;
 }
@@ -44,12 +48,18 @@ export interface PaymentQuote {
   discountCents: bigint;
   deliveryCents: bigint;
   totalCents: bigint;
+  /** The single promotion applied, as computed by the server; null when none applies. */
+  promotion: AppliedPromotion | null;
   expiresAt: Date;
 }
 
 export interface PricingRepository {
   findProduct(productId: string): Promise<AuthoritativeProduct | null>;
-  getApplicableDiscountCents(lines: readonly QuoteLine[], now: Date): Promise<bigint>;
+  /**
+   * Promotion rules of the store as persisted now (no cache: a pause applies to the next quote).
+   * Evaluation (window, schedule, priority, amounts) happens in the quote, never here.
+   */
+  listPromotions(): Promise<readonly PromotionRule[]>;
 }
 
 export interface PaymentQuotesPort {

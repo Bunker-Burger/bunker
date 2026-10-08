@@ -1,4 +1,4 @@
-import type { Product } from "@/domain/types";
+import type { Product, PromotionRule } from "@/domain/types";
 
 const images = {
   double: "https://lh3.googleusercontent.com/aida-public/AB6AXuCbAIlwAQyd01V9jkDGFyhimsk-mXpvbHL61YlyY-xESy0XpygcZu6sXrinKe7FVs08NLT8EM5WhBt8XGt63HA9hjD7tfZnHNl-s4dPdTfn2q7fMA9RSpPzaYm2rGoLBNb1kf9bAwMqvQuAt3rX4MkVVaE_tcT8R28HdK9Gw4UDBLM8-r5Ya4BYoUT1B0v_jwZAo1GXxtBo7ozi5-mQOrQPkaAlx0cUxRio4bcjpRWz6RWDxwYDjF-o_vjxkzE0cq1W",
@@ -103,6 +103,31 @@ export const products: Product[] = [
   { id: "aros", slug: "aros-de-cebolla", categoryId: "fries", type: "fries", name: "Aros de Cebolla", description: "Rebozado extra crocante con dip de barbacoa.", priceCents: 320000n, imageUrl: images.rings, imageAlt: "Aros de cebolla", published: true, featured: false, inStock: false, optionGroups: friesOptions },
   { id: "gaseosa", slug: "gaseosa-lata", categoryId: "drinks", type: "beverage", name: "Gaseosa Lata 354ml", description: "Bien fría para acompañar tu pedido.", priceCents: 140000n, imageUrl: images.soda, imageAlt: "Gaseosa en lata", published: true, featured: false, inStock: true, containsAlcohol: false, optionGroups: beverageOptions },
   { id: "limonada", slug: "limonada-de-la-casa", categoryId: "drinks", type: "beverage", name: "Limonada de la Casa", description: "Limón exprimido, menta fresca y hielo.", priceCents: 240000n, imageUrl: images.lemonade, imageAlt: "Limonada con menta", published: true, featured: false, inStock: true, containsAlcohol: false, optionGroups: beverageOptions }
+];
+
+/** Store time zone; promotion windows are evaluated in it. */
+export const STORE_TIMEZONE = "America/Argentina/Tucuman";
+
+/**
+ * Same rule as the development seed ("Martes de Smash"), used by this static storefront until
+ * it reads promotions from the database (BB-07). The authoritative quote never uses this list.
+ */
+export const promotions: PromotionRule[] = [
+  {
+    id: "martes-de-smash",
+    slug: "martes-de-smash",
+    name: "Martes de Smash",
+    description: "",
+    badgeText: "15% OFF",
+    priority: 10,
+    active: true,
+    startsAt: new Date("2026-10-01T03:00:00Z"),
+    endsAt: new Date("2027-04-01T02:59:00Z"),
+    mechanic: { type: "percent_off", percentOff: 15 },
+    channels: ["delivery", "pickup"],
+    items: [{ productId: "smash-doble", quantity: 1 }],
+    schedule: [{ dayOfWeek: 2, startsAt: "18:00:00", endsAt: "23:59:00" }]
+  }
 ];
 
 export const categoryLabels = {
