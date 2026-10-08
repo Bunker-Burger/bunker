@@ -3,12 +3,12 @@ import "server-only";
 import type { StoreStatus } from "@/domain/store-status";
 import type { Catalog } from "@/domain/types";
 import type { Result } from "@/lib/result";
-import { createPublicReadClient, createSessionClient } from "@/server/supabase/clients";
+import { createOperationalReadClient, createPublicReadClient, createSessionClient } from "@/server/supabase/clients";
 import { catalogImageBaseUrl, readSupabaseConfig } from "@/server/supabase/config";
 import { createSupabaseAdminAccess } from "./admin-access";
 import { loadAdminCatalog, loadPublicCatalog } from "./catalog-service";
 import { reportCatalogError, type CatalogError } from "./errors";
-import { loadStoreStatus } from "./store-status";
+import { createSupabaseStoreOperatingRepository, loadStoreStatus } from "./store-status";
 import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
 export { CATALOG_CACHE_TAG } from "@/server/supabase/clients";
@@ -35,8 +35,9 @@ export async function getPublicCatalog(storeSlug: string = STORE_SLUG): Promise<
 
 /**
  * Whether the store takes orders right now, and its delivery fee, decided on the server from
- * the persisted override, weekly hours (store time zone) and fee. Anonymous; the store row is
- * served from the catalog data cache, the decision is recomputed on every call.
+ * the persisted override, weekly hours (store time zone) and fee. Anonymous and never cached:
+ * every call reads the database, so a pause, closure or fee change applies to the next check,
+ * quote or payment without depending on catalog cache invalidation.
  */
 export async function getStoreStatus(
   storeSlug: string = STORE_SLUG,
@@ -47,10 +48,7 @@ export async function getStoreStatus(
     reportCatalogError("public", config.error);
     return config;
   }
-  const repository = createSupabaseCatalogRepository(createPublicReadClient(config.value), {
-    scope: "public",
-    imageBaseUrl: catalogImageBaseUrl(config.value)
-  });
+  const repository = createSupabaseStoreOperatingRepository(createOperationalReadClient(config.value));
   const status = await loadStoreStatus(repository, storeSlug, now);
   if (!status.ok) reportCatalogError("public", status.error);
   return status;

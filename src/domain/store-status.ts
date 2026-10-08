@@ -191,3 +191,46 @@ export function deliveryChargeCents(status: StoreStatus, fulfilment: FulfilmentM
   assertAcceptingOrders(status);
   return fulfilment === "delivery" ? status.deliveryFeeCents : 0n;
 }
+
+/** Minimal public shape: no hours table, no override details beyond the reason. Money as string. */
+export interface PublicStoreStatus {
+  state: StoreState;
+  acceptingOrders: boolean;
+  reason: StoreStatusReason;
+  closesAt: string | null;
+  nextOpeningAt: string | null;
+  deliveryFeeCents: string | null;
+  timezone: string;
+}
+
+export function toPublicStoreStatus(status: StoreStatus): PublicStoreStatus {
+  return {
+    state: status.state,
+    acceptingOrders: status.acceptingOrders,
+    reason: status.reason,
+    closesAt: status.closesAt?.toISOString() ?? null,
+    nextOpeningAt: status.nextOpeningAt?.toISOString() ?? null,
+    deliveryFeeCents: status.deliveryFeeCents?.toString() ?? null,
+    timezone: status.timezone
+  };
+}
+
+const STATES: readonly StoreState[] = ["open", "paused", "closed"];
+const REASONS: readonly StoreStatusReason[] = ["schedule", "manual_open", "manual_paused", "manual_closed", "delivery_fee_missing"];
+const isoOrNull = (value: unknown) => value === null || (typeof value === "string" && !Number.isNaN(Date.parse(value)));
+
+/** Validates a `GET /api/store/status` body; anything else (errors included) yields null. */
+export function parsePublicStoreStatus(value: unknown): PublicStoreStatus | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  const valid =
+    STATES.includes(candidate.state as StoreState) &&
+    typeof candidate.acceptingOrders === "boolean" &&
+    REASONS.includes(candidate.reason as StoreStatusReason) &&
+    isoOrNull(candidate.closesAt) &&
+    isoOrNull(candidate.nextOpeningAt) &&
+    (candidate.deliveryFeeCents === null || (typeof candidate.deliveryFeeCents === "string" && /^\d+$/.test(candidate.deliveryFeeCents))) &&
+    typeof candidate.timezone === "string" &&
+    isValidTimeZone(candidate.timezone);
+  return valid ? (candidate as unknown as PublicStoreStatus) : null;
+}

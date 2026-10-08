@@ -30,6 +30,18 @@ export function createPublicReadClient(config: SupabaseConfig): SupabaseClient<D
 }
 
 /**
+ * Anonymous, cookie-less client for operational reads that must reflect the database right
+ * now (store open/paused/closed, hours, delivery fee). Never cached: a pause or a fee change
+ * must reach the next status check, quote or payment without waiting for a tag revalidation.
+ */
+export function createOperationalReadClient(config: SupabaseConfig): SupabaseClient<Database> {
+  return createClient<Database>(config.url, config.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) }
+  });
+}
+
+/**
  * Client acting as the signed-in user (session from cookies), for administrative reads.
  * Requests opt out of every cache so one admin's data is never served to another request.
  */

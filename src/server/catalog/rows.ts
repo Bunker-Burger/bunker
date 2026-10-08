@@ -47,6 +47,20 @@ export const storeRowSchema = z.object({
 });
 export type StoreRow = z.output<typeof storeRowSchema>;
 
+/** Only what the store status needs; a separate (uncached) read from the catalog's store row. */
+export const STORE_OPERATING_SELECT =
+  "id, slug, timezone, status_override, delivery_fee_cents:delivery_fee_cents::text, store_business_hours(day_of_week, opens_at, closes_at)";
+
+export const storeOperatingRowSchema = storeRowSchema.pick({
+  id: true,
+  slug: true,
+  timezone: true,
+  status_override: true,
+  delivery_fee_cents: true,
+  store_business_hours: true
+});
+export type StoreOperatingRow = z.output<typeof storeOperatingRowSchema>;
+
 export const CATEGORY_SELECT = "id, name, slug, kind, sort_order, is_visible";
 
 export const categoryRowSchema = z.object({

@@ -27,10 +27,10 @@ import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
 import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
 import {
   changeLineQuantity,
-  createWhatsAppUrl,
   toggleOption,
   type PaymentMethod
 } from "./storefront-state";
+import { describeStoreStatus, useStoreStatus } from "./use-store-status";
 import "./storefront.css";
 
 const CART_KEY = "bunker-cart";
@@ -409,19 +409,14 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
   const [selectedPayment, setPayment] = useState<PaymentMethod>(mercadoPagoEnabled ? "mercado-pago" : "transfer");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const quote = useMemo(() => quoteCart(cart, [], fulfilment, 120000n), [cart, fulfilment]);
+  const storeStatus = useStoreStatus();
+  const deliveryFeeCents =
+    storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
+  // Display-only estimate; the authoritative quote is computed on the server.
+  const quote = useMemo(() => quoteCart(cart, [], fulfilment, deliveryFeeCents ?? 0n), [cart, fulfilment, deliveryFeeCents]);
   const payment = !mercadoPagoEnabled && selectedPayment === "mercado-pago" ? "transfer" : selectedPayment;
-
-  const whatsappUrl = createWhatsAppUrl({
-    phone: "5493865207458",
-    fulfilment,
-    payment,
-    totalCents: quote.totalCents,
-    lines: cart,
-    customerName: name,
-    address: fulfilment === "delivery" ? address : ""
-  });
-  const canSubmit = cart.length > 0 && name.trim().length >= 2 && (fulfilment === "pickup" || address.trim().length >= 5);
+  const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
+  const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
@@ -431,7 +426,7 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
           <fieldset className="choice-group">
             <legend>Tipo de entrega</legend>
             <div className="choice-grid">
-              <label className={fulfilment === "delivery" ? "choice-card active" : "choice-card"}><input checked={fulfilment === "delivery"} name="fulfilment" onChange={() => setFulfilment("delivery")} type="radio" /><Truck /><span>Delivery</span><strong>{formatArs(120000n)}</strong></label>
+              <label className={fulfilment === "delivery" ? "choice-card active" : "choice-card"}><input checked={fulfilment === "delivery"} name="fulfilment" onChange={() => setFulfilment("delivery")} type="radio" /><Truck /><span>Delivery</span><strong>{deliveryFeeCents === null ? "A confirmar" : formatArs(deliveryFeeCents)}</strong></label>
               <label className={fulfilment === "pickup" ? "choice-card active" : "choice-card"}><input checked={fulfilment === "pickup"} name="fulfilment" onChange={() => setFulfilment("pickup")} type="radio" /><Store /><span>Retiro en local</span><strong>Gratis</strong></label>
             </div>
           </fieldset>
@@ -454,10 +449,12 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
           {cart.map((line) => <div className="summary-line" key={line.id}><span>{line.quantity}× {line.productName}</span><strong>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong></div>)}
           <div className="summary-rule" />
           <div className="summary-line muted"><span>Subtotal</span><strong>{formatArs(quote.subtotalCents)}</strong></div>
-          <div className="summary-line muted"><span>Envío</span><strong>{quote.deliveryCents === 0n ? "$0" : formatArs(quote.deliveryCents)}</strong></div>
-          <div className="summary-total"><span>Total</span><strong>{formatArs(quote.totalCents)}</strong></div>
-          {canSubmit ? <a className="whatsapp-button" href={whatsappUrl} rel="noreferrer" target="_blank">Confirmar por WhatsApp <ChevronRight /></a> : <button className="whatsapp-button" disabled type="button">Completá tus datos</button>}
-          <small>Vas a revisar el mensaje antes de enviarlo.</small>
+          <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending ? "A confirmar" : quote.deliveryCents === 0n ? "$0" : formatArs(quote.deliveryCents)}</strong></div>
+          <div className="summary-total"><span>Total estimado</span><strong>{formatArs(quote.totalCents)}</strong></div>
+          <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
+          {/* No send action until a server-validated quote can authorize it (BB-10): a total computed in the browser never confirms an order. */}
+          <button className="whatsapp-button" disabled type="button">{acceptingOrders ? "Confirmación por WhatsApp próximamente" : "No se pueden enviar pedidos ahora"}</button>
+          <small>Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo.</small>
         </div>
       </div>
     </section>

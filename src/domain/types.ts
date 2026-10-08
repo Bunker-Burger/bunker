@@ -108,7 +108,7 @@ export interface StoreSettings {
   isPublic: boolean;
   /** Fixed delivery fee; null until configured, which keeps orders disabled. */
   deliveryFeeCents: bigint | null;
-  businessHours: BusinessHoursWindow[];
+  businessHours: readonly BusinessHoursWindow[];
   paymentMethods: PaymentMethodSetting[];
 }
 

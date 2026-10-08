@@ -1,25 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { StoreSettings } from "@/domain/types";
+import type { StoreOperatingSettings } from "@/domain/store-status";
+import { ok } from "@/lib/result";
 import { catalogError } from "./errors";
-import { createInMemoryCatalogRepository } from "./in-memory-catalog-repository";
-import { loadStoreStatus, storeStatusResponse } from "./store-status";
+import { loadStoreStatus, storeStatusResponse, type StoreOperatingRepository } from "./store-status";
 
-const store: StoreSettings = {
-  id: "store-1",
-  slug: "bunker-burger",
-  name: "Búnker Burger",
-  whatsappE164: "+5493865207458",
+const settings: StoreOperatingSettings = {
   timezone: "America/Argentina/Tucuman",
-  currency: "ARS",
   statusOverride: "auto",
-  isPublic: true,
   deliveryFeeCents: 120000n,
-  businessHours: [{ dayOfWeek: 3, opensAt: "19:30", closesAt: "00:00" }],
-  paymentMethods: []
+  businessHours: [{ dayOfWeek: 3, opensAt: "19:30", closesAt: "00:00" }]
 };
 
-const repository = (overrides: Partial<StoreSettings> = {}, scope: "public" | "admin" = "public") =>
-  createInMemoryCatalogRepository({ store: { ...store, ...overrides }, categories: [], products: [], promotions: [] }, { scope });
+/** One public store, "bunker-burger", with the given persisted settings. */
+function repository(overrides: Partial<StoreOperatingSettings> = {}): StoreOperatingRepository {
+  return {
+    async getOperatingSettings(slug) {
+      return slug === "bunker-burger" ? ok({ ...settings, ...overrides }) : catalogError("not_found", `stores: no public store "${slug}"`);
+    }
+  };
+}
 
 describe("loadStoreStatus", () => {
   it("evaluates the persisted hours at the given instant", async () => {
@@ -39,9 +38,8 @@ describe("loadStoreStatus", () => {
     expect(noFee).toMatchObject({ ok: true, value: { acceptingOrders: false, reason: "delivery_fee_missing" } });
   });
 
-  it("propagates read failures and refuses an admin-scoped repository", async () => {
+  it("propagates read failures", async () => {
     expect(await loadStoreStatus(repository(), "otra")).toMatchObject({ ok: false, error: { code: "not_found" } });
-    expect(await loadStoreStatus(repository({}, "admin"), "bunker-burger")).toMatchObject({ ok: false, error: { code: "misconfigured" } });
   });
 });
 
