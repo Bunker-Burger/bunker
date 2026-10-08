@@ -98,6 +98,7 @@
 .whatsapp-button { width: 100%; }
 .whatsapp-button:disabled { background: var(--color-surface-high); color: var(--color-muted); box-shadow: none; cursor: not-allowed; }
 .summary-card > small { display: block; margin-top: .55rem; color: var(--color-muted); text-align: center; }
+.store-status-note { margin: 0 0 .75rem; color: var(--color-foreground); font-size: var(--text-body-sm); text-align: center; }
 
 /* While the tray is on screen, reserve its height (min-height + borders + gap) in the shell's bottom clearance. */
 :root:has(.cart-tray) { --fixed-bottom-extra: 4.375rem; }

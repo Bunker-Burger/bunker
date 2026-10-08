@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 
 // Minimal worker so the production build is installable; BB-16 owns the final caching strategy.
 declare global {
@@ -17,7 +17,14 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache
+  runtimeCaching: [
+    // Store status (BB-08) must always come from the server: never answer it from a cache.
+    {
+      matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname === "/api/store/status",
+      handler: new NetworkOnly()
+    },
+    ...defaultCache
+  ]
 });
 
 serwist.addEventListeners();

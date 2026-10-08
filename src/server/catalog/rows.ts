@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimeZone } from "@/domain/store-status";
 import { Constants } from "@/server/supabase/database.types";
 
 /*
@@ -18,19 +19,22 @@ const timestamp = z.string().refine((value) => !Number.isNaN(Date.parse(value)),
 const wallClock = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "invalid time of day");
 
 export const STORE_SELECT =
-  "id, name, slug, whatsapp_e164, timezone, currency, is_open, is_public, delivery_fee_cents:delivery_fee_cents::text, business_hours, store_payment_methods(method, display_name, public_instructions, is_enabled, sort_order)";
+  "id, name, slug, whatsapp_e164, timezone, currency, status_override, is_public, delivery_fee_cents:delivery_fee_cents::text, " +
+  "store_business_hours(day_of_week, opens_at, closes_at), store_payment_methods(method, display_name, public_instructions, is_enabled, sort_order)";
 
 export const storeRowSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
   whatsapp_e164: z.string(),
-  timezone: z.string(),
+  timezone: z.string().refine(isValidTimeZone, "unknown time zone"),
   currency: z.string(),
-  is_open: z.boolean(),
+  status_override: z.enum(enums.store_status_override),
   is_public: z.boolean(),
-  delivery_fee_cents: cents,
-  business_hours: z.record(z.string(), z.unknown()),
+  delivery_fee_cents: cents.nullable(),
+  store_business_hours: z.array(
+    z.object({ day_of_week: z.number().int().min(0).max(6), opens_at: wallClock, closes_at: wallClock })
+  ),
   store_payment_methods: z.array(
     z.object({
       method: z.enum(enums.payment_method_kind),
@@ -42,6 +46,20 @@ export const storeRowSchema = z.object({
   )
 });
 export type StoreRow = z.output<typeof storeRowSchema>;
+
+/** Only what the store status needs; a separate (uncached) read from the catalog's store row. */
+export const STORE_OPERATING_SELECT =
+  "id, slug, timezone, status_override, delivery_fee_cents:delivery_fee_cents::text, store_business_hours(day_of_week, opens_at, closes_at)";
+
+export const storeOperatingRowSchema = storeRowSchema.pick({
+  id: true,
+  slug: true,
+  timezone: true,
+  status_override: true,
+  delivery_fee_cents: true,
+  store_business_hours: true
+});
+export type StoreOperatingRow = z.output<typeof storeOperatingRowSchema>;
 
 export const CATEGORY_SELECT = "id, name, slug, kind, sort_order, is_visible";
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { catalogImageBaseUrl, readSupabaseConfig } from "@/server/supabase/config";
 import type { Database } from "@/server/supabase/database.types";
 import { loadPublicCatalog } from "./catalog-service";
-import { getAdminCatalog } from "./index";
+import { getAdminCatalog, getStoreStatus } from "./index";
 import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
 /*
@@ -110,6 +110,36 @@ describe.skipIf(!enabled)("Supabase catalog (cloud development project)", () => 
 
       const badKey = await loadPublicCatalog(publicRepository("sb_publishable_invalid"), "bunker-burger");
       expect(badKey).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+    });
+  });
+
+  describe("store status via getStoreStatus()", () => {
+    // Seed hours, America/Argentina/Tucuman (UTC-3): closed Mondays, Wed 19:30–00:00, Fri 19:30–01:30.
+    it("reads the persisted override, hours, time zone and fee and decides on the server", async () => {
+      const store = await loadPublicCatalog(publicRepository(), "bunker-burger");
+      if (!store.ok) throw new Error(`${store.error.code}: ${store.error.message}`);
+      expect(store.value.store).toMatchObject({ timezone: "America/Argentina/Tucuman", statusOverride: "auto" });
+      expect(store.value.store.businessHours).toHaveLength(6);
+
+      // Wednesday 2026-10-07 09:00 local → closed until 19:30.
+      expect(await getStoreStatus("bunker-burger", new Date("2026-10-07T12:00:00Z"))).toMatchObject({
+        ok: true,
+        value: { state: "closed", acceptingOrders: false, nextOpeningAt: new Date("2026-10-07T22:30:00Z"), deliveryFeeCents: 120000n }
+      });
+      // Saturday 2026-10-10 00:45 local → inside Friday's shift, which crosses midnight.
+      expect(await getStoreStatus("bunker-burger", new Date("2026-10-10T03:45:00Z"))).toMatchObject({
+        ok: true,
+        value: { state: "open", acceptingOrders: true, closesAt: new Date("2026-10-10T04:30:00Z") }
+      });
+      // Monday 2026-10-12 12:00 local → closed all day, next opening Tuesday 19:30.
+      expect(await getStoreStatus("bunker-burger", new Date("2026-10-12T15:00:00Z"))).toMatchObject({
+        ok: true,
+        value: { state: "closed", nextOpeningAt: new Date("2026-10-13T22:30:00Z") }
+      });
+    });
+
+    it("returns not_found for an unknown store", async () => {
+      expect(await getStoreStatus("tienda-inexistente")).toMatchObject({ ok: false, error: { code: "not_found" } });
     });
   });
 

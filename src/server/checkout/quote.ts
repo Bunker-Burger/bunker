@@ -1,4 +1,5 @@
 import { validateOptionSelection } from "@/domain/options";
+import { deliveryChargeCents, type StoreStatus } from "@/domain/store-status";
 import type { CheckoutRequest } from "./schema";
 import type {
   AuthoritativeProduct,
@@ -11,6 +12,8 @@ import type {
 interface QuoteDependencies {
   repository: PricingRepository;
   quotes: PaymentQuotesPort;
+  /** Authoritative store status; the only source of the delivery fee. */
+  storeStatus(): Promise<StoreStatus>;
   createId(): string;
   now(): Date;
 }
@@ -50,6 +53,8 @@ export async function createAuthoritativeQuote(
   checkout: CheckoutRequest,
   dependencies: QuoteDependencies
 ): Promise<PaymentQuote> {
+  // Closed, paused or without a delivery fee: no quote, so nothing can be paid or sent.
+  const deliveryCents = deliveryChargeCents(await dependencies.storeStatus(), checkout.fulfilment);
   const lines: QuoteLine[] = [];
   for (const item of checkout.items) {
     const product = await dependencies.repository.findProduct(item.productId);
@@ -66,9 +71,6 @@ export async function createAuthoritativeQuote(
     "Descuento"
   );
   const discountCents = rawDiscount > subtotalCents ? subtotalCents : rawDiscount;
-  const deliveryCents = checkout.fulfilment === "delivery"
-    ? requireNonNegativeAmount(await dependencies.repository.getDeliveryFeeCents(), "Envío")
-    : 0n;
   const now = dependencies.now();
   const quote: PaymentQuote = {
     id: dependencies.createId(),

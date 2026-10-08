@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { assertAcceptingOrders, type StoreStatus } from "@/domain/store-status";
 import type { PaymentAttemptsPort } from "./ports";
 
 const REQUIRED_ENV = [
@@ -56,6 +57,8 @@ interface PreferenceDependencies {
   config: MercadoPagoConfig;
   fetcher: typeof fetch;
   attempts: PaymentAttemptsPort;
+  /** Re-checked at payment time: the store may have closed since the quote was made. */
+  storeStatus(): Promise<StoreStatus>;
   createId(): string;
   now(): Date;
 }
@@ -64,6 +67,7 @@ export async function createCheckoutProPreference(
   input: PreferenceInput,
   dependencies: PreferenceDependencies
 ): Promise<{ preferenceId: string; checkoutUrl: string }> {
+  assertAcceptingOrders(await dependencies.storeStatus());
   const attemptId = dependencies.createId();
   const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
   const response = await dependencies.fetcher("https://api.mercadopago.com/checkout/preferences", {

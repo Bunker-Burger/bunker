@@ -13,12 +13,12 @@ const store: StoreSettings = {
   slug: "bunker-burger",
   name: "Búnker Burger",
   whatsappE164: "+5493865207458",
-  timezone: "America/Argentina/Buenos_Aires",
+  timezone: "America/Argentina/Tucuman",
   currency: "ARS",
-  isOpen: true,
+  statusOverride: "auto",
   isPublic: true,
   deliveryFeeCents: 120000n,
-  businessHours: {},
+  businessHours: [{ dayOfWeek: 3, opensAt: "19:30", closesAt: "00:00" }],
   paymentMethods: []
 };
 

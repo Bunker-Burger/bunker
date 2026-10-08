@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CATALOG_CACHE_TAG, CATALOG_REVALIDATE_SECONDS, createPublicReadClient, createSessionClient } from "./clients";
+import {
+  CATALOG_CACHE_TAG,
+  CATALOG_REVALIDATE_SECONDS,
+  createOperationalReadClient,
+  createPublicReadClient,
+  createSessionClient
+} from "./clients";
 import type { SupabaseConfig } from "./config";
 
 vi.mock("next/headers", () => ({
@@ -38,6 +44,13 @@ describe("Supabase clients", () => {
       cache: "force-cache",
       next: { revalidate: CATALOG_REVALIDATE_SECONDS, tags: [CATALOG_CACHE_TAG] }
     });
+  });
+
+  it("operational reads (store status) are never cached nor tagged", async () => {
+    const calls = captureFetch();
+    await createOperationalReadClient(config).from("stores").select("id");
+    expect(calls[0]?.cache).toBe("no-store");
+    expect(calls[0]?.next).toBeUndefined();
   });
 
   it("session (admin) reads are never cached", async () => {

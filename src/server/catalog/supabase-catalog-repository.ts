@@ -21,14 +21,14 @@ interface SupabaseCatalogRepositoryOptions {
   imageBaseUrl: string;
 }
 
-interface QueryResponse {
+export interface QueryResponse {
   data: unknown;
   error: unknown;
   status: number;
 }
 
 /** Runs a PostgREST query, turning both returned errors and thrown network failures into results. */
-async function run(operation: string, query: PromiseLike<QueryResponse>): Promise<Result<unknown, CatalogError>> {
+export async function run(operation: string, query: PromiseLike<QueryResponse>): Promise<Result<unknown, CatalogError>> {
   try {
     const { data, error, status } = await query;
     return error ? fromSupabaseError(operation, error, status) : ok(data);

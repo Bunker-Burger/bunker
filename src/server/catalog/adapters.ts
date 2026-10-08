@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { StoreOperatingSettings } from "@/domain/store-status";
 import type {
   Category,
   FulfilmentMethod,
@@ -11,7 +12,7 @@ import type {
 } from "@/domain/types";
 import { ok, type Result } from "@/lib/result";
 import { catalogError, type CatalogError } from "./errors";
-import type { CategoryRow, ProductRow, PromotionRow, StoreRow } from "./rows";
+import type { CategoryRow, ProductRow, PromotionRow, StoreOperatingRow, StoreRow } from "./rows";
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "es");
 
@@ -43,18 +44,26 @@ export function parseRows<S extends z.ZodType>(
   return ok(parsed);
 }
 
+export function toStoreOperatingSettings(row: StoreOperatingRow): StoreOperatingSettings {
+  return {
+    timezone: row.timezone,
+    statusOverride: row.status_override,
+    deliveryFeeCents: row.delivery_fee_cents,
+    businessHours: row.store_business_hours
+      .map((window) => ({ dayOfWeek: window.day_of_week, opensAt: window.opens_at, closesAt: window.closes_at }))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt))
+  };
+}
+
 export function toStoreSettings(row: StoreRow): StoreSettings {
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     whatsappE164: row.whatsapp_e164,
-    timezone: row.timezone,
     currency: row.currency,
-    isOpen: row.is_open,
     isPublic: row.is_public,
-    deliveryFeeCents: row.delivery_fee_cents,
-    businessHours: row.business_hours,
+    ...toStoreOperatingSettings(row),
     paymentMethods: row.store_payment_methods
       .map((method) => ({
         method: method.method,

@@ -5,24 +5,40 @@
 
 insert into public.stores (
   id, name, slug, whatsapp_e164, timezone, currency,
-  is_open, is_public, delivery_fee_cents, business_hours
+  status_override, is_public, delivery_fee_cents
 ) values (
   '0199b2c8-40b0-7000-8000-000000000001',
   'Búnker Burger',
   'bunker-burger',
   '+5491100000000',
-  'America/Argentina/Buenos_Aires',
+  'America/Argentina/Tucuman',
   'ARS',
-  false,
+  'auto',
   true,
-  120000,
-  '{"notice":"Horario de demostración; configurar antes de producción"}'::jsonb
+  120000
 )
 on conflict (id) do update set
   name = excluded.name,
   slug = excluded.slug,
+  timezone = excluded.timezone,
   is_public = excluded.is_public,
-  delivery_fee_cents = excluded.delivery_fee_cents;
+  delivery_fee_cents = excluded.delivery_fee_cents,
+  status_override = excluded.status_override;
+
+-- Demo hours (America/Argentina/Tucuman): closed Mondays; Tuesday–Thursday and Sunday
+-- 19:30–00:00; Friday and Saturday 19:30–01:30, crossing midnight.
+insert into public.store_business_hours (id, store_id, day_of_week, opens_at, closes_at)
+values
+  ('0199b2c8-40b0-7000-8000-000000000700', '0199b2c8-40b0-7000-8000-000000000001', 0, '19:30', '00:00'),
+  ('0199b2c8-40b0-7000-8000-000000000702', '0199b2c8-40b0-7000-8000-000000000001', 2, '19:30', '00:00'),
+  ('0199b2c8-40b0-7000-8000-000000000703', '0199b2c8-40b0-7000-8000-000000000001', 3, '19:30', '00:00'),
+  ('0199b2c8-40b0-7000-8000-000000000704', '0199b2c8-40b0-7000-8000-000000000001', 4, '19:30', '00:00'),
+  ('0199b2c8-40b0-7000-8000-000000000705', '0199b2c8-40b0-7000-8000-000000000001', 5, '19:30', '01:30'),
+  ('0199b2c8-40b0-7000-8000-000000000706', '0199b2c8-40b0-7000-8000-000000000001', 6, '19:30', '01:30')
+on conflict (id) do update set
+  day_of_week = excluded.day_of_week,
+  opens_at = excluded.opens_at,
+  closes_at = excluded.closes_at;
 
 insert into public.categories (id, store_id, name, slug, kind, sort_order, is_visible)
 values
