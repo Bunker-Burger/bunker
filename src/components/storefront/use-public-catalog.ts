@@ -24,51 +24,51 @@ export interface PublicCatalogView {
  */
 export interface UsePublicCatalogOptions {
   initialProducts?: Product[];
-  revalidateOnMount?: boolean;
 }
 
 export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions): PublicCatalogView {
   const rawInitial = Array.isArray(options) ? options : options?.initialProducts;
   const initialProducts = rawInitial && rawInitial.length > 0 ? rawInitial : staticFallbackProducts;
-  const revalidateOnMount = Array.isArray(options) ? true : (options?.revalidateOnMount ?? true);
   const [products, setProducts] = useState<Product[]>(() => initialProducts);
-  const [verificationStatus, setVerificationStatus] = useState<CatalogVerificationStatus>("verified");
-  const inFlightRef = useRef(false);
+  const [verificationStatus, setVerificationStatus] = useState<CatalogVerificationStatus>("pending");
+  const requestIdRef = useRef(0);
 
   const load = useCallback(() => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    const controller = new AbortController();
+    const reqId = ++requestIdRef.current;
 
-    fetch(PRODUCTS_ENDPOINT, { cache: "no-store", signal: controller.signal })
+    fetch(PRODUCTS_ENDPOINT, { cache: "no-store" })
       .then(async (response) => {
+        if (reqId !== requestIdRef.current) return;
         if (!response.ok) {
-          // Server error: keep current products, mark unverified
+          // Server error (e.g. 503, 500, 404): keep existing products, mark unverified without wiping cart
           setVerificationStatus("unverified");
           return;
         }
-        const body = await response.json();
-        const parsed = parsePublicProducts(body);
-        if (parsed && parsed.length > 0) {
-          setProducts(parsed);
-          setVerificationStatus("verified");
-        } else {
+        try {
+          const body = await response.json();
+          const parsed = parsePublicProducts(body);
+          if (parsed && parsed.length > 0) {
+            setProducts(parsed);
+            setVerificationStatus("verified");
+          } else {
+            // Unconfirmed or empty payload: do not treat as verified
+            setVerificationStatus("unverified");
+          }
+        } catch {
+          if (reqId !== requestIdRef.current) return;
           setVerificationStatus("unverified");
         }
       })
-      .catch(() => {
-        // Network failure (offline, timeout): keep current products, mark unverified
+      .catch((err: unknown) => {
+        if (reqId !== requestIdRef.current) return;
+        if ((err as { name?: string })?.name === "AbortError") return;
+        // Network failure (offline, timeout): keep existing products, mark unverified
         setVerificationStatus("unverified");
-      })
-      .finally(() => {
-        inFlightRef.current = false;
       });
   }, []);
 
   useEffect(() => {
-    if (revalidateOnMount) {
-      load();
-    }
+    load();
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -89,7 +89,7 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [load, revalidateOnMount]);
+  }, [load]);
 
   return {
     products,

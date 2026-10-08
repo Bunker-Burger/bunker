@@ -1,15 +1,34 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { serializeCart } from "@/domain/cart";
-import type { CartLine } from "@/domain/types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { products as fallbackProducts } from "@/data/catalog";
+import { revalidateCart, serializeCart } from "@/domain/cart";
+import type { CartLine, Product } from "@/domain/types";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
+import { serializePublicProducts } from "@/server/catalog/public-products";
 import { ProductDrawer, Storefront } from "./storefront";
 
 describe("Storefront", () => {
   beforeEach(() => {
     localStorage.clear();
     resetCartStoreForTesting();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url.includes("/api/store/products")) {
+          return new Response(
+            JSON.stringify({ products: serializePublicProducts(fallbackProducts) }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        throw new Error(`Unexpected fetch call: ${url}`);
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("filters the visible menu and keeps sold-out products visible", async () => {
@@ -294,6 +313,24 @@ describe("Storefront", () => {
 describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y revalidación", () => {
   beforeEach(() => {
     localStorage.clear();
+    resetCartStoreForTesting();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url.includes("/api/store/products")) {
+          return new Response(
+            JSON.stringify({ products: serializePublicProducts(fallbackProducts) }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        throw new Error(`Unexpected fetch call: ${url}`);
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   const sampleLine: CartLine = {
@@ -425,7 +462,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     expect(within(checkoutSection).getByText("El carrito está vacío. Agregá productos para finalizar el pedido.")).toBeInTheDocument();
   });
 
-  it("revalida y actualiza precios en el carrito automáticamente ante discrepancias de catálogo", () => {
+  it("revalida y actualiza precios en el carrito automáticamente ante discrepancias de catálogo verificado", async () => {
     const oldPriceLine: CartLine = {
       ...sampleLine,
       unitPriceCents: 500000n
@@ -434,11 +471,13 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
     const cartSection = screen.getByRole("region", { name: "Carrito" });
-    expect(within(cartSection).getAllByText("$ 7.800")).toHaveLength(2);
-    expect(screen.getByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.');
+    await waitFor(() => {
+      expect(within(cartSection).getAllByText("$ 7.800")).toHaveLength(2);
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.');
   });
 
-  it("revalida y poda opciones cuando un grupo de opciones opcional desaparece del catálogo", () => {
+  it("revalida y poda opciones cuando un grupo de opciones opcional desaparece del catálogo verificado", async () => {
     const lineWithCustomGroup: CartLine = {
       ...sampleLine,
       selectedOptions: {
@@ -451,7 +490,191 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
     const cartSection = screen.getByRole("region", { name: "Carrito" });
     expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent('El grupo de opciones "og-retired-group" de "Smash Búnker Doble" ya no está disponible en la carta y fue retirado.');
+    expect(await screen.findByRole("status")).toHaveTextContent('El grupo de opciones "og-retired-group" de "Smash Búnker Doble" ya no está disponible en la carta y fue retirado.');
+  });
+
+  describe("P1 B: Preservación de carrito persistido ante snapshots no confirmados y carreras", () => {
+    const specialMissingProduct: Product = {
+      id: "special-edition-burger",
+      slug: "special-edition-burger",
+      categoryId: "burgers",
+      type: "burger",
+      name: "Edición Especial Búnker",
+      description: "Medallón wagyu con salsa trufada",
+      priceCents: 950000n,
+      imageUrl: null,
+      published: true,
+      featured: false,
+      inStock: true,
+      optionGroups: []
+    };
+
+    const specialMissingLine: CartLine = {
+      id: '{"productId":"special-edition-burger","notes":"","selectedOptions":{}}',
+      productId: "special-edition-burger",
+      productSlug: "special-edition-burger",
+      productName: "Edición Especial Búnker",
+      unitPriceCents: 950000n,
+      quantity: 1,
+      notes: "",
+      selectedOptions: {}
+    };
+
+    it("red diferida (pending): no borra productos faltantes del fallback estático y muestra aviso de verificación en progreso", async () => {
+      let resolveDelayedFetch: (res: Response) => void;
+      const delayedPromise = new Promise<Response>((resolve) => {
+        resolveDelayedFetch = resolve;
+      });
+
+      vi.stubGlobal("fetch", vi.fn(() => delayedPromise));
+
+      localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
+
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+      // While fetch is pending, the line MUST NOT be wiped from the cart or localStorage
+      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
+      expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
+
+      // Verification note indicates check in progress and submit button is disabled
+      const note = screen.getByTestId("verification-status-note");
+      expect(note).toHaveTextContent("Verificando disponibilidad de los productos con el servidor…");
+      const checkoutSection = screen.getByRole("region", { name: "Finalizar pedido" });
+      expect(within(checkoutSection).getByRole("button", { name: /WhatsApp|Confirmación|pedidos/i })).toBeDisabled();
+
+      // Clean up the hanging promise
+      resolveDelayedFetch!(
+        new Response(
+          JSON.stringify({ products: serializePublicProducts([...fallbackProducts, specialMissingProduct]) }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      );
+    });
+
+    it("error de red / 503 (unverified): conserva el carrito intacto y muestra aviso 'pendiente de verificar'", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ error: "service_unavailable" }), { status: 503 }))
+      );
+
+      localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
+
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+      // Line is preserved intact
+      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
+      expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
+
+      // Verification note transitions to "Pendiente de verificar"
+      await waitFor(() => {
+        const note = screen.getByTestId("verification-status-note");
+        expect(note).toHaveTextContent(/Pendiente de verificar/i);
+      });
+
+      // Checkout remains blocked
+      const checkoutSection = screen.getByRole("region", { name: "Finalizar pedido" });
+      expect(within(checkoutSection).getByRole("button", { name: /WhatsApp|Confirmación|pedidos/i })).toBeDisabled();
+    });
+
+    it("respuesta fresca confirmada: actualiza precios y emite avisos sin destruir la selección", async () => {
+      const updatedSpecialProduct: Product = {
+        ...specialMissingProduct,
+        priceCents: 990000n // price increased from $9.500 to $9.900
+      };
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          new Response(
+            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, updatedSpecialProduct]) }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+        )
+      );
+
+      localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
+
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      // Line is kept and its price is safely updated to $ 9.900
+      await waitFor(() => {
+        expect(within(cartSection).getAllByText("$ 9.900")).toHaveLength(2);
+      });
+      expect(await screen.findByRole("status")).toHaveTextContent('"Edición Especial Búnker" actualizó su precio de $ 9.500 a $ 9.900.');
+    });
+
+    it("carreras foco / refetch: ediciones realizadas mientras el fetch está en vuelo se conservan intactas", async () => {
+      const user = userEvent.setup();
+      let resolveFirstFetch: () => void;
+      const firstFetchGate = new Promise<void>((resolve) => {
+        resolveFirstFetch = resolve;
+      });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          await firstFetchGate;
+          return new Response(
+            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, specialMissingProduct]) }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        })
+      );
+
+      localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
+
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
+
+      // User increments quantity to 2 while the fetch is still pending
+      await user.click(screen.getByRole("button", { name: "Agregar uno de Edición Especial Búnker" }));
+      expect(within(cartSection).getByText("2")).toBeInTheDocument();
+
+      // The network fetch now resolves
+      act(() => {
+        resolveFirstFetch!();
+      });
+
+      // User edit (quantity 2) MUST NOT be overwritten by the resolved response!
+      await waitFor(() => {
+        expect(screen.queryByTestId("verification-status-note")).not.toBeInTheDocument();
+      });
+      expect(within(cartSection).getByText("2")).toBeInTheDocument();
+      const persisted = localStorage.getItem("bunker-cart");
+      expect(persisted).toContain('"quantity":2');
+    });
+
+    it("hidratación real: carrito recuperado tras hidratación no es eliminado por el estado inicial SSR", async () => {
+      localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
+
+      // Render Storefront with fallback products (where specialMissingProduct is absent)
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialProducts={fallbackProducts} />);
+
+      // After client hydration and verification, the recovered line must remain intact
+      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      await waitFor(() => {
+        expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
+      });
+      expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
+    });
+
+    it("sensibilidad P1 B: revalidar incondicionalmente contra el fallback no verificado destruiría el carrito persistido", () => {
+      // Revalidating specialMissingLine directly against the fallback (without server verification)
+      // would mark it as removed and produce an empty cart:
+      const prematureRevalidation = serializeCart([specialMissingLine]);
+      expect(prematureRevalidation).toContain("special-edition-burger");
+
+      // Verify that the bug would cause destruction:
+      const { validLines, issues } = revalidateCart([specialMissingLine], fallbackProducts);
+      expect(validLines).toHaveLength(0);
+      expect(issues.some((i) => i.code === "product_removed")).toBe(true);
+      // Our fix prevents Storefront from applying validLines=[] until verified with the server!
+    });
   });
 
   it("muestra el banner accesible de almacenamiento degradado cuando localStorage falla al escribir", async () => {

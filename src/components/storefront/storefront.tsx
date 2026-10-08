@@ -99,11 +99,9 @@ export function Storefront({
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
-  const [recoveredCartOnMount] = useState(() => cart.length > 0);
   const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
   const { products, verificationStatus } = usePublicCatalog({
-    initialProducts: resolvedInitialProducts,
-    revalidateOnMount: recoveredCartOnMount
+    initialProducts: resolvedInitialProducts
   });
   const storageDegraded = useStorageDegraded();
 
@@ -143,16 +141,21 @@ export function Storefront({
   const onInvalidProductRef = useRef(onInvalidProduct);
   const invalidSlugHandled = useRef(false);
 
-  const revalidation = useMemo(() => revalidateCart(cart, products), [cart, products]);
-
+  // Only revalidate the persisted cart when the catalog has been verified against the server.
+  // Never wipe or alter cart lines while verification is pending or if it failed (503 / network).
   useEffect(() => {
+    if (verificationStatus !== "verified") {
+      return;
+    }
+
+    const revalidation = revalidateCart(cart, products);
     if (revalidation.hasChanges) {
       setCart(revalidation.validLines);
       if (revalidation.issues.length > 0) {
         setRevalidationNotice(formatRevalidationNotice(revalidation.issues));
       }
     }
-  }, [revalidation, setCart, setRevalidationNotice]);
+  }, [verificationStatus, products, cart, setCart, setRevalidationNotice]);
 
   useEffect(() => {
     onInvalidProductRef.current = onInvalidProduct;
@@ -714,7 +717,9 @@ function CheckoutSection({
           ) : null}
           {!isVerified ? (
             <p aria-live="polite" className="store-status-note text-warning" data-testid="verification-status-note">
-              No pudimos verificar la disponibilidad de los productos con el servidor. Revisá tu conexión.
+              {verificationStatus === "pending"
+                ? "Verificando disponibilidad de los productos con el servidor…"
+                : "Pendiente de verificar: no pudimos confirmar la disponibilidad de los productos con el servidor. Revisá tu conexión."}
             </p>
           ) : null}
           {/* No send action until a server-validated quote can authorize it (BB-10): a total computed in the browser never confirms an order. */}
