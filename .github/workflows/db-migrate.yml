@@ -30,7 +30,7 @@ jobs:
   migrate:
     name: Aplicar migraciones
     runs-on: ubuntu-latest
-    environment: development
+    environment: main
     env:
       SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
       INPUT_DRY_RUN: ${{ inputs.dry_run }}

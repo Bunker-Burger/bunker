@@ -252,7 +252,3 @@ export function validateTrustBoundary(
     error: `Ejecución cloud bloqueada: el commit '${(candidateShas[0] || sha).slice(0, 7) || "desconocido"}' en '${ref || "desconocido"}' no cuenta con autorización verificada de un mantenedor para acceder a credenciales cloud.`,
   };
 }
-
-function rawNormalize(ref: string): string {
-  return ref.replace(/^refs\/heads\//, "").trim();
-}
