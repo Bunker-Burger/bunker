@@ -269,6 +269,15 @@ export function revalidateCart(
     for (const [groupId, optionIds] of Object.entries(line.selectedOptions)) {
       const group = product.optionGroups.find((g) => g.id === groupId);
       if (!group) {
+        issues.push({
+          code: "option_group_removed",
+          lineId: line.id,
+          productId: product.id,
+          productName: product.name,
+          groupId,
+          message: `El grupo de opciones "${groupId}" de "${product.name}" ya no está disponible en la carta y fue retirado.`,
+          blocking: false
+        });
         continue;
       }
 
@@ -392,4 +401,14 @@ export function revalidateCart(
     hasChanges,
     hasBlockingIssues
   };
+}
+
+export function formatRevalidationNotice(issues: readonly CartIssue[]): string {
+  if (issues.length === 0) return "";
+  if (issues.length === 1) return issues[0]!.message;
+  const blocking = issues.find((i) => i.blocking);
+  if (blocking) {
+    return `${blocking.message} (y otros cambios en tu pedido)`;
+  }
+  return `${issues[0]!.message} (y otros ajustes en tu pedido)`;
 }

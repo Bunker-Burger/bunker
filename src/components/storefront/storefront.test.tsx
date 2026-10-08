@@ -3,11 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { serializeCart } from "@/domain/cart";
 import type { CartLine } from "@/domain/types";
+import { resetCartStoreForTesting } from "@/lib/cart-store";
 import { ProductDrawer, Storefront } from "./storefront";
 
 describe("Storefront", () => {
   beforeEach(() => {
     localStorage.clear();
+    resetCartStoreForTesting();
   });
 
   it("filters the visible menu and keeps sold-out products visible", async () => {
@@ -434,5 +436,38 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     const cartSection = screen.getByRole("region", { name: "Carrito" });
     expect(within(cartSection).getAllByText("$ 7.800")).toHaveLength(2);
     expect(screen.getByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.');
+  });
+
+  it("revalida y poda opciones cuando un grupo de opciones opcional desaparece del catálogo", () => {
+    const lineWithCustomGroup: CartLine = {
+      ...sampleLine,
+      selectedOptions: {
+        ...sampleLine.selectedOptions,
+        "og-retired-group": ["opt-retired-1"]
+      }
+    };
+    localStorage.setItem("bunker-cart", serializeCart([lineWithCustomGroup]));
+
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent('El grupo de opciones "og-retired-group" de "Smash Búnker Doble" ya no está disponible en la carta y fue retirado.');
+  });
+
+  it("muestra el banner accesible de almacenamiento degradado cuando localStorage falla al escribir", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      const error = new Error("Quota exceeded");
+      error.name = "QuotaExceededError";
+      throw error;
+    });
+
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    await user.click(screen.getByRole("button", { name: "Agregar Smash Búnker Doble" }));
+
+    expect(screen.getByTestId("storage-degraded-banner")).toBeInTheDocument();
+    expect(screen.getByText(/El almacenamiento local no está disponible/i)).toBeInTheDocument();
+
+    vi.restoreAllMocks();
   });
 });

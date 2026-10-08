@@ -127,7 +127,8 @@ export type CartIssueCode =
   | "out_of_stock"
   | "price_changed"
   | "option_unavailable"
-  | "option_invalid";
+  | "option_invalid"
+  | "option_group_removed";
 
 export interface CartIssue {
   readonly code: CartIssueCode;
@@ -138,6 +139,7 @@ export interface CartIssue {
   readonly blocking: boolean;
   readonly oldPriceCents?: bigint;
   readonly newPriceCents?: bigint;
+  readonly groupId?: string;
   readonly optionId?: string;
   readonly optionName?: string;
 }

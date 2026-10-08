@@ -19,6 +19,7 @@ import {
   addCartLine,
   clearCart,
   editCartLine,
+  formatRevalidationNotice,
   removeCartLine,
   revalidateCart
 } from "@/domain/cart";
@@ -33,8 +34,8 @@ import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/d
 import { toPromotionRule } from "@/domain/public-promotions";
 import type { CartLine, FulfilmentMethod, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
-import { useCart } from "@/lib/cart-store";
-import { categoryLabels, products, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
+import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
+import { categoryLabels, products as fallbackProducts, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -46,6 +47,7 @@ import {
   type PaymentMethod
 } from "./storefront-state";
 import { useNow } from "./use-now";
+import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
 import { describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import "./storefront.css";
@@ -59,10 +61,6 @@ function revealInScroller(event: FocusEvent<HTMLElement>) {
   event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
-function isKnownSlug(slug: string) {
-  return products.some((product) => product.slug === slug);
-}
-
 function removeProductParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete("producto");
@@ -74,10 +72,8 @@ interface StorefrontProps {
   mercadoPagoEnabled: boolean;
   showAdminNav?: boolean;
   onInvalidProduct?: () => void;
+  initialProducts?: Product[] | undefined;
 }
-
-/** Promotion items name products by slug; the cart uses the storefront's product ids. */
-const PRODUCT_ID_BY_SLUG: ReadonlyMap<string, string> = new Map(products.map((product) => [product.slug, product.id]));
 
 function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string): CartLine {
   return {
@@ -96,16 +92,32 @@ export function Storefront({
   initialProductSlug,
   mercadoPagoEnabled,
   showAdminNav = false,
-  onInvalidProduct
+  onInvalidProduct,
+  initialProducts
 }: StorefrontProps) {
   const now = useNow();
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
+  const [cart, setCart] = useCart();
+  const [recoveredCartOnMount] = useState(() => cart.length > 0);
+  const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
+  const { products, verificationStatus } = usePublicCatalog({
+    initialProducts: resolvedInitialProducts,
+    revalidateOnMount: recoveredCartOnMount
+  });
+  const storageDegraded = useStorageDegraded();
+
+  /** Promotion items name products by slug; the cart uses the storefront's product ids. */
+  const productIdBySlug = useMemo(
+    () => new Map(products.map((product) => [product.slug, product.id])),
+    [products]
+  );
+
   // Rules published by the server (fresh read, same as the quote); never a static copy.
   const publicPromotions = usePublicPromotions();
   const promotions = useMemo(
-    () => publicPromotions.map((promotion) => toPromotionRule(promotion, PRODUCT_ID_BY_SLUG)),
-    [publicPromotions]
+    () => publicPromotions.map((promotion) => toPromotionRule(promotion, productIdBySlug)),
+    [publicPromotions, productIdBySlug]
   );
   const deliveryFeeCents =
     storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
@@ -115,32 +127,32 @@ export function Storefront({
     ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
     : null;
   const [category, setCategory] = useState<StoreCategory>("burgers");
-  const [cart, setCart] = useCart();
   const [editingLine, setEditingLine] = useState<CartLine | null>(null);
-  const [initialSlugInvalid] = useState(() => initialProductSlug !== null && !isKnownSlug(initialProductSlug));
+
+  const isKnownSlug = useCallback(
+    (slug: string) => products.some((product) => product.slug === slug),
+    [products]
+  );
+
+  const [initialSlugInvalid] = useState(
+    () => initialProductSlug !== null && !resolvedInitialProducts.some((p) => p.slug === initialProductSlug)
+  );
   const [activeSlug, setActiveSlug] = useState(initialSlugInvalid ? null : initialProductSlug);
   const [notice, setNotice] = useState(initialSlugInvalid ? INVALID_PRODUCT_NOTICE : "");
+  const [revalidationNotice, setRevalidationNotice] = useRevalidationNotice();
   const onInvalidProductRef = useRef(onInvalidProduct);
   const invalidSlugHandled = useRef(false);
 
-  const [revalidationNotice, setRevalidationNotice] = useState("");
-  const [lastCheckedCart, setLastCheckedCart] = useState<CartLine[]>([]);
-
-  if (cart !== lastCheckedCart) {
-    setLastCheckedCart(cart);
-    const initialCheck = revalidateCart(cart, products);
-    if (initialCheck.hasChanges && initialCheck.issues.length > 0) {
-      setRevalidationNotice(initialCheck.issues[0]!.message);
-    }
-  }
-
-  const revalidation = useMemo(() => revalidateCart(cart, products), [cart]);
+  const revalidation = useMemo(() => revalidateCart(cart, products), [cart, products]);
 
   useEffect(() => {
     if (revalidation.hasChanges) {
       setCart(revalidation.validLines);
+      if (revalidation.issues.length > 0) {
+        setRevalidationNotice(formatRevalidationNotice(revalidation.issues));
+      }
     }
-  }, [revalidation, setCart]);
+  }, [revalidation, setCart, setRevalidationNotice]);
 
   useEffect(() => {
     onInvalidProductRef.current = onInvalidProduct;
@@ -170,7 +182,7 @@ export function Storefront({
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, [rejectInvalidSlug]);
+  }, [isKnownSlug, rejectInvalidSlug]);
 
   const activeProduct = activeSlug ? products.find((product) => product.slug === activeSlug) : undefined;
 
@@ -182,18 +194,18 @@ export function Storefront({
     setActiveSlug(product.slug);
   };
 
-  const handleEditLine = useCallback((lineToEdit: CartLine) => {
+  const handleEditLine = (lineToEdit: CartLine) => {
     const product = products.find((p) => p.id === lineToEdit.productId);
     if (!product) return;
     setEditingLine(lineToEdit);
     setActiveSlug(product.slug);
-  }, []);
+  };
 
-  const closeProduct = useCallback(() => {
+  const closeProduct = () => {
     removeProductParam();
     setActiveSlug(null);
     setEditingLine(null);
-  }, []);
+  };
 
   const addDirect = (product: Product) => {
     if (!product.inStock) return;
@@ -204,6 +216,7 @@ export function Storefront({
       return;
     }
     setCart((current) => addCartLine(current, makeCartLine(product, defaults, 1, "")));
+    setRevalidationNotice("");
     setNotice(`${product.name} se agregó al carrito.`);
   };
 
@@ -211,7 +224,15 @@ export function Storefront({
   const activeSection = useActiveSection(SECTION_IDS);
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
-  const visibleProducts = products.filter((product) => product.categoryId === category && product.published);
+  const visibleProducts = products.filter((product) => {
+    if (!product.published) return false;
+    if (product.categoryId === category) return true;
+    if (category === "burgers" && product.type === "burger") return true;
+    if (category === "sandwiches" && product.type === "sandwich") return true;
+    if (category === "fries" && product.type === "fries") return true;
+    if (category === "drinks" && product.type === "beverage") return true;
+    return false;
+  });
 
   const navItems: BottomNavItem[] = [
     { href: "#menu", label: "Menú", icon: UtensilsCrossed },
@@ -236,7 +257,7 @@ export function Storefront({
       }
       bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
     >
-      {notice || revalidationNotice ? <div className="toast" role="status">{notice || revalidationNotice}</div> : null}
+      {revalidationNotice || notice ? <div className="toast" role="status">{revalidationNotice || notice}</div> : null}
 
       <section className="menu-section" id="menu" aria-labelledby="menu-title">
         <div className="menu-intro">
@@ -280,17 +301,25 @@ export function Storefront({
         </div>
       </section>
 
-      <CartSection cart={cart} onChange={setCart} onEditLine={handleEditLine} subtotal={subtotal} />
+      <CartSection
+        cart={cart}
+        onChange={setCart}
+        onEditLine={handleEditLine}
+        subtotal={subtotal}
+        storageDegraded={storageDegraded}
+      />
       <CheckoutSection
         cart={cart}
-        mercadoPagoEnabled={mercadoPagoEnabled}
         deliveryFeeCents={deliveryFeeCents}
         fulfilment={fulfilment}
+        mercadoPagoEnabled={mercadoPagoEnabled}
         now={now}
         onFulfilmentChange={setFulfilment}
+        products={products}
         promotions={promotions}
         storeStatus={storeStatus}
         timezone={timezone}
+        verificationStatus={verificationStatus}
       />
 
       {itemCount > 0 && !keyboardOpen ? (
@@ -356,7 +385,7 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
           </div>
           {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
           <p>{product.description}</p>
-          <span className="product-meta">{product.type === "burger" ? "SMASH • 200G" : categoryLabels[product.categoryId as StoreCategory]}</span>
+          <span className="product-meta">{product.type === "burger" ? "SMASH • 200G" : (categoryLabels[product.categoryId as StoreCategory] ?? (product.type === "sandwich" ? "Sándwiches" : product.type === "fries" ? "Papas" : "Bebidas"))}</span>
         </div>
       </button>
       <button className="add-button" disabled={!product.inStock} onClick={onAdd} type="button" aria-label={`Agregar ${product.name}`}>
@@ -497,16 +526,36 @@ function CartSection({
   cart,
   subtotal,
   onChange,
-  onEditLine
+  onEditLine,
+  storageDegraded
 }: {
   cart: CartLine[];
   subtotal: bigint;
   onChange: (cart: CartLine[]) => void;
   onEditLine: (line: CartLine) => void;
+  storageDegraded?: boolean;
 }) {
   return (
     <section className="order-section" id="carrito" aria-labelledby="cart-title">
       <div className="section-heading"><div><span>TU PEDIDO</span><h2 id="cart-title">Carrito</h2></div><ShoppingBag /></div>
+      {storageDegraded ? (
+        <div
+          className="storage-degraded-banner"
+          data-testid="storage-degraded-banner"
+          role="status"
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-surface-raised)",
+            border: "1px solid var(--color-border-strong)",
+            fontSize: "var(--text-body-sm)",
+            color: "var(--color-muted)"
+          }}
+        >
+          ⚠️ El almacenamiento local no está disponible en este navegador. Tu carrito se mantendrá durante esta sesión activa.
+        </div>
+      ) : null}
       {cart.length === 0 ? (
         <div className="empty-state"><ShoppingBag /><h3>Tu carrito está vacío</h3><p>Elegí algo rico de la carta para empezar.</p><a href="#menu">Ver menú</a></div>
       ) : (
@@ -562,9 +611,9 @@ function CartSection({
 }
 
 /** Cart lines as the promotion engine reads them; base prices come from the catalog, not the cart. */
-function toPromotionLines(cart: CartLine[]): PromotionLine[] {
+function toPromotionLines(cart: CartLine[], catalogProducts: readonly Product[]): PromotionLine[] {
   return cart.map((line) => {
-    const basePriceCents = products.find((product) => product.id === line.productId)?.priceCents ?? line.unitPriceCents;
+    const basePriceCents = catalogProducts.find((product) => product.id === line.productId)?.priceCents ?? line.unitPriceCents;
     return {
       productId: line.productId,
       quantity: line.quantity,
@@ -576,6 +625,8 @@ function toPromotionLines(cart: CartLine[]): PromotionLine[] {
 
 function CheckoutSection({
   cart,
+  products,
+  verificationStatus,
   mercadoPagoEnabled,
   now,
   promotions,
@@ -586,6 +637,8 @@ function CheckoutSection({
   timezone
 }: {
   cart: CartLine[];
+  products: readonly Product[];
+  verificationStatus: CatalogVerificationStatus;
   mercadoPagoEnabled: boolean;
   now: Date | null;
   promotions: readonly PromotionRule[];
@@ -602,16 +655,17 @@ function CheckoutSection({
   // Display-only estimate with the same engine the server quote uses; the server recomputes it.
   const quote = useMemo(
     () =>
-      quoteCart(toPromotionLines(cart), nowMs === null ? [] : promotions, fulfilment, deliveryFeeCents ?? 0n, {
+      quoteCart(toPromotionLines(cart, products), nowMs === null ? [] : promotions, fulfilment, deliveryFeeCents ?? 0n, {
         now: new Date(nowMs ?? 0),
         timezone
       }),
-    [cart, fulfilment, deliveryFeeCents, promotions, nowMs, timezone]
+    [cart, products, fulfilment, deliveryFeeCents, promotions, nowMs, timezone]
   );
   const payment = !mercadoPagoEnabled && selectedPayment === "mercado-pago" ? "transfer" : selectedPayment;
   const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
   const hasValidLines = cart.length > 0;
+  const isVerified = verificationStatus === "verified";
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
@@ -656,6 +710,11 @@ function CheckoutSection({
           {!hasValidLines ? (
             <p aria-live="polite" className="store-status-note text-muted">
               El carrito está vacío. Agregá productos para finalizar el pedido.
+            </p>
+          ) : null}
+          {!isVerified ? (
+            <p aria-live="polite" className="store-status-note text-warning" data-testid="verification-status-note">
+              No pudimos verificar la disponibilidad de los productos con el servidor. Revisá tu conexión.
             </p>
           ) : null}
           {/* No send action until a server-validated quote can authorize it (BB-10): a total computed in the browser never confirms an order. */}

@@ -5,6 +5,7 @@ import {
   changeCartLineQuantity,
   clearCart,
   editCartLine,
+  formatRevalidationNotice,
   normalizeNotes,
   normalizeOptions,
   parsePersistedCart,
@@ -169,21 +170,13 @@ describe("cart - Parseo Resiliente y Casos de Corrupción (TC-CORR)", () => {
   });
 
   it("TC-CORR-10: es inmune a polución de prototipos (__proto__)", () => {
-    const payload = JSON.stringify({
-      version: 1,
-      lines: [
-        {
-          ...line,
-          unitPriceCents: "980000",
-          selectedOptions: {
-            __proto__: ["evil"],
-            patty: ["double"]
-          }
-        }
-      ]
-    });
+    // Clave JSON real: no un literal JS cuyo __proto__ se interprete como prototipo
+    const payload =
+      '{"version":1,"lines":[{"id":"smash-doble","productId":"smash-doble","productSlug":"smash-bunker-doble","productName":"Smash Búnker Doble","unitPriceCents":"980000","quantity":1,"notes":"","selectedOptions":{"__proto__":["evil"],"patty":["double"]}}]}';
     const parsed = parsePersistedCart(payload);
     expect(parsed).toHaveLength(1);
+    expect(Object.prototype.hasOwnProperty.call(parsed[0]?.selectedOptions, "__proto__")).toBe(false);
+    expect(parsed[0]?.selectedOptions.patty).toEqual(["double"]);
     expect(({} as Record<string, unknown>).evil).toBeUndefined();
   });
 });
@@ -405,5 +398,82 @@ describe("cart - Revalidación contra Catálogo (TC-REVAL)", () => {
     const result = revalidateCart([line], [outOfStock]);
     expect(result.validLines).toHaveLength(0);
     expect(result.hasBlockingIssues).toBe(true);
+  });
+
+  it("TC-REVAL-07: emite issue option_group_removed cuando un grupo opcional desaparece del catálogo pero la línea sigue siendo válida", () => {
+    // Producto donde se eliminó el grupo opcional 'extras'
+    const productWithoutExtras: Product = {
+      ...sampleProduct,
+      optionGroups: sampleProduct.optionGroups.filter((g) => g.id === "patty")
+    };
+
+    const lineWithExtras: CartLine = {
+      ...line,
+      selectedOptions: { patty: ["double"], extras: ["bacon"] }
+    };
+
+    const result = revalidateCart([lineWithExtras], [productWithoutExtras]);
+    expect(result.validLines).toHaveLength(1);
+    expect(result.validLines[0]?.selectedOptions).toEqual({ patty: ["double"] });
+    expect(result.hasChanges).toBe(true);
+    expect(result.hasBlockingIssues).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "option_group_removed",
+          groupId: "extras",
+          blocking: false
+        })
+      ])
+    );
+  });
+
+  it("TC-REVAL-08: emite bloqueo si la personalización ya no cumple con las opciones requeridas del catálogo", () => {
+    // Producto donde se agrega un grupo requerido que la línea persistida no tiene
+    const productWithNewRequiredGroup: Product = {
+      ...sampleProduct,
+      optionGroups: [
+        ...sampleProduct.optionGroups,
+        {
+          id: "bun",
+          name: "Pan",
+          selectionMode: "single",
+          required: true,
+          minSelections: 1,
+          maxSelections: 1,
+          defaultOptionIds: ["brioche"],
+          applicableTypes: ["burger"],
+          options: [{ id: "brioche", name: "Pan Brioche", priceDeltaCents: 0n, available: true }]
+        }
+      ]
+    };
+
+    const result = revalidateCart([line], [productWithNewRequiredGroup]);
+    expect(result.validLines).toHaveLength(0);
+    expect(result.hasBlockingIssues).toBe(true);
+    expect(result.issues.some((i) => i.code === "option_invalid" && i.blocking)).toBe(true);
+  });
+
+  it("TC-REVAL-09: formatRevalidationNotice prioriza issues bloqueantes y resume múltiples cambios", () => {
+    const blockingIssue = {
+      code: "out_of_stock" as const,
+      lineId: "1",
+      productId: "smash",
+      productName: "Smash Doble",
+      message: '"Smash Doble" está agotado y fue retirado.',
+      blocking: true
+    };
+    const priceIssue = {
+      code: "price_changed" as const,
+      lineId: "2",
+      productId: "fries",
+      productName: "Papas",
+      message: '"Papas" actualizó su precio de $ 4.000 a $ 4.500.',
+      blocking: false
+    };
+
+    expect(formatRevalidationNotice([priceIssue])).toBe(priceIssue.message);
+    expect(formatRevalidationNotice([priceIssue, blockingIssue])).toContain(blockingIssue.message);
+    expect(formatRevalidationNotice([priceIssue, blockingIssue])).toContain("otros cambios en tu pedido");
   });
 });
