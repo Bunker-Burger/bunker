@@ -172,10 +172,20 @@ describe("P1 A: GET /api/store/products operational freshness", () => {
     expect(body2.products[0]?.optionGroups[0]?.options[0]?.available).toBe(false);
   });
 
-  it("sensibilidad: falla si se forzara force-cache en lugar de no-store", () => {
-    // Demonstrating test sensitivity: every call MUST require no-store
+  it("sensibilidad de política de cache: el route handler ejecuta peticiones reales de transporte que exigen no-store", async () => {
+    const res = await productsRoute();
+    expect(res.status).toBe(200);
+
+    // Assert that real transport requests were captured and none bypassed no-store
+    expect(capturedInits.length).toBeGreaterThan(0);
     for (const init of capturedInits) {
-      expect(init.cache).not.toBe("force-cache");
+      expect(init.cache).toBe("no-store");
     }
+
+    // Comprobación de sensibilidad: si el init tuviese force-cache, la aserción de no-store falla
+    const simulatedStaleInit: RequestInit = { cache: "force-cache" };
+    expect(() => {
+      expect(simulatedStaleInit.cache).toBe("no-store");
+    }).toThrow();
   });
 });
