@@ -56,18 +56,20 @@ on conflict (id) do update set
 -- Option groups and options first, so products can link valid defaults before publication checks.
 insert into public.option_groups (
   id, store_id, name, selection_mode,
-  minimum_selections, maximum_selections, is_required, sort_order
+  minimum_selections, maximum_selections, is_required, sort_order,
+  applicable_category_kinds
 ) values
-  ('0199b2c8-40b0-7000-8000-000000000301', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño / medallones', 'single', 1, 1, true, 10),
-  ('0199b2c8-40b0-7000-8000-000000000302', '0199b2c8-40b0-7000-8000-000000000001', 'Extras', 'multiple', 0, 3, false, 20),
-  ('0199b2c8-40b0-7000-8000-000000000303', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño de porción', 'single', 1, 1, true, 10)
+  ('0199b2c8-40b0-7000-8000-000000000301', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño / medallones', 'single', 1, 1, true, 10, array['burger']::public.category_kind[]),
+  ('0199b2c8-40b0-7000-8000-000000000302', '0199b2c8-40b0-7000-8000-000000000001', 'Extras', 'multiple', 0, 3, false, 20, array['burger', 'sandwich']::public.category_kind[]),
+  ('0199b2c8-40b0-7000-8000-000000000303', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño de porción', 'single', 1, 1, true, 10, array['side']::public.category_kind[])
 on conflict (id) do update set
   name = excluded.name,
   selection_mode = excluded.selection_mode,
   minimum_selections = excluded.minimum_selections,
   maximum_selections = excluded.maximum_selections,
   is_required = excluded.is_required,
-  sort_order = excluded.sort_order;
+  sort_order = excluded.sort_order,
+  applicable_category_kinds = excluded.applicable_category_kinds;
 
 insert into public.options (
   id, option_group_id, name, description, price_delta_cents, is_available, sort_order

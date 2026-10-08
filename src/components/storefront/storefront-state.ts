@@ -1,4 +1,4 @@
-import type { CartLine, FulfilmentMethod, SelectedOptions } from "@/domain/types";
+import type { CartLine, FulfilmentMethod } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 
 export type PaymentMethod = "cash" | "transfer" | "mercado-pago";
@@ -11,20 +11,7 @@ export function changeLineQuantity(lines: CartLine[], id: string, delta: number)
   });
 }
 
-export function toggleOption(
-  selected: SelectedOptions,
-  groupId: string,
-  optionId: string,
-  maxSelections: number
-): SelectedOptions {
-  const current = selected[groupId] ?? [];
-  if (maxSelections === 1) return { ...selected, [groupId]: [optionId] };
-  if (current.includes(optionId)) {
-    return { ...selected, [groupId]: current.filter((id) => id !== optionId) };
-  }
-  if (current.length >= maxSelections) return selected;
-  return { ...selected, [groupId]: [...current, optionId] };
-}
+export { clearOptionGroup, toggleOption } from "@/domain/options";
 
 export function validateCashAmount(value: string, totalCents: bigint): boolean {
   if (!/^\d+$/.test(value)) return false;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CartLine } from "@/domain/types";
 import {
   changeLineQuantity,
+  clearOptionGroup,
   createWhatsAppUrl,
   toggleOption,
   validateCashAmount
@@ -34,18 +35,48 @@ describe("cart editing", () => {
 
 describe("product option selection", () => {
   it("replaces the previous option in a single-select group", () => {
-    expect(toggleOption({ size: ["double"] }, "size", "triple", 1)).toEqual({
+    expect(toggleOption({ size: ["double"] }, "size", "triple", 1, true, "single", true)).toEqual({
       size: ["triple"]
     });
   });
 
   it("toggles options without exceeding a multi-select maximum", () => {
-    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "egg", 2)).toEqual({
+    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "egg", 2, true, "multiple", false)).toEqual({
       extras: ["bacon", "cheddar"]
     });
-    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "bacon", 2)).toEqual({
+    expect(toggleOption({ extras: ["bacon", "cheddar"] }, "extras", "bacon", 2, true, "multiple", false)).toEqual({
       extras: ["cheddar"]
     });
+  });
+
+  it("allows selecting, prevents selecting a second, and allows deselecting when mode is multiple with maxSelections 1", () => {
+    const initial = toggleOption({}, "extras", "opt1", 1, true, "multiple", false);
+    expect(initial).toEqual({ extras: ["opt1"] });
+
+    const blocked = toggleOption(initial, "extras", "opt2", 1, true, "multiple", false);
+    expect(blocked).toEqual({ extras: ["opt1"] });
+
+    const deselected = toggleOption(initial, "extras", "opt1", 1, true, "multiple", false);
+    expect(deselected).toEqual({ extras: [] });
+  });
+
+  it("allows selecting and deselecting in a single optional group (required: false)", () => {
+    const initial = toggleOption({}, "dressing", "mayo", 1, true, "single", false);
+    expect(initial).toEqual({ dressing: ["mayo"] });
+
+    const deselected = toggleOption(initial, "dressing", "mayo", 1, true, "single", false);
+    expect(deselected).toEqual({ dressing: [] });
+  });
+
+  it("prevents deselecting an already selected option in a single required group (required: true)", () => {
+    const initial = { size: ["double"] };
+    const retained = toggleOption(initial, "size", "double", 1, true, "single", true);
+    expect(retained).toEqual({ size: ["double"] });
+  });
+
+  it("clears group selection using clearOptionGroup", () => {
+    const current = { size: ["double"], extras: ["bacon"] };
+    expect(clearOptionGroup(current, "size")).toEqual({ size: [], extras: ["bacon"] });
   });
 });
 

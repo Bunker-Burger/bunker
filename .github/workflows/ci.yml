@@ -27,29 +27,27 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  database:
+  cloud-reviewed:
+    name: pgTAP cloud revisado (SHA exacto)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    concurrency:
-      group: supabase-cloud-development
-      cancel-in-progress: false
-    env:
-      SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+    permissions:
+      contents: read
+      statuses: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - name: Verificar configuración cloud
-        if: env.SUPABASE_DEV_DB_URL == ''
-        run: echo "SUPABASE_DEV_DB_URL todavía no está configurado; pruebas cloud omitidas."
-      - name: Aplicar migraciones al proyecto de desarrollo
-        if: env.SUPABASE_DEV_DB_URL != ''
-        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
-      - name: Ejecutar pgTAP en desarrollo
-        if: env.SUPABASE_DEV_DB_URL != ''
-        run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
+      - name: Exigir ejecución cloud autorizada desde el workflow confiable de main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/pgTAP-reviewed")][0].state // "missing"')"
+          if [[ "$state" != "success" ]]; then
+            echo "::error::No existe pgTAP cloud aprobado para este SHA. Un mantenedor debe ejecutar 'Cloud DB — ejecución revisada (main)' desde main con el número de PR y SHA completo; luego reejecutar este job."
+            exit 1
+          fi
+          echo "pgTAP cloud del SHA exacto verificado; este job no usa secretos."
 
   e2e:
     runs-on: ubuntu-latest
