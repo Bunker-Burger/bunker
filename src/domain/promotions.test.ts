@@ -90,6 +90,26 @@ describe("calendar, weekly windows and pause", () => {
     expect(isPromotionInEffect(lateFriday, new Date("2026-10-10T00:59:00Z"), TUCUMAN)).toBe(false);
   });
 
+  it("treats a window whose start equals its end as empty, never as 24 hours", () => {
+    const sameTime = rule({
+      id: "same-time",
+      priority: 1,
+      mechanic: { type: "percent_off", percentOff: 20 },
+      schedule: [{ dayOfWeek: 2, startsAt: "18:00:00", endsAt: "18:00:00" }]
+    });
+    // Tuesday 18:00 and 21:00, Wednesday 12:00 and 17:59 local: never in effect.
+    for (const instant of ["2026-10-06T21:00:00Z", "2026-10-07T00:00:00Z", "2026-10-07T15:00:00Z", "2026-10-07T20:59:00Z"]) {
+      expect(isPromotionInEffect(sameTime, new Date(instant), TUCUMAN)).toBe(false);
+    }
+    expect(selectPromotion([sameTime], [burger()], context())).toBeNull();
+    // A genuine Tuesday 22:00–02:00 window still crosses into Wednesday.
+    const lateTuesday = { ...sameTime, schedule: [{ dayOfWeek: 2, startsAt: "22:00:00", endsAt: "02:00:00" }] };
+    expect(isPromotionInEffect(lateTuesday, new Date("2026-10-07T01:00:00Z"), TUCUMAN)).toBe(true);
+    expect(isPromotionInEffect(lateTuesday, new Date("2026-10-07T04:59:00Z"), TUCUMAN)).toBe(true);
+    expect(isPromotionInEffect(lateTuesday, new Date("2026-10-07T05:00:00Z"), TUCUMAN)).toBe(false);
+    expect(isPromotionInEffect(lateTuesday, new Date("2026-10-07T00:59:00Z"), TUCUMAN)).toBe(false);
+  });
+
   it("never applies a paused promotion, even when it would be the best one", () => {
     const paused = rule({ id: "paused", priority: 99, active: false, mechanic: { type: "percent_off", percentOff: 50 } });
     expect(isPromotionInEffect(paused, TUESDAY_NIGHT, TUCUMAN)).toBe(false);
@@ -231,7 +251,7 @@ describe("promotionalPrice (struck-through price)", () => {
   const product = { id: "burger", priceCents: 780000n };
 
   it("derives the promotional price from the real price while the promotion is in effect", () => {
-    expect(promotionalPrice(product, [tuesdaySmash], TUESDAY_NIGHT, TUCUMAN)).toEqual({
+    expect(promotionalPrice(product, [tuesdaySmash], context())).toEqual({
       priceCents: 663000n,
       compareAtPriceCents: 780000n,
       promotionName: "martes",
@@ -240,8 +260,33 @@ describe("promotionalPrice (struck-through price)", () => {
   });
 
   it("shows nothing outside the window, for paused rules or products the rule does not cover", () => {
-    expect(promotionalPrice(product, [tuesdaySmash], new Date("2026-10-07T23:00:00Z"), TUCUMAN)).toBeNull();
-    expect(promotionalPrice(product, [{ ...tuesdaySmash, active: false }], TUESDAY_NIGHT, TUCUMAN)).toBeNull();
-    expect(promotionalPrice({ id: "fries", priceCents: 350000n }, [tuesdaySmash], TUESDAY_NIGHT, TUCUMAN)).toBeNull();
+    expect(promotionalPrice(product, [tuesdaySmash], context({ now: new Date("2026-10-07T23:00:00Z") }))).toBeNull();
+    expect(promotionalPrice(product, [{ ...tuesdaySmash, active: false }], context())).toBeNull();
+    expect(promotionalPrice({ id: "fries", priceCents: 350000n }, [tuesdaySmash], context())).toBeNull();
+  });
+
+  it("follows the selected fulfilment, exactly like the quote", () => {
+    const deliveryOnly = rule({ id: "delivery-only", priority: 20, mechanic: { type: "percent_off", percentOff: 20 }, channels: ["delivery"] });
+    const pickup = context({ fulfilment: "pickup" });
+    const delivery = context({ fulfilment: "delivery", deliveryCents: 120000n });
+
+    expect(promotionalPrice(product, [deliveryOnly], pickup)).toBeNull();
+    expect(selectPromotion([deliveryOnly], [burger()], pickup)).toBeNull();
+
+    expect(promotionalPrice(product, [deliveryOnly], delivery)?.priceCents).toBe(624000n);
+    expect(selectPromotion([deliveryOnly], [burger()], delivery)?.productDiscountCents).toBe(156000n);
+
+    // With both rules, pickup falls back to the one its channel allows.
+    expect(promotionalPrice(product, [deliveryOnly, tuesdaySmash], pickup)?.promotionName).toBe("martes");
+    expect(promotionalPrice(product, [deliveryOnly, tuesdaySmash], delivery)?.promotionName).toBe("delivery-only");
+  });
+
+  it("strikes nothing when the promotion that would win is free delivery", () => {
+    const freeDelivery = rule({ id: "envio", priority: 30, mechanic: { type: "free_delivery" } });
+    const delivery = context({ fulfilment: "delivery", deliveryCents: 120000n });
+    expect(selectPromotion([freeDelivery, tuesdaySmash], [burger()], delivery)?.promotionId).toBe("envio");
+    expect(promotionalPrice(product, [freeDelivery, tuesdaySmash], delivery)).toBeNull();
+    // Pickup never gets free delivery, so the product promotion applies and is shown.
+    expect(promotionalPrice(product, [freeDelivery, tuesdaySmash], context())?.promotionName).toBe("martes");
   });
 });

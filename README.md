@@ -54,7 +54,7 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 
 ## Promociones
 
-- **Un solo motor** (`src/domain/promotions.ts`), usado por la cotización del servidor y por la estimación del navegador. Una regla está vigente si está activa (no pausada), `starts_at <= ahora < ends_at` y, si tiene `promotion_schedule`, la hora local de la tienda cae en uno de sus tramos semanales. Si `ends_at` no es posterior a `starts_at`, el tramo cruza la medianoche.
+- **Un solo motor** (`src/domain/promotions.ts`), usado por la cotización del servidor y por la estimación del navegador. Una regla está vigente si está activa (no pausada), `starts_at <= ahora < ends_at` y, si tiene `promotion_schedule`, la hora local de la tienda cae en uno de sus tramos semanales. Si `ends_at` es anterior a `starts_at`, el tramo cruza la medianoche (22:00–02:00); si son iguales, el tramo está vacío y nunca activa la regla.
 - **No acumulables.** A cada pedido se aplica como máximo una promoción: entre las vigentes que le dan descuento gana el `priority` más alto, con desempate estable por `id`. No hay cupos, contadores ni topes por unidades.
 - **Mecánicas** (`promotion_items` define los productos alcanzados):
   - `percent_off`: porcentaje de lo que se paga por esos productos (o por todo el pedido si no lista ninguno). Se calcula exacto en puntos básicos y se redondea hacia abajo.
@@ -62,7 +62,8 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
   - `buy_x_get_y`: por cada `buy + get` unidades, las `get` más baratas (a precio base) son gratis.
   - `free_delivery`: anula la tarifa de envío una sola vez, solo en delivery.
 - **Cotización autoritativa.** `createAuthoritativeQuote` recibe las reglas de `PricingRepository.listPromotions()` y guarda la promoción aplicada en el snapshot (`PaymentQuote.promotion`), que reutilizan el mensaje de WhatsApp y Mercado Pago. `getPromotionsForQuote()` (`@/server/catalog`) lee las reglas con el cliente operativo sin caché, así una pausa rige en la próxima cotización. El navegador no envía precios, descuentos ni ids de promoción: el schema de checkout los rechaza.
-- **UI sin texto de precio libre.** El precio tachado sale del precio real (`promotionalPrice`) y la explicación se genera desde la mecánica (`explainPromotion`); nunca se muestran `description` ni `badge_text` como precio. La carta estática usa una copia de la regla del seed ("Martes de Smash") hasta que BB-07 lea la base.
+- **Fuente pública real.** La carta y el total estimado leen `GET /api/store/promotions`: las mismas reglas que `getPromotionsForQuote()`, sin caché (`no-store`, y el service worker nunca la guarda), sin `description` ni `badge_text`, con los productos identificados por slug. El navegador la vuelve a leer cada minuto y al volver a la pestaña, así una pausa o un cambio de porcentaje llega a la página abierta. Si el endpoint falla, no se anuncia ningún descuento; no existe copia estática de reglas.
+- **UI sin texto de precio libre.** El precio tachado sale del precio real y es exactamente lo que `quoteCart` descontaría a ese producto solo con la modalidad elegida (`promotionalPrice`): una promoción solo delivery no se anuncia mientras está elegido retiro, y si la que ganaría es envío gratis no se tacha nada. La explicación se genera desde la mecánica (`explainPromotion`); nunca se muestran `description` ni `badge_text` como precio.
 
 ## UI
 

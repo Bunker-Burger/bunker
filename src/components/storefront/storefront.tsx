@@ -24,9 +24,10 @@ import {
 } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
+import { toPromotionRule } from "@/domain/public-promotions";
 import type { CartLine, FulfilmentMethod, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
-import { categoryLabels, products, promotions as catalogPromotions, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
+import { categoryLabels, products, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -38,7 +39,8 @@ import {
   type PaymentMethod
 } from "./storefront-state";
 import { useNow } from "./use-now";
-import { describeStoreStatus, useStoreStatus } from "./use-store-status";
+import { usePublicPromotions } from "./use-public-promotions";
+import { describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import "./storefront.css";
 
 const CART_KEY = "bunker-cart";
@@ -100,9 +102,10 @@ interface StorefrontProps {
   mercadoPagoEnabled: boolean;
   showAdminNav?: boolean;
   onInvalidProduct?: () => void;
-  /** Promotion rules shown in the menu and the checkout estimate; the server quote re-reads its own. */
-  promotions?: readonly PromotionRule[];
 }
+
+/** Promotion items name products by slug; the cart uses the storefront's product ids. */
+const PRODUCT_ID_BY_SLUG: ReadonlyMap<string, string> = new Map(products.map((product) => [product.slug, product.id]));
 
 function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string): CartLine {
   return {
@@ -121,10 +124,24 @@ export function Storefront({
   initialProductSlug,
   mercadoPagoEnabled,
   showAdminNav = false,
-  onInvalidProduct,
-  promotions = catalogPromotions
+  onInvalidProduct
 }: StorefrontProps) {
   const now = useNow();
+  const storeStatus = useStoreStatus();
+  const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
+  // Rules published by the server (fresh read, same as the quote); never a static copy.
+  const publicPromotions = usePublicPromotions();
+  const promotions = useMemo(
+    () => publicPromotions.map((promotion) => toPromotionRule(promotion, PRODUCT_ID_BY_SLUG)),
+    [publicPromotions]
+  );
+  const deliveryFeeCents =
+    storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
+  const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
+  // The card price is what this product alone would cost with the selected fulfilment.
+  const cardContext = now
+    ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
+    : null;
   const [category, setCategory] = useState<StoreCategory>("burgers");
   const cart = useSyncExternalStore(subscribeCart, readCart, readServerCart);
   const [initialSlugInvalid] = useState(() => initialProductSlug !== null && !isKnownSlug(initialProductSlug));
@@ -251,7 +268,7 @@ export function Storefront({
         <div className="product-grid">
           {visibleProducts.map((product, index) => (
             <ProductCard
-              promotion={now ? promotionalPrice(product, promotions, now, STORE_TIMEZONE) : null}
+              promotion={cardContext ? promotionalPrice(product, promotions, cardContext) : null}
               featured={category === "burgers" && index === 0}
               key={product.id}
               onAdd={() => addDirect(product)}
@@ -266,8 +283,13 @@ export function Storefront({
       <CheckoutSection
         cart={cart}
         mercadoPagoEnabled={mercadoPagoEnabled}
+        deliveryFeeCents={deliveryFeeCents}
+        fulfilment={fulfilment}
         now={now}
+        onFulfilmentChange={setFulfilment}
         promotions={promotions}
+        storeStatus={storeStatus}
+        timezone={timezone}
       />
 
       {itemCount > 0 && !keyboardOpen ? (
@@ -486,20 +508,30 @@ function toPromotionLines(cart: CartLine[]): PromotionLine[] {
   });
 }
 
-function CheckoutSection({ cart, mercadoPagoEnabled, now, promotions }: {
+function CheckoutSection({
+  cart,
+  mercadoPagoEnabled,
+  now,
+  promotions,
+  fulfilment,
+  onFulfilmentChange: setFulfilment,
+  storeStatus,
+  deliveryFeeCents,
+  timezone
+}: {
   cart: CartLine[];
   mercadoPagoEnabled: boolean;
   now: Date | null;
   promotions: readonly PromotionRule[];
+  fulfilment: FulfilmentMethod;
+  onFulfilmentChange: (fulfilment: FulfilmentMethod) => void;
+  storeStatus: StoreStatusView;
+  deliveryFeeCents: bigint | null;
+  timezone: string;
 }) {
-  const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [selectedPayment, setPayment] = useState<PaymentMethod>(mercadoPagoEnabled ? "mercado-pago" : "transfer");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const storeStatus = useStoreStatus();
-  const deliveryFeeCents =
-    storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
-  const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
   const nowMs = now?.getTime() ?? null;
   // Display-only estimate with the same engine the server quote uses; the server recomputes it.
   const quote = useMemo(

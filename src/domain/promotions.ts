@@ -57,6 +57,8 @@ const NO_DISCOUNT: PromotionDiscount = { productDiscountCents: 0n, deliveryDisco
 function inWindow(window: PromotionWindow, dayOfWeek: number, seconds: number): boolean {
   const start = wallClockSeconds(window.startsAt);
   const end = wallClockSeconds(window.endsAt);
+  // Same start and end is an empty window, not 24 hours (the schema does not forbid it).
+  if (end === start) return false;
   if (end > start) return window.dayOfWeek === dayOfWeek && seconds >= start && seconds < end;
   // Crosses midnight: from `start` on its day until `end` the next day.
   return (window.dayOfWeek === dayOfWeek && seconds >= start) || ((window.dayOfWeek + 1) % 7 === dayOfWeek && seconds < end);
@@ -187,29 +189,23 @@ export interface PromotionalPrice {
 }
 
 /**
- * Struck-through price for a product card: what one unit costs alone under the promotion that
- * would apply to it (any channel the rule allows), computed from the real base price.
- * Null when no promotion lowers a single unit of it.
+ * Struck-through price for a product card: what one unit ordered alone costs with the selected
+ * fulfilment, i.e. exactly what `quoteCart` would discount for it (same rule choice, same
+ * channel), computed from the real base price. Null when that order gets no product discount
+ * (including when the winning promotion is free delivery).
  */
 export function promotionalPrice(
   product: { id: string; priceCents: bigint },
   rules: readonly PromotionRule[],
-  now: Date,
-  timezone: string
+  context: PromotionContext
 ): PromotionalPrice | null {
   const line: PromotionLine = { productId: product.id, quantity: 1, unitPriceCents: product.priceCents, basePriceCents: product.priceCents };
-  for (const rule of [...rules].sort(byPriority)) {
-    if (!isPromotionInEffect(rule, now, timezone)) continue;
-    const fulfilment = rule.channels[0];
-    if (!fulfilment || rule.mechanic.type === "free_delivery") continue;
-    const discount = promotionDiscount(rule, [line], { now, timezone, fulfilment, deliveryCents: 0n }).productDiscountCents;
-    if (discount === 0n) continue;
-    return {
-      priceCents: product.priceCents - discount,
-      compareAtPriceCents: product.priceCents,
-      promotionName: rule.name,
-      explanation: explainPromotion(rule)
-    };
-  }
-  return null;
+  const applied = selectPromotion(rules, [line], context);
+  if (!applied || applied.productDiscountCents === 0n) return null;
+  return {
+    priceCents: product.priceCents - applied.productDiscountCents,
+    compareAtPriceCents: product.priceCents,
+    promotionName: applied.name,
+    explanation: applied.explanation
+  };
 }

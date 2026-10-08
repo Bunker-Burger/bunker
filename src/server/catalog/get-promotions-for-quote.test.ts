@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPromotionsForQuote } from "./index";
+import { getPromotionsForQuote, getPublicPromotions } from "./index";
 
 /*
  * Production seam of getPromotionsForQuote(): real config, client construction and repository.
@@ -56,6 +56,7 @@ function respond(url: URL, headers: Headers): Response {
   if (url.pathname.endsWith("/stores")) {
     return json(headers.get("accept")?.includes("vnd.pgrst.object") ? storeRow : [storeRow]);
   }
+  if (url.pathname.endsWith("/products")) return json([{ id: "smash", slug: "smash-bunker-doble" }]);
   // Public reads only see active rules (RLS); a paused promotion is simply not returned.
   return json(database.martesActive ? [promotionRow()] : []);
 }
@@ -105,5 +106,27 @@ describe("getPromotionsForQuote() freshness", () => {
     expect(await getPromotionsForQuote("bunker-burger")).toMatchObject({ ok: true, value: [{ slug: "martes-de-smash" }] });
     database.martesActive = false;
     expect(await getPromotionsForQuote("bunker-burger")).toEqual({ ok: true, value: [] });
+  });
+});
+
+describe("getPublicPromotions() freshness", () => {
+  it("reads the same rules, and the slugs of their products, without any cache", async () => {
+    const result = await getPublicPromotions("bunker-burger");
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: [{ slug: "martes-de-smash", mechanic: { type: "percent_off", percentOff: 15 }, items: [{ productSlug: "smash-bunker-doble", quantity: 1 }] }]
+    });
+    expect(requests.map(({ url }) => new URL(url).pathname)).toEqual(["/rest/v1/stores", "/rest/v1/promotion_rules", "/rest/v1/products"]);
+    for (const { init } of requests) {
+      expect(init.cache).toBe("no-store");
+      expect(init.next).toBeUndefined();
+    }
+  });
+
+  it("sees a pause persisted between two reads, without any tag invalidation", async () => {
+    expect(await getPublicPromotions("bunker-burger")).toMatchObject({ ok: true, value: [{ slug: "martes-de-smash" }] });
+    database.martesActive = false;
+    expect(await getPublicPromotions("bunker-burger")).toEqual({ ok: true, value: [] });
   });
 });

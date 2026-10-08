@@ -2,12 +2,14 @@ import "server-only";
 
 import type { StoreStatus } from "@/domain/store-status";
 import type { Catalog, PromotionRule } from "@/domain/types";
-import type { Result } from "@/lib/result";
+import type { PublicPromotion } from "@/domain/public-promotions";
+import { ok, type Result } from "@/lib/result";
 import { createOperationalReadClient, createPublicReadClient, createSessionClient } from "@/server/supabase/clients";
 import { catalogImageBaseUrl, readSupabaseConfig } from "@/server/supabase/config";
 import { createSupabaseAdminAccess } from "./admin-access";
 import { loadAdminCatalog, loadPublicCatalog } from "./catalog-service";
 import { reportCatalogError, type CatalogError } from "./errors";
+import { toPublicPromotions } from "./public-promotions";
 import { createSupabaseStoreOperatingRepository, loadStoreStatus } from "./store-status";
 import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
@@ -60,19 +62,42 @@ export async function getStoreStatus(
  * their date range; the quote still re-checks window, schedule, channel and priority.
  */
 export async function getPromotionsForQuote(storeSlug: string = STORE_SLUG): Promise<Result<PromotionRule[], CatalogError>> {
+  const read = await readPublicPromotionRules(storeSlug);
+  return read.ok ? ok(read.value.rules) : read;
+}
+
+/**
+ * The same fresh rules as `getPromotionsForQuote`, in the public shape the menu and checkout
+ * estimate read from `GET /api/store/promotions`: the browser never advertises a promotion
+ * the quote would not apply. Anonymous: only data RLS already shows to anyone.
+ */
+export async function getPublicPromotions(storeSlug: string = STORE_SLUG): Promise<Result<PublicPromotion[], CatalogError>> {
+  const read = await readPublicPromotionRules(storeSlug);
+  if (!read.ok) return read;
+  const promotions = await toPublicPromotions(read.value.client, read.value.storeId, read.value.rules);
+  if (!promotions.ok) reportCatalogError("public", promotions.error);
+  return promotions;
+}
+
+async function readPublicPromotionRules(storeSlug: string) {
   const config = readSupabaseConfig();
   if (!config.ok) {
     reportCatalogError("public", config.error);
     return config;
   }
-  const repository = createSupabaseCatalogRepository(createOperationalReadClient(config.value), {
-    scope: "public",
-    imageBaseUrl: catalogImageBaseUrl(config.value)
-  });
+  const client = createOperationalReadClient(config.value);
+  const repository = createSupabaseCatalogRepository(client, { scope: "public", imageBaseUrl: catalogImageBaseUrl(config.value) });
   const store = await repository.getStoreBySlug(storeSlug);
-  const promotions = store.ok ? await repository.listPromotions(store.value.id) : store;
-  if (!promotions.ok) reportCatalogError("public", promotions.error);
-  return promotions;
+  if (!store.ok) {
+    reportCatalogError("public", store.error);
+    return store;
+  }
+  const rules = await repository.listPromotions(store.value.id);
+  if (!rules.ok) {
+    reportCatalogError("public", rules.error);
+    return rules;
+  }
+  return ok({ client, storeId: store.value.id, rules: rules.value });
 }
 
 /**
