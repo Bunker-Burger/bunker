@@ -1,6 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { serializeCart } from "@/domain/cart";
+import type { CartLine } from "@/domain/types";
 import { ProductDrawer, Storefront } from "./storefront";
 
 describe("Storefront", () => {
@@ -284,5 +286,153 @@ describe("Storefront", () => {
     await user.click(jugosoRadio);
     expect(jugosoRadio).toBeChecked();
     expect(addButton).toBeEnabled();
+  });
+});
+
+describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y revalidación", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const sampleLine: CartLine = {
+    id: '{"productId":"smash-doble","notes":"","selectedOptions":{"patty":["double"]}}',
+    productId: "smash-doble",
+    productSlug: "smash-bunker-doble",
+    productName: "Smash Búnker Doble",
+    unitPriceCents: 780000n,
+    quantity: 1,
+    notes: "",
+    selectedOptions: { patty: ["double"] }
+  };
+
+  it("TC-PERS-02: el carrito persiste y se recupera intacto tras desmontar y volver a montar", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Agregar Smash Búnker Doble" }));
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+
+    unmount();
+
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
+  });
+
+  it("TC-SYNC-01: sincroniza la pestaña en vivo cuando otra pestaña escribe en localStorage vía StorageEvent", () => {
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    expect(screen.getByLabelText("Carrito, 0 productos")).toBeInTheDocument();
+
+    act(() => {
+      localStorage.setItem("bunker-cart", serializeCart([sampleLine]));
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "bunker-cart",
+          newValue: serializeCart([sampleLine])
+        })
+      );
+    });
+
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
+  });
+
+  it("TC-SYNC-03: eliminación o vaciado en otra pestaña se refleja inmediatamente", () => {
+    localStorage.setItem("bunker-cart", serializeCart([sampleLine]));
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+
+    act(() => {
+      localStorage.setItem("bunker-cart", serializeCart([]));
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "bunker-cart",
+          newValue: serializeCart([])
+        })
+      );
+    });
+
+    expect(screen.getByLabelText("Carrito, 0 productos")).toBeInTheDocument();
+    expect(screen.getByText("Tu carrito está vacío")).toBeInTheDocument();
+  });
+
+  it("TC-SYNC-04: ignora eventos de claves ajenas a bunker-cart", () => {
+    localStorage.setItem("bunker-cart", serializeCart([sampleLine]));
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    act(() => {
+      localStorage.setItem("other-key", "val");
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "other-key",
+          newValue: "val"
+        })
+      );
+    });
+
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+  });
+
+  it("permite editar notas y opciones de una línea abriendo el drawer en modo edición", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Agregar Smash Búnker Doble" }));
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+
+    // Click en botón Editar
+    await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Guardar cambios/ })).toBeInTheDocument();
+
+    // Modificar notas
+    const notesInput = within(dialog).getByLabelText("Aclaraciones para la cocina");
+    await user.type(notesInput, "Sin mostaza");
+
+    // Guardar cambios
+    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
+
+    expect(screen.getByText("Sin mostaza")).toBeInTheDocument();
+  });
+
+  it("permite eliminar una línea individual y vaciar el carrito completo", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Agregar Smash Búnker Doble" }));
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+
+    // Vaciar carrito
+    await user.click(screen.getByRole("button", { name: "Vaciar carrito completo" }));
+    expect(screen.getByLabelText("Carrito, 0 productos")).toBeInTheDocument();
+    expect(screen.getByText("Tu carrito está vacío")).toBeInTheDocument();
+  });
+
+  it("bloquea el checkout y muestra aviso cuando el carrito está vacío", () => {
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    const checkoutSection = screen.getByRole("region", { name: "Finalizar pedido" });
+    const submitButton = within(checkoutSection).getByRole("button", {
+      name: /WhatsApp|Confirmación|pedidos/i
+    });
+    expect(submitButton).toBeDisabled();
+    expect(within(checkoutSection).getByText("El carrito está vacío. Agregá productos para finalizar el pedido.")).toBeInTheDocument();
+  });
+
+  it("revalida y actualiza precios en el carrito automáticamente ante discrepancias de catálogo", () => {
+    const oldPriceLine: CartLine = {
+      ...sampleLine,
+      unitPriceCents: 500000n
+    };
+    localStorage.setItem("bunker-cart", serializeCart([oldPriceLine]));
+
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    expect(within(cartSection).getAllByText("$ 7.800")).toHaveLength(2);
+    expect(screen.getByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.');
   });
 });

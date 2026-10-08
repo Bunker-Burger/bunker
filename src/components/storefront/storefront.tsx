@@ -14,8 +14,14 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FocusEvent } from "react";
-import { addCartLine, parsePersistedCart, serializeCart } from "@/domain/cart";
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
+import {
+  addCartLine,
+  clearCart,
+  editCartLine,
+  removeCartLine,
+  revalidateCart
+} from "@/domain/cart";
 import {
   calculateConfiguredUnitPrice,
   getApplicableOptionGroups,
@@ -25,6 +31,7 @@ import {
 import { quoteCart } from "@/domain/pricing";
 import type { CartLine, FulfilmentMethod, Product, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { useCart } from "@/lib/cart-store";
 import { categoryLabels, products, type StoreCategory } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
@@ -39,44 +46,9 @@ import {
 import { describeStoreStatus, useStoreStatus } from "./use-store-status";
 import "./storefront.css";
 
-const CART_KEY = "bunker-cart";
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const categories = Object.keys(categoryLabels) as StoreCategory[];
-
-// The cart lives in localStorage; useSyncExternalStore keeps SSR output empty and
-// re-renders on same-tab writes and cross-tab `storage` events.
-const cartListeners = new Set<() => void>();
-const EMPTY_CART: CartLine[] = [];
-let cartSnapshot: { raw: string | null; lines: CartLine[] } = { raw: null, lines: EMPTY_CART };
-
-function readCart(): CartLine[] {
-  const raw = localStorage.getItem(CART_KEY);
-  if (raw !== cartSnapshot.raw) cartSnapshot = { raw, lines: parsePersistedCart(raw) };
-  return cartSnapshot.lines;
-}
-
-function readServerCart(): CartLine[] {
-  return EMPTY_CART;
-}
-
-function subscribeCart(listener: () => void) {
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === CART_KEY || event.key === null) listener();
-  };
-  cartListeners.add(listener);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    cartListeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-function setCart(next: CartLine[] | ((current: CartLine[]) => CartLine[])) {
-  const lines = typeof next === "function" ? next(readCart()) : next;
-  localStorage.setItem(CART_KEY, serializeCart(lines));
-  cartListeners.forEach((listener) => listener());
-}
 
 // Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
 function revealInScroller(event: FocusEvent<HTMLElement>) {
@@ -120,12 +92,32 @@ export function Storefront({
   onInvalidProduct
 }: StorefrontProps) {
   const [category, setCategory] = useState<StoreCategory>("burgers");
-  const cart = useSyncExternalStore(subscribeCart, readCart, readServerCart);
+  const [cart, setCart] = useCart();
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null);
   const [initialSlugInvalid] = useState(() => initialProductSlug !== null && !isKnownSlug(initialProductSlug));
   const [activeSlug, setActiveSlug] = useState(initialSlugInvalid ? null : initialProductSlug);
   const [notice, setNotice] = useState(initialSlugInvalid ? INVALID_PRODUCT_NOTICE : "");
   const onInvalidProductRef = useRef(onInvalidProduct);
   const invalidSlugHandled = useRef(false);
+
+  const [revalidationNotice, setRevalidationNotice] = useState("");
+  const [lastCheckedCart, setLastCheckedCart] = useState<CartLine[]>([]);
+
+  if (cart !== lastCheckedCart) {
+    setLastCheckedCart(cart);
+    const initialCheck = revalidateCart(cart, products);
+    if (initialCheck.hasChanges && initialCheck.issues.length > 0) {
+      setRevalidationNotice(initialCheck.issues[0]!.message);
+    }
+  }
+
+  const revalidation = useMemo(() => revalidateCart(cart, products), [cart]);
+
+  useEffect(() => {
+    if (revalidation.hasChanges) {
+      setCart(revalidation.validLines);
+    }
+  }, [revalidation, setCart]);
 
   useEffect(() => {
     onInvalidProductRef.current = onInvalidProduct;
@@ -163,12 +155,21 @@ export function Storefront({
     const url = new URL(window.location.href);
     url.searchParams.set("producto", product.slug);
     window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    setEditingLine(null);
     setActiveSlug(product.slug);
   };
+
+  const handleEditLine = useCallback((lineToEdit: CartLine) => {
+    const product = products.find((p) => p.id === lineToEdit.productId);
+    if (!product) return;
+    setEditingLine(lineToEdit);
+    setActiveSlug(product.slug);
+  }, []);
 
   const closeProduct = useCallback(() => {
     removeProductParam();
     setActiveSlug(null);
+    setEditingLine(null);
   }, []);
 
   const addDirect = (product: Product) => {
@@ -212,7 +213,7 @@ export function Storefront({
       }
       bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
     >
-      {notice ? <div className="toast" role="status">{notice}</div> : null}
+      {notice || revalidationNotice ? <div className="toast" role="status">{notice || revalidationNotice}</div> : null}
 
       <section className="menu-section" id="menu" aria-labelledby="menu-title">
         <div className="menu-intro">
@@ -255,7 +256,7 @@ export function Storefront({
         </div>
       </section>
 
-      <CartSection cart={cart} onChange={setCart} subtotal={subtotal} />
+      <CartSection cart={cart} onChange={setCart} onEditLine={handleEditLine} subtotal={subtotal} />
       <CheckoutSection
         cart={cart}
         mercadoPagoEnabled={mercadoPagoEnabled}
@@ -269,11 +270,29 @@ export function Storefront({
       ) : null}
 
       {activeProduct ? (
-        <ProductDrawer product={activeProduct} onClose={closeProduct} onSubmit={(line) => {
-          setCart((current) => addCartLine(current, line));
-          setNotice(`${line.productName} se agregó al carrito.`);
-          closeProduct();
-        }} />
+        <ProductDrawer
+          initialLine={editingLine}
+          onClose={closeProduct}
+          onSubmit={(submittedLine) => {
+            if (editingLine) {
+              setCart((current) =>
+                editCartLine(current, editingLine.id, {
+                  selectedOptions: submittedLine.selectedOptions,
+                  unitPriceCents: submittedLine.unitPriceCents,
+                  notes: submittedLine.notes,
+                  quantity: submittedLine.quantity
+                })
+              );
+              setNotice(`${submittedLine.productName} se actualizó en el carrito.`);
+              setEditingLine(null);
+            } else {
+              setCart((current) => addCartLine(current, submittedLine));
+              setNotice(`${submittedLine.productName} se agregó al carrito.`);
+            }
+            closeProduct();
+          }}
+          product={activeProduct}
+        />
       ) : null}
     </AppShell>
   );
@@ -311,14 +330,15 @@ function ProductCard({ product, featured, onOpen, onAdd }: {
   );
 }
 
-export function ProductDrawer({ product, onClose, onSubmit }: {
+export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   product: Product;
+  initialLine?: CartLine | null;
   onClose: () => void;
   onSubmit: (line: CartLine) => void;
 }) {
-  const [selected, setSelected] = useState<SelectedOptions>(() => getDefaultSelection(product));
-  const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState("");
+  const [selected, setSelected] = useState<SelectedOptions>(() => initialLine?.selectedOptions ?? getDefaultSelection(product));
+  const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
+  const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -425,7 +445,11 @@ export function ProductDrawer({ product, onClose, onSubmit }: {
             }}
             type="button"
           >
-            Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span>
+            {initialLine ? (
+              <>Guardar cambios <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
+            ) : (
+              <>Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
+            )}
           </button>
         </div>
       </div>
@@ -433,7 +457,17 @@ export function ProductDrawer({ product, onClose, onSubmit }: {
   );
 }
 
-function CartSection({ cart, subtotal, onChange }: { cart: CartLine[]; subtotal: bigint; onChange: (cart: CartLine[]) => void }) {
+function CartSection({
+  cart,
+  subtotal,
+  onChange,
+  onEditLine
+}: {
+  cart: CartLine[];
+  subtotal: bigint;
+  onChange: (cart: CartLine[]) => void;
+  onEditLine: (line: CartLine) => void;
+}) {
   return (
     <section className="order-section" id="carrito" aria-labelledby="cart-title">
       <div className="section-heading"><div><span>TU PEDIDO</span><h2 id="cart-title">Carrito</h2></div><ShoppingBag /></div>
@@ -443,14 +477,46 @@ function CartSection({ cart, subtotal, onChange }: { cart: CartLine[]; subtotal:
         <div className="cart-panel">
           {cart.map((line) => (
             <div className="cart-line" key={line.id}>
-              <div><strong>{line.productName}</strong><small>{line.notes || "Personalización estándar"}</small><span>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</span></div>
-              <div className="quantity-stepper compact">
-                <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
-                <strong>{line.quantity}</strong>
-                <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+              <div>
+                <strong>{line.productName}</strong>
+                <small>{line.notes || "Personalización estándar"}</small>
+                <span>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</span>
+              </div>
+              <div className="cart-line-actions">
+                <div className="quantity-stepper compact">
+                  <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
+                  <strong>{line.quantity}</strong>
+                  <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+                </div>
+                <button
+                  aria-label={`Editar ${line.productName}`}
+                  className="cart-action-btn"
+                  onClick={() => onEditLine(line)}
+                  type="button"
+                >
+                  Editar
+                </button>
+                <button
+                  aria-label={`Quitar ${line.productName} del carrito`}
+                  className="cart-action-btn text-danger"
+                  onClick={() => onChange(removeCartLine(cart, line.id))}
+                  type="button"
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
           ))}
+          <div className="cart-actions-row">
+            <button
+              aria-label="Vaciar carrito completo"
+              className="clear-cart-btn"
+              onClick={() => onChange(clearCart())}
+              type="button"
+            >
+              Vaciar carrito
+            </button>
+          </div>
           <div className="cart-total"><span>Subtotal</span><strong>{formatArs(subtotal)}</strong></div>
           <a className="primary-action wide" href="#checkout">Continuar al checkout <ChevronRight /></a>
         </div>
@@ -472,6 +538,7 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
   const payment = !mercadoPagoEnabled && selectedPayment === "mercado-pago" ? "transfer" : selectedPayment;
   const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
+  const hasValidLines = cart.length > 0;
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
@@ -507,8 +574,19 @@ function CheckoutSection({ cart, mercadoPagoEnabled }: { cart: CartLine[]; merca
           <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending ? "A confirmar" : quote.deliveryCents === 0n ? "$0" : formatArs(quote.deliveryCents)}</strong></div>
           <div className="summary-total"><span>Total estimado</span><strong>{formatArs(quote.totalCents)}</strong></div>
           <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
+          {!hasValidLines ? (
+            <p aria-live="polite" className="store-status-note text-muted">
+              El carrito está vacío. Agregá productos para finalizar el pedido.
+            </p>
+          ) : null}
           {/* No send action until a server-validated quote can authorize it (BB-10): a total computed in the browser never confirms an order. */}
-          <button className="whatsapp-button" disabled type="button">{acceptingOrders ? "Confirmación por WhatsApp próximamente" : "No se pueden enviar pedidos ahora"}</button>
+          <button
+            className="whatsapp-button"
+            disabled
+            type="button"
+          >
+            {acceptingOrders ? "Confirmación por WhatsApp próximamente" : "No se pueden enviar pedidos ahora"}
+          </button>
           <small>Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo.</small>
         </div>
       </div>

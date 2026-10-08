@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { CartLine } from "@/domain/types";
 import {
   changeLineQuantity,
+  clearCart,
   clearOptionGroup,
   createWhatsAppUrl,
+  editCartLine,
+  removeCartLine,
   toggleOption,
+  updateCartLineNotes,
   validateCashAmount
 } from "./storefront-state";
 
@@ -30,6 +34,27 @@ describe("cart editing", () => {
       { ...line, quantity: 3 },
       other
     ]);
+  });
+
+  it("updates notes without losing quantity or options (TC-EDIT-01)", () => {
+    const updated = updateCartLineNotes([line], line.id, "sin mayonesa");
+    expect(updated[0]?.notes).toBe("sin mayonesa");
+    expect(updated[0]?.quantity).toBe(2);
+    expect(updated[0]?.unitPriceCents).toBe(780000n);
+  });
+
+  it("updates line options and recalculates price via editCartLine", () => {
+    const updated = editCartLine([line], line.id, {
+      selectedOptions: { patty: ["triple"] },
+      unitPriceCents: 940000n
+    });
+    expect(updated[0]?.unitPriceCents).toBe(940000n);
+    expect(updated[0]?.quantity).toBe(2);
+  });
+
+  it("removes line and clears cart", () => {
+    expect(removeCartLine([line], line.id)).toEqual([]);
+    expect(clearCart()).toEqual([]);
   });
 });
 
