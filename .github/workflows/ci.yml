@@ -4,6 +4,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      verified_sha:
+        description: "SHA del commit revisado y autorizado para pruebas cloud (opcional)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -35,6 +41,10 @@ jobs:
       cancel-in-progress: false
     env:
       SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+      GITHUB_REF: ${{ github.ref }}
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_EVENT_NAME: ${{ github.event_name }}
+      VERIFIED_SHA: ${{ inputs.verified_sha || vars.AUTHORIZED_DEV_DB_SHA }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,14 +52,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Verificar configuración cloud
-        if: env.SUPABASE_DEV_DB_URL == ''
-        run: echo "SUPABASE_DEV_DB_URL todavía no está configurado; pruebas cloud omitidas."
-      - name: Validar URL de base de datos
-        if: env.SUPABASE_DEV_DB_URL != ''
+      - name: Validar autorización de confianza y URL de base de datos
         run: node scripts/validate-db-url.mjs
       - name: Ejecutar pgTAP en desarrollo
-        if: env.SUPABASE_DEV_DB_URL != ''
         run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
 
   e2e:

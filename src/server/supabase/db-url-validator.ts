@@ -1,8 +1,17 @@
-// Validates Supabase database connection URLs and migration inputs
+// Validates Supabase database connection URLs, migration inputs, and trust boundaries
 // without revealing passwords, tokens, or credentials in error messages or logs.
 
 export const DEFAULT_DEV_PROJECT_REF = "zokkgocmcaqcujltfkjf";
 export const ALLOWED_MIGRATION_BRANCHES = ["main", "feat/bb-05-option-engine"];
+
+/**
+ * Checks if a hostname matches the official Supabase pooler host pattern.
+ * e.g. aws-0-sa-east-1.pooler.supabase.com, aws-0-us-east-1.pooler.supabase.com
+ */
+export function isOfficialPoolerHost(hostname: string | undefined): boolean {
+  if (!hostname || typeof hostname !== "string") return false;
+  return /^aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(hostname.trim().toLowerCase());
+}
 
 export interface ValidateDbUrlOptions {
   url?: string | undefined;
@@ -11,17 +20,23 @@ export interface ValidateDbUrlOptions {
 }
 
 export type ValidateDbUrlResult =
-  | { ok: true; projectRef: string; host: string; port: string }
+  | { ok: true; projectRef: string; host: string; port: string; mode: "direct" | "pooler" }
   | { ok: false; error: string };
 
 /**
  * Validates a PostgreSQL connection URL against the authorized development project.
  * Guaranteed never to return or log raw passwords or credentials.
+ * Enforces exact structural validation:
+ * - Direct connection: host must be exactly 'db.<expectedRef>.supabase.co' with username 'postgres' or 'postgres.<expectedRef>'.
+ * - Pooler connection: host must match official Supabase pooler host and username must be exactly 'postgres.<expectedRef>'.
+ * Rejects arbitrary hosts, other project refs, spoofed subdomains, and production references.
  */
 export function validateDbUrl(options: ValidateDbUrlOptions = {}): ValidateDbUrlResult {
   const rawUrl = options.url !== undefined ? options.url : process.env.SUPABASE_DEV_DB_URL;
   const expectedRef = (options.expectedProjectRef || DEFAULT_DEV_PROJECT_REF).trim();
-  const prodRef = (options.productionRef !== undefined ? options.productionRef : process.env.SUPABASE_PRODUCTION_PROJECT_REF)?.trim();
+  const prodRef = (
+    options.productionRef !== undefined ? options.productionRef : process.env.SUPABASE_PRODUCTION_PROJECT_REF
+  )?.trim();
 
   if (!rawUrl || typeof rawUrl !== "string" || rawUrl.trim().length === 0) {
     return {
@@ -48,9 +63,16 @@ export function validateDbUrl(options: ValidateDbUrlOptions = {}): ValidateDbUrl
     };
   }
 
+  const hostname = parsed.hostname.toLowerCase();
+  const username = decodeURIComponent(parsed.username);
+  const expected = expectedRef.toLowerCase();
+  const prod = prodRef ? prodRef.toLowerCase() : "";
+
   // Reject production references
-  if (prodRef && prodRef.length > 0) {
-    if (parsed.hostname.includes(prodRef) || parsed.username.includes(prodRef)) {
+  if (prod && prod.length > 0) {
+    const isDirectProd = hostname === `db.${prod}.supabase.co`;
+    const isPoolerProd = isOfficialPoolerHost(hostname) && username === `postgres.${prod}`;
+    if (isDirectProd || isPoolerProd || hostname.includes(prod) || username.includes(prod) || expected === prod) {
       return {
         ok: false,
         error: "SUPABASE_DEV_DB_URL apunta al proyecto de producción no permitido.",
@@ -58,9 +80,18 @@ export function validateDbUrl(options: ValidateDbUrlOptions = {}): ValidateDbUrl
     }
   }
 
-  // Validate that hostname or username matches the expected development project ref
-  const matchesDev = parsed.hostname.includes(expectedRef) || parsed.username.includes(expectedRef);
-  if (!matchesDev) {
+  // Exact structural check:
+  // 1. Direct connection: host is strictly 'db.<expected>.supabase.co'
+  const isDirectDev =
+    hostname === `db.${expected}.supabase.co` &&
+    (username === "postgres" || username === `postgres.${expected}`);
+
+  // 2. Pooler connection: host is strictly an official Supabase pooler AND username is strictly 'postgres.<expected>'
+  const isPoolerDev =
+    isOfficialPoolerHost(hostname) &&
+    username === `postgres.${expected}`;
+
+  if (!isDirectDev && !isPoolerDev) {
     return {
       ok: false,
       error: `SUPABASE_DEV_DB_URL no coincide con el identificador del proyecto de desarrollo autorizado (${expectedRef}).`,
@@ -71,7 +102,8 @@ export function validateDbUrl(options: ValidateDbUrlOptions = {}): ValidateDbUrl
     ok: true,
     projectRef: expectedRef,
     host: parsed.hostname,
-    port: parsed.port || "5432",
+    port: parsed.port || (isPoolerDev ? "6543" : "5432"),
+    mode: isPoolerDev ? "pooler" : "direct",
   };
 }
 
@@ -88,7 +120,9 @@ export type ValidateMigrationInputsResult =
 /**
  * Validates manual migration execution inputs (dry_run default and explicit confirmation).
  */
-export function validateMigrationInputs(options: ValidateMigrationInputsOptions = {}): ValidateMigrationInputsResult {
+export function validateMigrationInputs(
+  options: ValidateMigrationInputsOptions = {}
+): ValidateMigrationInputsResult {
   const dryRun = options.dryRun !== undefined ? Boolean(options.dryRun) : true;
   const confirmProject = (options.confirmProject || "").trim();
   const expectedRef = (options.expectedProjectRef || DEFAULT_DEV_PROJECT_REF).trim();
@@ -132,4 +166,78 @@ export function validateBranch(options: ValidateBranchOptions = {}): ValidateBra
   }
 
   return { ok: true, branch: normalized };
+}
+
+export interface ValidateTrustBoundaryOptions {
+  eventName?: string | undefined;
+  ref?: string | undefined;
+  sha?: string | undefined;
+  verifiedSha?: string | undefined;
+  allowedBranches?: string[] | undefined;
+  isCi?: boolean | undefined;
+}
+
+export type ValidateTrustBoundaryResult =
+  | { ok: true; reason: string; sha?: string | undefined }
+  | { ok: false; error: string };
+
+/**
+ * Validates trust boundary and authorization to execute against cloud database.
+ * Enforces:
+ * 1. Trusted main workflow: push events on branch main are authorized.
+ * 2. Explicit verified SHA: matching verified commit SHA from maintainer dispatch or authorized variable.
+ * 3. Rejects unauthorized PR events or unreviewed SHAs on allowed refs.
+ */
+export function validateTrustBoundary(
+  options: ValidateTrustBoundaryOptions = {}
+): ValidateTrustBoundaryResult {
+  const isCi = options.isCi !== undefined ? options.isCi : process.env.GITHUB_ACTIONS === "true";
+  if (!isCi) {
+    return { ok: true, reason: "local-environment" };
+  }
+
+  const eventName = options.eventName !== undefined ? options.eventName : (process.env.GITHUB_EVENT_NAME || "");
+  const ref = options.ref !== undefined ? options.ref : (process.env.GITHUB_REF || "");
+  const sha = (options.sha !== undefined ? options.sha : (process.env.GITHUB_SHA || "")).trim();
+  const verifiedSha = (
+    options.verifiedSha !== undefined
+      ? options.verifiedSha
+      : (process.env.VERIFIED_SHA || process.env.INPUT_VERIFIED_SHA || "")
+  ).trim();
+  const allowedBranches = options.allowedBranches || ALLOWED_MIGRATION_BRANCHES;
+  const normalizedBranch = rawNormalize(ref);
+
+  // 1. Trusted main workflow: push on main
+  if (eventName === "push" && normalizedBranch === "main") {
+    return { ok: true, reason: "trusted-main", sha };
+  }
+
+  // 2. Explicit verified SHA check (manual maintainer dispatch or repository variable)
+  if (verifiedSha.length >= 7 && sha.length >= 7) {
+    const normSha = sha.toLowerCase();
+    const normVerified = verifiedSha.toLowerCase();
+    if (normSha.startsWith(normVerified) || normVerified.startsWith(normSha)) {
+      if (normalizedBranch && !allowedBranches.includes(normalizedBranch)) {
+        return {
+          ok: false,
+          error: `Ejecución cloud bloqueada: la rama '${normalizedBranch}' no está en la lista de ramas autorizadas (${allowedBranches.join(", ")}).`,
+        };
+      }
+      return { ok: true, reason: "verified-sha", sha };
+    }
+    return {
+      ok: false,
+      error: `Ejecución cloud bloqueada: el commit '${sha}' no coincide con el SHA autorizado ('${verifiedSha}').`,
+    };
+  }
+
+  // 3. Untrusted event or unverified SHA
+  return {
+    ok: false,
+    error: `Ejecución cloud bloqueada: el commit '${sha.slice(0, 7) || "desconocido"}' en '${ref || "desconocido"}' no cuenta con autorización verificada de un mantenedor para acceder a credenciales cloud.`,
+  };
+}
+
+function rawNormalize(ref: string): string {
+  return ref.replace(/^refs\/heads\//, "").trim();
 }
