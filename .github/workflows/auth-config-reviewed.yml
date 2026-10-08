@@ -2,8 +2,9 @@ name: Supabase Auth — registro público deshabilitado (main)
 
 # Evidencia reproducible de BB-11: el proyecto cloud rechaza registros directos a Auth y
 # mantiene el login por email para admins aprovisionados. Solo corre código de main.
-# No toca la base, no crea usuarios: el probe de signUp se envía únicamente si
-# /auth/v1/settings ya informa disable_signup=true (ver scripts/check-auth-signup.mjs).
+# No toca la base. El probe de signUp se envía únicamente si /auth/v1/settings ya informa
+# disable_signup=true; si la configuración cambiara entre la lectura y el probe, el job falla y
+# dice qué cuenta borrar (ver límites en scripts/check-auth-signup.mjs). Nunca reintenta.
 on:
   workflow_dispatch:
     inputs:
