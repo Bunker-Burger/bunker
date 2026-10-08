@@ -492,8 +492,8 @@ describe("applicability through Supabase adapter", () => {
       async findProduct() {
         return authoritativeProduct;
       },
-      async getApplicableDiscountCents() {
-        return 0n;
+      async listPromotions() {
+        return [];
       }
     };
     const quotes: PaymentQuotesPort = {
@@ -682,8 +682,8 @@ describe("persisted applicability with arbitrary unmapped UUID", () => {
       async findProduct() {
         return authoritativeBeverage;
       },
-      async getApplicableDiscountCents() {
-        return 0n;
+      async listPromotions() {
+        return [];
       }
     };
     const quotes: PaymentQuotesPort = {

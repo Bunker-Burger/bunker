@@ -106,6 +106,12 @@ function localDateTime(instantMs: number, timeZone: string): LocalDateTime & { w
   return { dateMs, dayOfWeek: WEEKDAYS[parts.weekday ?? ""] ?? 0, wallMs: dateMs + seconds * 1000 };
 }
 
+/** Day of week (0 = Sunday) and seconds since local midnight of an instant in a time zone. */
+export function localWallClock(instant: Date, timeZone: string): { dayOfWeek: number; seconds: number } {
+  const local = localDateTime(instant.getTime(), timeZone);
+  return { dayOfWeek: local.dayOfWeek, seconds: Math.floor((local.wallMs - local.dateMs) / 1000) };
+}
+
 /** Local wall clock minus UTC at an instant, in ms (whole seconds; sub-second offsets do not exist here). */
 function offsetAt(instantMs: number, timeZone: string): number {
   const flooredMs = Math.floor(instantMs / 1000) * 1000;

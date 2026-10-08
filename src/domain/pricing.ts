@@ -1,47 +1,35 @@
-import type { CartLine, FulfilmentMethod, Promotion, Quote } from "./types";
+import { selectPromotion, type AppliedPromotion, type PromotionLine } from "./promotions";
+import type { FulfilmentMethod, PromotionRule } from "./types";
 
-function isPromotionEligible(lines: CartLine[], promotion: Promotion, now: Date): boolean {
-  if (!promotion.active) return false;
-  if (promotion.startsAt && now < new Date(promotion.startsAt)) return false;
-  if (promotion.endsAt && now > new Date(promotion.endsAt)) return false;
-  if (!promotion.productIds?.length) return lines.length > 0;
-  return lines.some((line) => promotion.productIds?.includes(line.productId));
+export interface Quote {
+  subtotalCents: bigint;
+  /** Product discount plus any waived delivery fee of the single applied promotion. */
+  discountCents: bigint;
+  deliveryCents: bigint;
+  totalCents: bigint;
+  promotion: AppliedPromotion | null;
 }
 
-export function choosePromotion(
-  lines: CartLine[],
-  promotions: Promotion[],
-  now = new Date()
-): Promotion | null {
-  return promotions
-    .filter((promotion) => isPromotionEligible(lines, promotion, now))
-    .sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id))[0] ?? null;
-}
-
+/**
+ * Totals for priced lines: the fixed delivery fee once (delivery only) and at most one
+ * promotion. The server uses it for the authoritative quote; the browser only for an estimate.
+ */
 export function quoteCart(
-  lines: CartLine[],
-  promotions: Promotion[],
+  lines: readonly PromotionLine[],
+  rules: readonly PromotionRule[],
   fulfilment: FulfilmentMethod,
   deliveryFeeCents: bigint,
-  now = new Date()
+  context: { now: Date; timezone: string }
 ): Quote {
-  const subtotalCents = lines.reduce(
-    (total, line) => total + line.unitPriceCents * BigInt(line.quantity),
-    0n
-  );
-  const promotion = choosePromotion(lines, promotions, now);
-  const rawDiscount = promotion?.kind === "percentage"
-    ? subtotalCents * BigInt(Math.max(0, Math.min(100, Math.trunc(promotion.value)))) / 100n
-    : BigInt(Math.max(0, Math.trunc(promotion?.value ?? 0)));
-  const discountCents = rawDiscount > subtotalCents ? subtotalCents : rawDiscount;
+  const subtotalCents = lines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
   const deliveryCents = fulfilment === "delivery" ? deliveryFeeCents : 0n;
-
+  const promotion = selectPromotion(rules, lines, { ...context, fulfilment, deliveryCents });
+  const discountCents = promotion ? promotion.productDiscountCents + promotion.deliveryDiscountCents : 0n;
   return {
     subtotalCents,
     discountCents,
     deliveryCents,
-    totalCents: subtotalCents - discountCents + deliveryCents,
+    totalCents: subtotalCents + deliveryCents - discountCents,
     promotion
   };
 }
-

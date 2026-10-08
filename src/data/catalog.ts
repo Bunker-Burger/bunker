@@ -105,6 +105,9 @@ export const products: Product[] = [
   { id: "limonada", slug: "limonada-de-la-casa", categoryId: "drinks", type: "beverage", name: "Limonada de la Casa", description: "Limón exprimido, menta fresca y hielo.", priceCents: 240000n, imageUrl: images.lemonade, imageAlt: "Limonada con menta", published: true, featured: false, inStock: true, containsAlcohol: false, optionGroups: beverageOptions }
 ];
 
+/** Store time zone; promotion windows are evaluated in it. */
+export const STORE_TIMEZONE = "America/Argentina/Tucuman";
+
 export const categoryLabels = {
   burgers: "Hamburguesas",
   sandwiches: "Sándwiches",
