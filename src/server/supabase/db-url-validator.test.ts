@@ -334,6 +334,8 @@ describe("CLI scripts/validate-db-url.mjs (ejecución real Node.js)", () => {
           INPUT_BRANCH: "",
           GITHUB_ACTIONS: "",
           GITHUB_EVENT_NAME: "",
+          GITHUB_HEAD_REF: "",
+          GITHUB_HEAD_SHA: "",
           GITHUB_REF: "",
           GITHUB_SHA: "",
           VERIFIED_SHA: "",

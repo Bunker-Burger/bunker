@@ -155,9 +155,13 @@ export type ValidateBranchResult =
  * Validates that the git ref / branch is allowed for migration workflows.
  */
 export function validateBranch(options: ValidateBranchOptions = {}): ValidateBranchResult {
-  const headRef = (options.headRef !== undefined ? options.headRef : (process.env.GITHUB_HEAD_REF || "")).trim();
-  const rawBranch = options.branch !== undefined ? options.branch : (headRef || process.env.GITHUB_REF || "");
-  const normalized = (headRef || rawBranch)
+  const rawBranch =
+    options.branch !== undefined
+      ? options.branch
+      : options.headRef !== undefined
+        ? options.headRef
+        : (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF || "");
+  const normalized = rawBranch
     .replace(/^refs\/heads\//, "")
     .replace(/^refs\/pull\/\d+\/merge$/, "")
     .trim();
@@ -204,8 +208,12 @@ export function validateTrustBoundary(
   }
 
   const eventName = options.eventName !== undefined ? options.eventName : (process.env.GITHUB_EVENT_NAME || "");
-  const headRef = (options.headRef !== undefined ? options.headRef : (process.env.GITHUB_HEAD_REF || "")).trim();
-  const ref = options.ref !== undefined ? options.ref : (headRef || process.env.GITHUB_REF || "");
+  const ref =
+    options.ref !== undefined
+      ? options.ref
+      : options.headRef !== undefined
+        ? options.headRef
+        : (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF || "");
   const sha = (options.sha !== undefined ? options.sha : (process.env.GITHUB_SHA || "")).trim();
   const headSha = (options.headSha !== undefined ? options.headSha : (process.env.GITHUB_HEAD_SHA || "")).trim();
   const verifiedSha = (
@@ -214,7 +222,7 @@ export function validateTrustBoundary(
       : (process.env.VERIFIED_SHA || process.env.INPUT_VERIFIED_SHA || "")
   ).trim();
   const allowedBranches = options.allowedBranches || ALLOWED_MIGRATION_BRANCHES;
-  const normalizedBranch = (headRef || ref)
+  const normalizedBranch = ref
     .replace(/^refs\/heads\//, "")
     .replace(/^refs\/pull\/\d+\/merge$/, "")
     .trim();
