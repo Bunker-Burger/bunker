@@ -44,9 +44,6 @@ jobs:
       - name: Verificar configuración cloud
         if: env.SUPABASE_DEV_DB_URL == ''
         run: echo "SUPABASE_DEV_DB_URL todavía no está configurado; pruebas cloud omitidas."
-      - name: Aplicar migraciones al proyecto de desarrollo
-        if: env.SUPABASE_DEV_DB_URL != ''
-        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
       - name: Ejecutar pgTAP en desarrollo
         if: env.SUPABASE_DEV_DB_URL != ''
         run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"

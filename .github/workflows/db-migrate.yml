@@ -1,0 +1,45 @@
+name: Migraciones Supabase Cloud
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Ejecutar en modo dry-run (verificación sin aplicar cambios)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-cloud-development
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Aplicar migraciones
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Verificar configuración de base de datos
+        if: env.SUPABASE_DEV_DB_URL == ''
+        run: |
+          echo "::error::SUPABASE_DEV_DB_URL no está configurado en los secrets del repositorio."
+          exit 1
+
+      - name: Dry-run de migraciones
+        if: inputs.dry_run == true
+        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL" --dry-run
+
+      - name: Aplicar migraciones a desarrollo
+        if: inputs.dry_run != true
+        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
