@@ -29,6 +29,7 @@ jobs:
 
   database:
     runs-on: ubuntu-latest
+    environment: development
     concurrency:
       group: supabase-cloud-development
       cancel-in-progress: false
@@ -44,6 +45,9 @@ jobs:
       - name: Verificar configuración cloud
         if: env.SUPABASE_DEV_DB_URL == ''
         run: echo "SUPABASE_DEV_DB_URL todavía no está configurado; pruebas cloud omitidas."
+      - name: Validar URL de base de datos
+        if: env.SUPABASE_DEV_DB_URL != ''
+        run: node scripts/validate-db-url.mjs
       - name: Ejecutar pgTAP en desarrollo
         if: env.SUPABASE_DEV_DB_URL != ''
         run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
