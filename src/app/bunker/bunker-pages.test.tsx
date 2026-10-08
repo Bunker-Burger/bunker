@@ -122,6 +122,12 @@ describe("/bunker (login)", () => {
     render(await LoginPage(params({ sesion: "cerrada" })));
     expect(screen.getByRole("status")).toHaveTextContent("Cerraste sesión en este dispositivo.");
   });
+
+  it("says plainly when only this device was signed out", async () => {
+    render(await LoginPage(params({ sesion: "local" })));
+    expect(screen.getByRole("alert")).toHaveTextContent("no pudimos confirmar el cierre con el servidor");
+    expect(screen.queryByText("Cerraste sesión en este dispositivo.")).not.toBeInTheDocument();
+  });
 });
 
 describe("Admin tab in the storefront (/)", () => {

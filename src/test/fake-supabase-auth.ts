@@ -5,6 +5,12 @@ import { vi } from "vitest";
  * the real clients (`@supabase/ssr`, `getUser`, refresh, `signOut`) and the real repositories.
  * It models what matters for BB-11: password sign-in, access-token expiry, refresh-token
  * rotation and revocation, logout, and RLS on `admin_memberships` (a user sees only their rows).
+ *
+ * Like the real services, the two halves judge an access token differently:
+ * - GoTrue (`/auth/v1/user`, what `getUser()` calls) also looks up the token's session, so a
+ *   signed-out (revoked) session is refused at once.
+ * - PostgREST (`/rest/v1/*`) only verifies the JWT (signature, `exp`) and applies RLS on
+ *   `auth.uid()`: a copied access token keeps working there until it expires, even after logout.
  */
 
 export const SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
@@ -40,8 +46,8 @@ export interface FakeSupabase {
   users: FakeUser[];
   sessions: IssuedSession[];
   requests: Array<{ method: string; path: string }>;
-  /** Overrides the response of an auth endpoint (e.g. 429 or 500). */
-  failAuth: { path: string; status: number } | null;
+  /** Overrides the response of an auth endpoint (e.g. 429 or 500); `"network"` rejects the request. */
+  failAuth: { path: string; status: number | "network" } | null;
   /** Access tokens issued from now on are already expired. */
   issueExpiredTokens: boolean;
   now: () => number;
@@ -101,19 +107,27 @@ export function sessionCookieValue(session: ReturnType<typeof issueSession>) {
   return `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`;
 }
 
-function bearerUser(fake: FakeSupabase, request: { headers: Headers }): FakeUser | "expired" | null {
-  const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
-  const claims = decode(token);
+/** PostgREST's view of the caller: a well-formed, unexpired JWT is enough (no session lookup). */
+function jwtUser(fake: FakeSupabase, headers: Headers): FakeUser | "expired" | null {
+  const claims = decode(headers.get("authorization")?.replace(/^Bearer /, "") ?? "");
   if (!claims) return null;
   if (claims.exp * 1000 <= fake.now()) return "expired";
-  const session = fake.sessions.find((candidate) => candidate.refreshToken === claims.session_id);
-  if (!session || session.revoked) return null;
   return fake.users.find((user) => user.id === claims.sub) ?? null;
+}
+
+/** GoTrue's view: the JWT must also belong to a session that still exists (not signed out). */
+function authUser(fake: FakeSupabase, headers: Headers): FakeUser | "expired" | null {
+  const user = jwtUser(fake, headers);
+  if (user === null || user === "expired") return user;
+  const claims = decode(headers.get("authorization")?.replace(/^Bearer /, "") ?? "");
+  const session = fake.sessions.find((candidate) => candidate.refreshToken === claims?.session_id);
+  return session && !session.revoked ? user : null;
 }
 
 async function handleAuth(fake: FakeSupabase, url: URL, init: RequestInit, headers: Headers): Promise<Response> {
   const path = url.pathname.replace("/auth/v1", "");
   if (fake.failAuth && fake.failAuth.path === path) {
+    if (fake.failAuth.status === "network") throw new TypeError("fetch failed");
     return json({ code: "unexpected_failure", message: "Simulated failure" }, fake.failAuth.status);
   }
   const body = init.body ? JSON.parse(String(init.body)) : {};
@@ -130,7 +144,7 @@ async function handleAuth(fake: FakeSupabase, url: URL, init: RequestInit, heade
     return json(issueSession(fake, user));
   }
   if (path === "/user") {
-    const user = bearerUser(fake, { headers });
+    const user = authUser(fake, headers);
     if (user === "expired") return json({ code: "bad_jwt", message: "invalid JWT: token is expired" }, 403);
     return user ? json(userBody(user)) : json({ code: "session_not_found", message: "Session from session_id claim in JWT does not exist" }, 403);
   }
@@ -144,7 +158,7 @@ async function handleAuth(fake: FakeSupabase, url: URL, init: RequestInit, heade
 
 function handleRest(fake: FakeSupabase, url: URL, headers: Headers): Response {
   const table = url.pathname.replace("/rest/v1/", "");
-  const caller = bearerUser(fake, { headers });
+  const caller = jwtUser(fake, headers);
   const user = caller === "expired" ? null : caller;
   switch (table) {
     case "admin_memberships": {

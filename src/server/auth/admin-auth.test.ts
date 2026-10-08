@@ -7,6 +7,7 @@ import {
   issueSession,
   sessionCookieValue,
   stubSupabaseEnv,
+  SUPABASE_URL,
   type FakeSupabase
 } from "@/test/fake-supabase-auth";
 import { redirectedTo } from "@/test/redirects";
@@ -32,10 +33,23 @@ vi.mock("next/headers", () => ({
 // getAdminSession memoizes per render pass with React's cache(); each test is its own request.
 vi.mock("react", async (importOriginal) => ({ ...(await importOriginal<typeof import("react")>()), cache: <T,>(fn: T) => fn }));
 
+const sessionClient = vi.hoisted(() => ({ fail: false }));
+vi.mock("@/server/supabase/clients", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/server/supabase/clients")>();
+  return {
+    ...original,
+    createSessionClient: async (...args: Parameters<typeof original.createSessionClient>) => {
+      if (sessionClient.fail) throw new Error("simulated failure building the session client");
+      return original.createSessionClient(...args);
+    }
+  };
+});
+
 let fake: FakeSupabase;
 
 beforeEach(() => {
   jar.clear();
+  sessionClient.fail = false;
   stubSupabaseEnv();
   fake = installFakeSupabase();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -168,16 +182,92 @@ describe("the admin session on later requests", () => {
 });
 
 describe("signing out", () => {
-  it("revokes the session, clears the cookies and returns to the login", async () => {
+  const signedOutVia = () => redirectedTo(() => signOut());
+  const authCookies = () => [...jar.keys()].filter((name) => name.startsWith(AUTH_COOKIE));
+
+  it("revokes the session in Supabase, clears this device and says so", async () => {
     signedInAs(accounts.admin);
-    const stolenCookie = jar.get(AUTH_COOKIE)!;
 
-    expect(await redirectedTo(() => signOut())).toBe("/bunker?sesion=cerrada");
-    expect(jar.has(AUTH_COOKIE)).toBe(false);
+    expect(await signedOutVia()).toBe("/bunker?sesion=cerrada");
+    expect(fake.requests.some(({ method, path }) => method === "POST" && path.startsWith("/auth/v1/logout"))).toBe(true);
+    expect(fake.sessions.every((session) => session.revoked)).toBe(true);
+    // This browser holds no session any more.
+    expect(authCookies()).toEqual([]);
     expect(await getAdminSession()).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+  });
 
-    // A copy of the old cookie is useless afterwards: the server revoked that session.
-    jar.set(AUTH_COOKIE, stolenCookie);
+  it("the app's gate refuses a copy of the old cookie, because getUser checks the session in Auth", async () => {
+    signedInAs(accounts.admin);
+    const copiedCookie = jar.get(AUTH_COOKIE)!;
+    await signedOutVia();
+
+    jar.set(AUTH_COOKIE, copiedCookie);
     expect(await getAdminSession()).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+    expect(await redirectedTo(() => requireAdminSession())).toBe("/bunker");
+  });
+
+  it("does not make the old access token useless against the Data API before it expires (documented window)", async () => {
+    const session = signedInAs(accounts.admin);
+    await signedOutVia();
+
+    // PostgREST verifies only the JWT and applies RLS on auth.uid(): the copied token still reads
+    // what RLS allows that user until `exp`. The app never authorizes with it (see above).
+    const readMemberships = () =>
+      fetch(`${SUPABASE_URL}/rest/v1/admin_memberships?select=store_id,role,is_active,stores!inner(slug)`, {
+        headers: { apikey: "sb_publishable_test", authorization: `Bearer ${session.access_token}` }
+      }).then((response) => response.json());
+    expect(await readMemberships()).toEqual([{ store_id: "store-1", role: "owner", is_active: true, stores: { slug: "bunker-burger" } }]);
+
+    // Once `exp` passes, the Data API refuses it too.
+    fake.now = () => Date.now() + 2 * 60 * 60 * 1000;
+    expect(await readMemberships()).toEqual([]);
+  });
+
+  it.each([
+    ["Auth answers 500 to the logout", { path: "/logout", status: 500 }],
+    ["the logout request fails on the network", { path: "/logout", status: "network" }]
+  ] as const)("when %s: clears this device anyway and says the revocation was not confirmed", async (_case, failure) => {
+    signedInAs(accounts.admin);
+    fake.failAuth = failure;
+
+    expect(await signedOutVia()).toBe("/bunker?sesion=local");
+    expect(authCookies()).toEqual([]);
+    expect(await getAdminSession()).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+    // Nothing pretends the server-side session ended.
+    expect(fake.sessions.some((issued) => !issued.revoked)).toBe(true);
+  });
+
+  it("without Supabase configuration: clears this device and says the revocation was not confirmed", async () => {
+    signedInAs(accounts.admin);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    fake.requests.length = 0;
+
+    expect(await signedOutVia()).toBe("/bunker?sesion=local");
+    expect(authCookies()).toEqual([]);
+    expect(fake.requests).toEqual([]);
+  });
+
+  it("when signing out throws: clears this device anyway and says the revocation was not confirmed", async () => {
+    signedInAs(accounts.admin);
+    sessionClient.fail = true;
+
+    expect(await signedOutVia()).toBe("/bunker?sesion=local");
+    expect(authCookies()).toEqual([]);
+    expect(fake.sessions.some((issued) => !issued.revoked)).toBe(true);
+  });
+
+  it("clears every chunk of a session stored in chunked cookies", async () => {
+    // @supabase/ssr splits a large session into `<name>.0`, `<name>.1`, … with no base cookie.
+    const value = sessionCookieValue(issueSession(fake, accounts.admin));
+    const half = Math.ceil(value.length / 2);
+    jar.set(`${AUTH_COOKIE}.0`, value.slice(0, half));
+    jar.set(`${AUTH_COOKIE}.1`, value.slice(half));
+    jar.set("otra-cookie", "se-queda");
+    expect(await getAdminSession()).toMatchObject({ ok: true });
+    fake.failAuth = { path: "/logout", status: 500 };
+
+    expect(await signedOutVia()).toBe("/bunker?sesion=local");
+    expect(authCookies()).toEqual([]);
+    expect(jar.get("otra-cookie")).toBe("se-queda");
   });
 });

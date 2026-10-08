@@ -89,6 +89,18 @@ for (const width of [320, 390, 768, 1280]) {
   });
 }
 
+test("the sign-out banners are announced and accessible", async ({ page }) => {
+  await page.goto("/bunker?sesion=local");
+  await expect(page.getByRole("alert").filter({ hasText: "no pudimos confirmar el cierre con el servidor" })).toBeVisible();
+  let results = await new AxeBuilder({ page }).withTags(WCAG_AA).analyze();
+  expect(results.violations.map(({ id }) => id)).toEqual([]);
+
+  await page.goto("/bunker?sesion=cerrada");
+  await expect(page.getByRole("status").filter({ hasText: "Cerraste sesión en este dispositivo." })).toBeVisible();
+  results = await new AxeBuilder({ page }).withTags(WCAG_AA).analyze();
+  expect(results.violations.map(({ id }) => id)).toEqual([]);
+});
+
 test("a rejected sign-in stays on the login with an announced error and no session", async ({ page, context }) => {
   // The same answer for unknown accounts and wrong passwords (checked by the server against the
   // development project locally); without Supabase (CI) the check cannot run and says so.

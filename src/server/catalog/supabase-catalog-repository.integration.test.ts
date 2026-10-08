@@ -5,6 +5,9 @@ import type { Database } from "@/server/supabase/database.types";
 import { loadPublicCatalog } from "./catalog-service";
 import { quoteCart } from "@/domain/pricing";
 import { toPromotionRule } from "@/domain/public-promotions";
+import { signInAdmin, signOutAdmin } from "@/server/auth/admin-auth";
+import { INVALID_CREDENTIALS } from "@/server/auth/messages";
+import { getAdminSession } from "@/server/auth/session";
 import { getAdminCatalog, getPromotionsForQuote, getPublicPromotions, getStoreStatus } from "./index";
 import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
@@ -23,7 +26,8 @@ const cookieJar = vi.hoisted(() => new Map<string, string>());
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     getAll: () => [...cookieJar].map(([name, value]) => ({ name, value })),
-    set: (name: string, value: string) => void cookieJar.set(name, value)
+    set: (name: string, value: string, options: { maxAge?: number } = {}) =>
+      void (value === "" || options.maxAge === 0 ? cookieJar.delete(name) : cookieJar.set(name, value))
   })
 }));
 
@@ -235,5 +239,34 @@ describe.skipIf(!enabled)("Supabase catalog (cloud development project)", () => 
         expect(result.value.promotions.map((promotion) => promotion.slug)).toEqual(["martes-de-smash", "envio-gratis"]);
       }
     );
+  });
+
+  describe("Auth configuration and the admin login (BB-11)", () => {
+    it("does not allow public sign-up: Auth reports it disabled and refuses signUp without creating a user", async () => {
+      // Read-only public settings of the development project (no credentials beyond the publishable key).
+      const response = await fetch(`${requireConfig().url}/auth/v1/settings`, { headers: { apikey: requireConfig().publishableKey } });
+      const settings = (await response.json()) as { disable_signup?: boolean; external?: { email?: boolean } };
+      // Email + password stays enabled for provisioned admins.
+      expect(settings.external?.email).toBe(true);
+      // If this fails, sign-ups are open: the probe below is never attempted, so no user is created.
+      expect(settings.disable_signup).toBe(true);
+
+      const probe = `signup-probe-${Date.now()}@example.invalid`;
+      const { data, error } = await anonClient().auth.signUp({ email: probe, password: `Probe-${crypto.randomUUID()}` });
+      expect(error).toMatchObject({ code: "signup_disabled" });
+      expect(data.user).toBeNull();
+    });
+
+    it.skipIf(!adminAccount.email || !adminAccount.password)("a provisioned admin signs in, is recognized and signs out", async () => {
+      expect(await signInAdmin(adminAccount.email ?? "", adminAccount.password ?? "")).toEqual({ ok: true });
+      expect(await getAdminSession("bunker-burger")).toMatchObject({ ok: true, value: { role: expect.any(String) } });
+      expect(await signOutAdmin()).toBe("revoked");
+      expect([...cookieJar.keys()].filter((name) => name.includes("-auth-token"))).toEqual([]);
+    });
+
+    it.skipIf(!memberlessAccount.email || !memberlessAccount.password)("a user without membership is refused and left without a session", async () => {
+      expect(await signInAdmin(memberlessAccount.email ?? "", memberlessAccount.password ?? "")).toEqual({ ok: false, message: INVALID_CREDENTIALS });
+      expect([...cookieJar.keys()].filter((name) => name.includes("-auth-token"))).toEqual([]);
+    });
   });
 });

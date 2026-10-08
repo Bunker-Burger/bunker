@@ -68,12 +68,33 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 ## Administración (`/bunker`)
 
 - **Sin registro público.** Los administradores se aprovisionan a mano: un usuario en Supabase Auth del proyecto correspondiente más una fila activa en `admin_memberships` para la tienda. `/bunker` solo ofrece email + contraseña.
+  - No alcanza con que falte el formulario: la publishable key puede llamar a `signUp`. Por eso **"Allow new users to sign up" debe estar desactivado en cada proyecto cloud**, con el login por email habilitado.
+  - `supabase/config.toml` solo describe el entorno local del CLI y no es el estado del cloud.
+  - El test de integración lo verifica en desarrollo leyendo `/auth/v1/settings`. Recién con el registro desactivado prueba `signUp`, que debe responder `signup_disabled` sin crear usuario.
 - **Autorización en el servidor, en cada request.** `getAdminSession()` (`src/server/auth/session.ts`) valida la sesión con Supabase Auth (`getUser`, nunca solo la cookie) y exige una membresía activa de `bunker-burger`. `user_metadata`, claims y estado del cliente no autorizan nada. Una sesión válida de otra tienda, inactiva, vencida sin refresh o revocada es `unauthorized`. Sin cookie de sesión no se consulta a Supabase.
 - **`/bunker/admin`** llama a `requireAdminSession()`: quien no es admin va al login. Si la verificación no puede ejecutarse, muestra un error y no da acceso.
 - **Login** (Server Action): si la cuenta no es admin de la tienda, la sesión recién creada se cierra en el acto. Hay un único mensaje para credenciales incorrectas y para falta de acceso. Solo redirige a rutas dentro de `/bunker/admin` (`safeAdminPath`), así que no hay open redirects.
 - **Cookies.** `src/proxy.ts` (antes "middleware") renueva la sesión vencida una vez por request en `/` y `/bunker/**` y entrega los tokens rotados a la página y al navegador, que es el patrón de `@supabase/ssr`. No es autorización.
-- **Cierre de sesión:** revoca la sesión en Supabase (`scope: "local"`), borra las cookies y vuelve a `/bunker`, que además purga del Cache Storage cualquier respuesta de `/bunker/**`. El service worker sirve `/bunker/**` siempre por red (`NetworkOnly`) y las páginas responden `no-store`, así que el admin nunca queda disponible offline.
+- **Cierre de sesión:** pide a Supabase revocar la sesión (`scope: "local"`) y **siempre** expira las cookies de Auth de este dispositivo (todos los chunks), porque el SDK las conserva si la revocación falla.
+  - Si Supabase confirmó la revocación, el login dice "Cerraste sesión".
+  - Si no (5xx, red, configuración), dice que solo se borró este dispositivo y que la revocación no se confirmó (`?sesion=local`).
+  - `/bunker` además purga del Cache Storage cualquier respuesta de `/bunker/**`.
+  - El service worker sirve `/bunker/**` siempre por red (`NetworkOnly`) y las páginas responden `no-store`, así que el admin nunca queda disponible offline.
+- **Alcance de la revocación (decisión de producto: se acepta la ventana del JWT).**
+  - Tras cerrar sesión, la app rechaza al instante cualquier copia de la cookie, porque cada request pasa por `getUser`, que consulta la sesión en Auth.
+  - En cambio, un *access token* copiado antes del logout sigue valiendo **contra la Data API** (PostgREST valida firma y `exp`, y RLS solo mira `auth.uid()` + membresía) hasta su vencimiento: el "JWT expiry" del proyecto, por defecto 1 h.
+  - Por eso toda escritura administrativa (BB-12/13) debe pasar por Server Actions que vuelvan a llamar a `requireAdminSession`, nunca por el cliente directo.
+  - No se promete invalidación inmediata de accesos directos a la Data API.
 - **Tab Admin:** aparece en la navegación de la carta solo con una sesión de admin validada en el servidor.
+
+### Checklist de deploy (Auth)
+
+En cada proyecto cloud (desarrollo y producción), sin compartir claves:
+1. Authentication → Sign In / Providers: **"Allow new users to sign up" desactivado**, provider Email habilitado.
+2. Verificar sin credenciales: `GET <SUPABASE_URL>/auth/v1/settings` con la publishable key en el header `apikey` debe devolver `"disable_signup": true`.
+3. Revisar el "JWT expiry" (ventana máxima de un access token copiado tras un logout).
+4. Aprovisionar cada admin a mano: crear el usuario desde el Dashboard (invitación) y agregar una fila activa en `admin_memberships` para `bunker-burger`.
+5. Probar el login real en `/bunker` con un admin y con una cuenta sin membresía, que debe ser rechazada. Para desarrollo están los tests opt-in `SUPABASE_TEST_ADMIN_*` / `SUPABASE_TEST_MEMBERLESS_*`.
 
 ## UI
 

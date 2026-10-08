@@ -18,8 +18,11 @@ export async function signIn(_previous: SignInState, formData: FormData): Promis
   redirect(safeAdminPath(formData.get("next")));
 }
 
-/** Ends this device's session and returns to the login page (which purges admin caches). */
+/**
+ * Ends this device's session and returns to the login page (which purges admin caches). The
+ * banner there says whether Supabase confirmed the revocation or only this device was cleared.
+ */
 export async function signOut(): Promise<void> {
-  await signOutAdmin();
-  redirect(`${ADMIN_LOGIN}?sesion=cerrada`);
+  const outcome = await signOutAdmin();
+  redirect(`${ADMIN_LOGIN}?sesion=${outcome === "revoked" ? "cerrada" : "local"}`);
 }

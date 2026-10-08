@@ -1,12 +1,14 @@
 import "server-only";
 
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { STORE_SLUG } from "@/server/catalog";
-import { createSupabaseAdminAccess } from "@/server/catalog/admin-access";
+import { createSupabaseAdminAccess, fromAuthError } from "@/server/catalog/admin-access";
 import { reportCatalogError } from "@/server/catalog/errors";
 import { createSessionClient } from "@/server/supabase/clients";
 import { readSupabaseConfig } from "@/server/supabase/config";
+import { isAuthCookieName } from "./auth-cookie";
 import { AUTH_UNAVAILABLE, INVALID_CREDENTIALS, INVALID_INPUT, TOO_MANY_ATTEMPTS } from "./messages";
 
 const credentialsSchema = z.object({
@@ -49,10 +51,41 @@ export async function signInAdmin(email: string, password: string): Promise<{ ok
   return { ok: true };
 }
 
-/** Ends this device's session: Supabase revokes it and the auth cookies are cleared. */
-export async function signOutAdmin(): Promise<void> {
+export type SignOutOutcome =
+  /** Supabase revoked the session and this device's auth cookies were cleared. */
+  | "revoked"
+  /** The cookies were cleared here, but Supabase did not confirm the revocation. */
+  | "local_only";
+
+/** Expires every Supabase auth cookie of this request (all chunks), whatever Auth answered. */
+async function clearAuthCookies() {
+  const cookieStore = await cookies();
+  for (const { name } of cookieStore.getAll()) {
+    if (isAuthCookieName(name)) cookieStore.set(name, "", { path: "/", maxAge: 0, sameSite: "lax" });
+  }
+}
+
+/**
+ * Ends this device's session. Supabase is asked to revoke it, but its client keeps the cookies
+ * when that call fails (5xx, network): the auth cookies are therefore always expired here as
+ * well, and the outcome says whether the revocation was confirmed, so the UI never claims more
+ * than what happened. A failure to clear the cookies throws: it is never reported as signed out.
+ */
+export async function signOutAdmin(): Promise<SignOutOutcome> {
+  let revoked = false;
   const config = readSupabaseConfig();
-  if (!config.ok) return;
-  const client = await createSessionClient(config.value);
-  await client.auth.signOut({ scope: "local" });
+  if (!config.ok) {
+    reportCatalogError("admin", config.error);
+  } else {
+    try {
+      const client = await createSessionClient(config.value);
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) reportCatalogError("admin", fromAuthError(error).error);
+      revoked = !error;
+    } catch (thrown) {
+      reportCatalogError("admin", fromAuthError(thrown).error);
+    }
+  }
+  await clearAuthCookies();
+  return revoked ? "revoked" : "local_only";
 }

@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await getAdminSession();
   if (session.ok) redirect(next);
 
-  const signedOut = first(params.sesion) === "cerrada";
+  const signOut = first(params.sesion);
   const unavailable = session.error.code !== "unauthorized";
 
   return (
@@ -37,9 +37,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </h1>
           <p className="m-0 text-body-lg text-muted">Solo para administradores habilitados por Búnker Burger. No hay registro público.</p>
         </div>
-        {signedOut ? (
+        {signOut === "cerrada" ? (
           <p className="m-0 rounded-md border border-border-strong bg-surface-high px-3 py-2 text-body" role="status">
             Cerraste sesión en este dispositivo.
+          </p>
+        ) : null}
+        {signOut === "local" ? (
+          <p className="m-0 rounded-md border border-danger bg-danger-soft px-3 py-2 text-body" role="alert">
+            Borramos la sesión de este dispositivo, pero no pudimos confirmar el cierre con el servidor. Si usaste un equipo
+            compartido o creés que alguien más tiene acceso, avisá al dueño para revocar la cuenta.
           </p>
         ) : null}
         {unavailable ? (
