@@ -122,6 +122,35 @@ export interface CartLine {
   selectedOptions: SelectedOptions;
 }
 
+export type CartIssueCode =
+  | "product_removed"
+  | "out_of_stock"
+  | "price_changed"
+  | "option_unavailable"
+  | "option_invalid"
+  | "option_group_removed";
+
+export interface CartIssue {
+  readonly code: CartIssueCode;
+  readonly lineId: string;
+  readonly productId: string;
+  readonly productName: string;
+  readonly message: string;
+  readonly blocking: boolean;
+  readonly oldPriceCents?: bigint;
+  readonly newPriceCents?: bigint;
+  readonly groupId?: string;
+  readonly optionId?: string;
+  readonly optionName?: string;
+}
+
+export interface RevalidationResult {
+  readonly validLines: CartLine[];
+  readonly issues: CartIssue[];
+  readonly hasChanges: boolean;
+  readonly hasBlockingIssues: boolean;
+}
+
 export type FulfilmentMethod = "pickup" | "delivery";
 
 export interface Category {

@@ -1,4 +1,5 @@
 import { Storefront } from "@/components/storefront/storefront";
+import { getPublicCatalog } from "@/server/catalog";
 
 interface HomeProps {
   searchParams: Promise<{ producto?: string | string[] }>;
@@ -16,10 +17,16 @@ function mercadoPagoConfigured() {
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
   const productParam = Array.isArray(params.producto) ? params.producto[0] : params.producto;
+  const catalogResult = await getPublicCatalog();
+  const initialProducts =
+    catalogResult.ok && catalogResult.value.products.length > 0
+      ? catalogResult.value.products
+      : undefined;
   return (
     <Storefront
       initialProductSlug={productParam ?? null}
       mercadoPagoEnabled={mercadoPagoConfigured()}
+      initialProducts={initialProducts}
     />
   );
 }

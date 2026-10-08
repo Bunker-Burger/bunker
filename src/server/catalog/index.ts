@@ -36,6 +36,25 @@ export async function getPublicCatalog(storeSlug: string = STORE_SLUG): Promise<
 }
 
 /**
+ * Customer-facing catalog read with real freshness (never cached by Next data cache)
+ * for authoritative cart revalidation, price checks and option availability.
+ */
+export async function getOperationalPublicCatalog(storeSlug: string = STORE_SLUG): Promise<Result<Catalog, CatalogError>> {
+  const config = readSupabaseConfig();
+  if (!config.ok) {
+    reportCatalogError("public", config.error);
+    return config;
+  }
+  const repository = createSupabaseCatalogRepository(createOperationalReadClient(config.value), {
+    scope: "public",
+    imageBaseUrl: catalogImageBaseUrl(config.value)
+  });
+  const catalog = await loadPublicCatalog(repository, storeSlug);
+  if (!catalog.ok) reportCatalogError("public", catalog.error);
+  return catalog;
+}
+
+/**
  * Whether the store takes orders right now, and its delivery fee, decided on the server from
  * the persisted override, weekly hours (store time zone) and fee. Anonymous and never cached:
  * every call reads the database, so a pause, closure or fee change applies to the next check,
