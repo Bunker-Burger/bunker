@@ -1,18 +1,24 @@
 name: Supabase Auth — registro público deshabilitado (main)
 
-# Evidencia reproducible de BB-11: el proyecto cloud rechaza registros directos a Auth y
-# mantiene el login por email para admins aprovisionados. Solo corre código de main.
-# No toca la base. El probe de signUp se envía únicamente si /auth/v1/settings ya informa
-# disable_signup=true; si la configuración cambiara entre la lectura y el probe, el job falla y
-# dice qué cuenta borrar (ver límites en scripts/check-auth-signup.mjs). Nunca reintenta.
+# Evidencia reproducible de BB-11: el proyecto cloud de desarrollo rechaza registros directos a Auth y
+# mantiene el login por email para admins aprovisionados. Solo corre código confiable de main.
+# Por defecto se ejecuta en modo solo lectura (GET /auth/v1/settings).
+# El probe activo de POST solo se ejecuta con opt-in explícito (run_active_probe: true) sobre development.
 on:
   workflow_dispatch:
     inputs:
       expected_project_ref:
-        description: "Ref del proyecto que deben apuntar los secretos (development: zokkgocmcaqcujltfkjf)"
+        description: "Ref del proyecto autorizado (development: zokkgocmcaqcujltfkjf)"
         required: true
-        type: string
+        type: choice
+        options:
+          - zokkgocmcaqcujltfkjf
         default: zokkgocmcaqcujltfkjf
+      run_active_probe:
+        description: "Opt-in explícito: enviar probe POST a /auth/v1/signup (solo development)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,9 +43,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      - name: Validar allowlist de proyecto de desarrollo antes de ejecutar
+        shell: bash
+        env:
+          EXPECTED_PROJECT_REF: ${{ inputs.expected_project_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EXPECTED_PROJECT_REF" != "zokkgocmcaqcujltfkjf" ]]; then
+            echo "::error::Proyecto no autorizado en allowlist: $EXPECTED_PROJECT_REF"
+            exit 1
+          fi
+          echo "Proyecto development autorizado: $EXPECTED_PROJECT_REF"
       - name: Verificar configuración de Auth (sin imprimir claves)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           EXPECTED_PROJECT_REF: ${{ inputs.expected_project_ref }}
-        run: node scripts/check-auth-signup.mjs
+          RUN_ACTIVE_PROBE: ${{ inputs.run_active_probe }}
+        run: |
+          args=()
+          if [ "$RUN_ACTIVE_PROBE" = "true" ]; then
+            args+=("--active-probe")
+          fi
+          node scripts/check-auth-signup.mjs "${args[@]}"
