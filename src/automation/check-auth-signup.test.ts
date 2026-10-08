@@ -1,18 +1,27 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
+import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const execFileAsync = promisify(execFile);
+
+// Every test starts a real Node process (and some, local HTTP servers): allow for a loaded machine.
+vi.setConfig({ testTimeout: 20_000 });
 
 interface MockResponseRule {
   status?: number;
   body?: unknown;
   rawBody?: string;
   networkError?: string;
+  /** Answer with a redirect to this URL; the preload then behaves as fetch does for the script's `redirect` option. */
+  redirectTo?: string;
+  /** Response of the redirect target, if the request is (wrongly) followed. */
+  followed?: { status?: number; body?: unknown };
 }
 
 interface CapturedRequest {
@@ -20,20 +29,24 @@ interface CapturedRequest {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  /** The `redirect` option the script passed to fetch (null when missing). */
+  redirect: string | null;
 }
 
 async function runCheckAuthScript({
   args = [],
   env = {},
-  mockResponses = []
+  mockResponses = [],
+  preload = "scripts/test-mock-fetch-preload.mjs"
 }: {
   args?: string[];
   env?: Record<string, string | undefined>;
   mockResponses?: MockResponseRule[];
+  preload?: string;
 }) {
   const logFile = resolve(tmpdir(), `auth-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
   const summaryFile = resolve(tmpdir(), `summary-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
-  const preloadPath = resolve(process.cwd(), "scripts/test-mock-fetch-preload.mjs");
+  const preloadPath = resolve(process.cwd(), preload);
 
   const baseEnv: Record<string, string> = {
     NEXT_PUBLIC_SUPABASE_URL: "https://zokkgocmcaqcujltfkjf.supabase.co",
@@ -433,5 +446,231 @@ describe("check-auth-signup CLI: confidencialidad y no revelación de secretos",
     expect(stdout).not.toContain(superSecretKey);
     expect(stderr).not.toContain(superSecretKey);
     expect(summaryContent).not.toContain(superSecretKey);
+  });
+});
+
+describe("check-auth-signup CLI: redirecciones prohibidas (REDIRECT - P2)", () => {
+  const validSettings = { status: 200, body: { disable_signup: true, external: { email: true } } };
+  const attacker = "https://attacker.example";
+  const toAttacker = (requests: CapturedRequest[]) => requests.filter((request) => !request.url.startsWith("https://zokkgocmcaqcujltfkjf.supabase.co/"));
+
+  it("pide redirect:\"error\" al leer settings en modo read-only", async () => {
+    const { exitCode, capturedRequests } = await runCheckAuthScript({ mockResponses: [validSettings] });
+
+    expect(exitCode).toBe(0);
+    expect(capturedRequests).toHaveLength(1);
+    expect(capturedRequests[0]?.redirect).toBe("error");
+  });
+
+  it("pide redirect:\"error\" en las tres solicitudes del probe activo (GET, POST, GET)", async () => {
+    const { exitCode, capturedRequests } = await runCheckAuthScript({
+      args: ["--active-probe"],
+      mockResponses: [validSettings, { status: 422, body: { error_code: "signup_disabled" } }, validSettings]
+    });
+
+    expect(exitCode).toBe(0);
+    expect(capturedRequests.map((request) => [request.method, request.redirect])).toEqual([
+      ["GET", "error"],
+      ["POST", "error"],
+      ["GET", "error"]
+    ]);
+  });
+
+  it("302 en settings hacia otro origen con flags válidos: FALLA y nunca consulta ese origen", async () => {
+    const { exitCode, stdout, capturedRequests } = await runCheckAuthScript({
+      mockResponses: [{ status: 302, redirectTo: `${attacker}/auth/v1/settings`, followed: validSettings }]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(toAttacker(capturedRequests)).toEqual([]);
+    expect(stdout).toContain("Network error reading /auth/v1/settings");
+    expect(stdout).not.toContain("disable_signup === true: true");
+    expect(stdout).toContain("RESULT: FAIL");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+
+  it("307 en el probe POST hacia otro origen que responde signup_disabled: FALLA sin reenviar cuerpo ni apikey", async () => {
+    const { exitCode, stdout, capturedRequests } = await runCheckAuthScript({
+      args: ["--active-probe"],
+      mockResponses: [
+        validSettings,
+        { status: 307, redirectTo: `${attacker}/auth/v1/signup`, followed: { status: 422, body: { error_code: "signup_disabled" } } },
+        validSettings
+      ]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(toAttacker(capturedRequests)).toEqual([]);
+    expect(capturedRequests.filter((request) => request.method === "POST")).toHaveLength(1);
+    expect(stdout).toContain("Network error during active probe");
+    expect(stdout).not.toContain("error_code: signup_disabled");
+    expect(stdout).toContain("RESULT: FAIL");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+
+  it("falla cerrado ante un 3xx entregado sin seguir en settings (aunque traiga flags válidos)", async () => {
+    const { exitCode, stdout, capturedRequests } = await runCheckAuthScript({
+      mockResponses: [{ status: 302, body: { disable_signup: true, external: { email: true } } }]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(capturedRequests).toHaveLength(1);
+    expect(stdout).toContain("Redirect refused from /auth/v1/settings (HTTP 302)");
+    expect(stdout).toContain("RESULT: FAIL");
+  });
+
+  it("falla cerrado ante un 3xx entregado sin seguir en el probe (aunque traiga signup_disabled)", async () => {
+    const { exitCode, stdout } = await runCheckAuthScript({
+      args: ["--active-probe"],
+      mockResponses: [validSettings, { status: 307, body: { error_code: "signup_disabled" } }, validSettings]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toContain("FAIL: redirect refused from /auth/v1/signup (HTTP 307)");
+    expect(stdout).toContain("RESULT: FAIL");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+});
+
+describe("check-auth-signup CLI: redirecciones con fetch real sobre loopback (2 servidores)", () => {
+  type Hit = { method: string; path: string; hasApiKey: boolean; body: string };
+  type Handler = (request: IncomingMessage, body: string) => { status: number; headers?: Record<string, string>; body?: unknown };
+
+  async function listen(handler: Handler) {
+    const hits: Hit[] = [];
+    const server: Server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
+      request.on("end", () => {
+        hits.push({ method: request.method ?? "", path: request.url ?? "", hasApiKey: Boolean(request.headers.apikey), body });
+        const answer = handler(request, body);
+        response.writeHead(answer.status, { "content-type": "application/json", ...(answer.headers ?? {}) });
+        response.end(JSON.stringify(answer.body ?? {}));
+      });
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const close = () => new Promise<void>((done) => server.close(() => done()));
+    return { hits, origin, close };
+  }
+
+  const settingsBody = { disable_signup: true, external: { email: true } };
+
+  // The second server answers exactly what a passing run needs: following it would look like a PASS.
+  const lookalike: Handler = (request) =>
+    request.method === "POST" ? { status: 422, body: { error_code: "signup_disabled" } } : { status: 200, body: settingsBody };
+
+  /** First server = the "canonical" origin (through the preload); second = a foreign origin. */
+  async function withServers(primary: (secondOrigin: string) => Handler, args: string[] = []) {
+    const second = await listen(lookalike);
+    const first = await listen(primary(second.origin));
+    try {
+      const result = await runCheckAuthScript({
+        args,
+        preload: "scripts/test-loopback-fetch-preload.mjs",
+        env: { __LOOPBACK_ORIGIN: first.origin }
+      });
+      return { ...result, firstHits: first.hits, secondHits: second.hits };
+    } finally {
+      await first.close();
+      await second.close();
+    }
+  }
+
+  it("control: sin redirección, el harness llega al servidor real con fetch real y el script pasa", async () => {
+    const { exitCode, stdout, firstHits, secondHits } = await withServers(() => lookalike);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("RESULT: PASS");
+    expect(firstHits).toEqual([{ method: "GET", path: "/auth/v1/settings", hasApiKey: true, body: "" }]);
+    expect(secondHits).toEqual([]);
+  });
+
+  it("302 real en settings: la solicitud no llega al segundo servidor y el run FALLA", async () => {
+    const { exitCode, stdout, firstHits, secondHits } = await withServers((secondOrigin) => () => ({
+      status: 302,
+      headers: { location: `${secondOrigin}/auth/v1/settings` }
+    }));
+
+    expect(exitCode).toBe(1);
+    expect(firstHits).toHaveLength(1);
+    expect(secondHits).toEqual([]);
+    expect(stdout).toContain("Network error reading /auth/v1/settings");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+
+  it("307 real en el probe POST: ni cuerpo, ni contraseña, ni apikey llegan al segundo servidor y el run FALLA", async () => {
+    const { exitCode, stdout, firstHits, secondHits } = await withServers(
+      (secondOrigin) => (request) =>
+        request.method === "POST"
+          ? { status: 307, headers: { location: `${secondOrigin}/auth/v1/signup` } }
+          : { status: 200, body: settingsBody },
+      ["--active-probe"]
+    );
+
+    expect(exitCode).toBe(1);
+    expect(firstHits.map((hit) => `${hit.method} ${hit.path}`)).toEqual(["GET /auth/v1/settings", "POST /auth/v1/signup"]);
+    expect(secondHits).toEqual([]);
+    expect(stdout).toContain("Network error during active probe");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+
+  // Node's fetch with redirect:"error" rejects any 3xx, even without Location; the script's own 3xx
+  // check (covered with the mock above) is the second layer if a runtime ever delivered one.
+  it("3xx real sin Location en el probe: falla cerrado aunque el cuerpo diga signup_disabled", async () => {
+    const { exitCode, stdout, secondHits } = await withServers(
+      () => (request) =>
+        request.method === "POST" ? { status: 307, body: { error_code: "signup_disabled" } } : { status: 200, body: settingsBody },
+      ["--active-probe"]
+    );
+
+    expect(exitCode).toBe(1);
+    expect(secondHits).toEqual([]);
+    expect(stdout).toContain("Network error during active probe");
+    expect(stdout).not.toContain("error_code: signup_disabled");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+});
+
+describe("check-auth-signup CLI: GITHUB_STEP_SUMMARY obligatorio (SUMMARY - P3)", () => {
+  const validSettings = { status: 200, body: { disable_signup: true, external: { email: true } } };
+
+  it("si el summary no se puede escribir, un run que habría pasado sale con 1 y advierte sin datos sensibles", async () => {
+    const secretKey = "secret-summary-key-should-never-leak-42";
+    // A directory is never writable as a file, on any OS.
+    const unwritable = tmpdir();
+    const { exitCode, stdout, stderr } = await runCheckAuthScript({
+      env: { GITHUB_STEP_SUMMARY: unwritable, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: secretKey },
+      mockResponses: [validSettings]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toMatch(/WARNING: could not write GITHUB_STEP_SUMMARY \(E[A-Z]+\); the audit record is incomplete\./);
+    expect(stdout).toContain("RESULT: FAIL — the step summary is required evidence and could not be written.");
+    expect(stdout).not.toContain("RESULT: PASS");
+    for (const output of [stdout, stderr]) {
+      expect(output).not.toContain(secretKey);
+      expect(output).not.toContain(unwritable);
+    }
+  });
+
+  it("si el summary no se puede escribir y el chequeo ya fallaba, sigue saliendo con 1", async () => {
+    const { exitCode, stdout, stderr } = await runCheckAuthScript({
+      env: { GITHUB_STEP_SUMMARY: tmpdir() },
+      mockResponses: [{ status: 200, body: { disable_signup: false, external: { email: true } } }]
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("WARNING: could not write GITHUB_STEP_SUMMARY");
+    expect(stdout).not.toContain("RESULT: PASS");
+  });
+
+  it("cuando el summary se escribe, incluye el resultado final", async () => {
+    const { exitCode, summaryContent } = await runCheckAuthScript({ mockResponses: [validSettings] });
+
+    expect(exitCode).toBe(0);
+    expect(summaryContent).toContain("### Supabase Auth: registro público");
+    expect(summaryContent).toContain("disable_signup === true: true");
+    expect(summaryContent).toContain("RESULT: PASS — public sign-up is disabled; email sign-in is enabled.");
   });
 });

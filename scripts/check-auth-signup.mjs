@@ -17,6 +17,9 @@
  * Inputs (environment): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and
  * EXPECTED_PROJECT_REF (must belong to development allowlist).
  * Prints only booleans, codes, and canonical ref; never keys, secrets, or passwords.
+ * Requests never follow redirects (redirect: "error"), and any 3xx fails: only the canonical origin
+ * may answer, and the probe body and apikey are never resent elsewhere.
+ * When GITHUB_STEP_SUMMARY is set, the summary is part of the evidence: failing to write it fails.
  * Exit code 0 only when every check passed.
  */
 import { appendFileSync } from "node:fs";
@@ -37,17 +40,22 @@ function report(line) {
 }
 
 function finish(ok) {
-  report(ok ? "RESULT: PASS — public sign-up is disabled; email sign-in is enabled." : "RESULT: FAIL");
+  const result = ok ? "RESULT: PASS — public sign-up is disabled; email sign-in is enabled." : "RESULT: FAIL";
+  // El resumen del paso es parte de la evidencia auditable: si no se puede escribir, el run no es PASS.
   if (process.env.GITHUB_STEP_SUMMARY) {
     try {
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY,
-        `### Supabase Auth: registro público\n\n\`\`\`\n${lines.join("\n")}\n\`\`\`\n`
+        `### Supabase Auth: registro público\n\n\`\`\`\n${[...lines, result].join("\n")}\n\`\`\`\n`
       );
-    } catch {
-      // Ignorar fallos de escritura de resumen en pruebas
+    } catch (err) {
+      // Solo el código de error del sistema: sin rutas, claves ni mensajes con datos del entorno.
+      console.error(`WARNING: could not write GITHUB_STEP_SUMMARY (${err?.code ?? "unknown error"}); the audit record is incomplete.`);
+      console.log("RESULT: FAIL — the step summary is required evidence and could not be written.");
+      process.exit(1);
     }
   }
+  console.log(result);
   process.exit(ok ? 0 : 1);
 }
 
@@ -138,10 +146,16 @@ const headers = { apikey: key, "content-type": "application/json" };
 async function readSettings() {
   let response;
   try {
-    response = await fetch(`${canonicalOrigin}/auth/v1/settings`, { headers });
+    // Nunca seguir redirecciones: otro origen no puede responder por el proyecto ni recibir el apikey.
+    response = await fetch(`${canonicalOrigin}/auth/v1/settings`, { headers, redirect: "error" });
     report(`GET /auth/v1/settings: HTTP ${response.status}`);
   } catch (err) {
     report(`Network error reading /auth/v1/settings: ${err.message}`);
+    return { ok: false, settings: null };
+  }
+
+  if (response.redirected || (response.status >= 300 && response.status < 400)) {
+    report(`Redirect refused from /auth/v1/settings (HTTP ${response.status}): only the canonical origin may answer.`);
     return { ok: false, settings: null };
   }
 
@@ -204,11 +218,18 @@ try {
   signUpResponse = await fetch(`${canonicalOrigin}/auth/v1/signup`, {
     method: "POST",
     headers,
-    body: JSON.stringify(probe)
+    body: JSON.stringify(probe),
+    // Un 307/308 reenviaría cuerpo, contraseña de sonda y apikey a otro origen.
+    redirect: "error"
   });
   body = await signUpResponse.json().catch(() => ({}));
 } catch (err) {
   report(`Network error during active probe: ${err.message}`);
+  finish(false);
+}
+
+if (signUpResponse.redirected || (signUpResponse.status >= 300 && signUpResponse.status < 400)) {
+  report(`FAIL: redirect refused from /auth/v1/signup (HTTP ${signUpResponse.status}); the probe result is not trusted.`);
   finish(false);
 }
 
