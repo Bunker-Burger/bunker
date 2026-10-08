@@ -92,9 +92,13 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 En cada proyecto cloud (desarrollo y producción), sin compartir claves:
 1. Authentication → Sign In / Providers: **"Allow new users to sign up" desactivado**, provider Email habilitado.
 2. Verificar sin credenciales: `GET <SUPABASE_URL>/auth/v1/settings` con la publishable key en el header `apikey` debe devolver `"disable_signup": true`.
+   - La evidencia reproducible sale de `scripts/check-auth-signup.mjs`. Para desarrollo, corre en el workflow manual "Supabase Auth — registro público deshabilitado (main)".
+   - El script comprueba el ref del proyecto, `disable_signup` y `external.email`. Solo si el registro está deshabilitado envía un probe de `signUp`, que debe responder `signup_disabled` sin usuario.
 3. Revisar el "JWT expiry" (ventana máxima de un access token copiado tras un logout).
 4. Aprovisionar cada admin a mano: crear el usuario desde el Dashboard (invitación) y agregar una fila activa en `admin_memberships` para `bunker-burger`.
 5. Probar el login real en `/bunker` con un admin y con una cuenta sin membresía, que debe ser rechazada. Para desarrollo están los tests opt-in `SUPABASE_TEST_ADMIN_*` / `SUPABASE_TEST_MEMBERLESS_*`.
+
+**Bloqueo de despliegue a producción:** no se publica `/bunker` en producción hasta que un responsable con acceso al proyecto de producción complete los pasos 1–2 allí (el mismo script con el ref de producción, desde un environment protegido) y deje el enlace a la evidencia. Al cierre de BB-11 ese proyecto no está verificado: esta PR no lo conecta ni lo modifica.
 
 ## UI
 
