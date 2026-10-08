@@ -7,6 +7,8 @@ import { catalogError, fromSupabaseError, type CatalogError } from "./errors";
 
 export interface AdminMembership {
   userId: string;
+  /** Sign-in email, for display only; authorization never depends on it. */
+  email: string | null;
   storeId: string;
   role: Database["public"]["Enums"]["admin_role"];
 }
@@ -44,10 +46,15 @@ type MembershipRow = z.output<typeof membershipRowSchema>;
 export const MEMBERSHIP_SELECT = "store_id, role, is_active, stores!inner(slug)";
 
 /** Picks the active membership of `userId` for the store `storeSlug`, or `unauthorized`. */
-export function membershipForStore(userId: string, rows: MembershipRow[], storeSlug: string): Result<AdminMembership, CatalogError> {
+export function membershipForStore(
+  userId: string,
+  rows: MembershipRow[],
+  storeSlug: string,
+  email: string | null = null
+): Result<AdminMembership, CatalogError> {
   const membership = rows.find((row) => row.is_active && row.stores?.slug === storeSlug);
   return membership
-    ? ok({ userId, storeId: membership.store_id, role: membership.role })
+    ? ok({ userId, email, storeId: membership.store_id, role: membership.role })
     : catalogError("unauthorized", `admin_memberships: user is not an active admin of "${storeSlug}"`);
 }
 
@@ -55,6 +62,7 @@ export function createSupabaseAdminAccess(client: SupabaseClient<Database>): Adm
   return {
     async requireStoreAdmin(storeSlug) {
       let userId: string;
+      let email: string | null;
       try {
         // getUser() validates the session with Supabase Auth (expiry, revocation, signature);
         // getSession() would trust whatever the cookie says.
@@ -62,6 +70,7 @@ export function createSupabaseAdminAccess(client: SupabaseClient<Database>): Adm
         if (error) return fromAuthError(error);
         if (!data.user) return catalogError("unauthorized", "auth.getUser: no user in session");
         userId = data.user.id;
+        email = data.user.email ?? null;
       } catch (thrown) {
         return fromAuthError(thrown);
       }
@@ -75,7 +84,7 @@ export function createSupabaseAdminAccess(client: SupabaseClient<Database>): Adm
           .eq("stores.slug", storeSlug);
         if (error) return fromSupabaseError("admin_memberships.select", error, status);
         const rows = parseRows("admin_memberships", membershipRowSchema, data);
-        return rows.ok ? membershipForStore(userId, rows.value, storeSlug) : rows;
+        return rows.ok ? membershipForStore(userId, rows.value, storeSlug, email) : rows;
       } catch (thrown) {
         return fromSupabaseError("admin_memberships.select", thrown);
       }

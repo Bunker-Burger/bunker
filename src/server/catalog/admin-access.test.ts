@@ -32,7 +32,7 @@ describe("membershipForStore", () => {
   it("accepts an active owner or admin of the requested store", () => {
     expect(membershipForStore("u-1", [row("otra"), row("bunker-burger", true, "owner")], "bunker-burger")).toEqual({
       ok: true,
-      value: { userId: "u-1", storeId: "id-bunker-burger", role: "owner" }
+      value: { userId: "u-1", email: null, storeId: "id-bunker-burger", role: "owner" }
     });
   });
 

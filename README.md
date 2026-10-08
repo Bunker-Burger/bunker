@@ -65,6 +65,16 @@ Antes de abrir un PR: `npm run lint`, `npm run typecheck`, `npm test` y las prue
 - **Fuente pública real.** La carta y el total estimado leen `GET /api/store/promotions`: las mismas reglas que `getPromotionsForQuote()`, sin caché (`no-store`, y el service worker nunca la guarda), sin `description` ni `badge_text`, con los productos identificados por slug. El navegador la vuelve a leer cada minuto y al volver a la pestaña, así una pausa o un cambio de porcentaje llega a la página abierta. Si el endpoint falla, no se anuncia ningún descuento; no existe copia estática de reglas.
 - **UI sin texto de precio libre.** El precio tachado sale del precio real y es exactamente lo que `quoteCart` descontaría a ese producto solo con la modalidad elegida (`promotionalPrice`): una promoción solo delivery no se anuncia mientras está elegido retiro, y si la que ganaría es envío gratis no se tacha nada. La explicación se genera desde la mecánica (`explainPromotion`); nunca se muestran `description` ni `badge_text` como precio.
 
+## Administración (`/bunker`)
+
+- **Sin registro público.** Los administradores se aprovisionan a mano: un usuario en Supabase Auth del proyecto correspondiente más una fila activa en `admin_memberships` para la tienda. `/bunker` solo ofrece email + contraseña.
+- **Autorización en el servidor, en cada request.** `getAdminSession()` (`src/server/auth/session.ts`) valida la sesión con Supabase Auth (`getUser`, nunca solo la cookie) y exige una membresía activa de `bunker-burger`. `user_metadata`, claims y estado del cliente no autorizan nada. Una sesión válida de otra tienda, inactiva, vencida sin refresh o revocada es `unauthorized`. Sin cookie de sesión no se consulta a Supabase.
+- **`/bunker/admin`** llama a `requireAdminSession()`: quien no es admin va al login. Si la verificación no puede ejecutarse, muestra un error y no da acceso.
+- **Login** (Server Action): si la cuenta no es admin de la tienda, la sesión recién creada se cierra en el acto. Hay un único mensaje para credenciales incorrectas y para falta de acceso. Solo redirige a rutas dentro de `/bunker/admin` (`safeAdminPath`), así que no hay open redirects.
+- **Cookies.** `src/proxy.ts` (antes "middleware") renueva la sesión vencida una vez por request en `/` y `/bunker/**` y entrega los tokens rotados a la página y al navegador, que es el patrón de `@supabase/ssr`. No es autorización.
+- **Cierre de sesión:** revoca la sesión en Supabase (`scope: "local"`), borra las cookies y vuelve a `/bunker`, que además purga del Cache Storage cualquier respuesta de `/bunker/**`. El service worker sirve `/bunker/**` siempre por red (`NetworkOnly`) y las páginas responden `no-store`, así que el admin nunca queda disponible offline.
+- **Tab Admin:** aparece en la navegación de la carta solo con una sesión de admin validada en el servidor.
+
 ## UI
 
 Tailwind CSS 4.3 se carga desde `src/app/globals.css`, que es la única fuente de tokens (colores, tipografía, radios, sombras, `tap` de 44 px y ancho `content` de 1280 px). La paleta por defecto de Tailwind está deshabilitada: usar solo utilidades de tokens (`bg-surface`, `text-primary`, `text-headline-md`, `rounded-lg`, `min-h-tap`…) o `var(--color-*)` en CSS. Oswald (títulos y precios) y Space Grotesk (cuerpo y controles) se cargan con `next/font`.

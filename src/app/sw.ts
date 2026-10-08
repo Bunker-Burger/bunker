@@ -25,6 +25,11 @@ const serwist = new Serwist({
         sameOrigin && (pathname === "/api/store/status" || pathname === "/api/store/promotions"),
       handler: new NetworkOnly()
     },
+    // Administration (BB-11) is never available offline nor kept after signing out.
+    {
+      matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && (pathname === "/bunker" || pathname.startsWith("/bunker/")),
+      handler: new NetworkOnly()
+    },
     ...defaultCache
   ]
 });

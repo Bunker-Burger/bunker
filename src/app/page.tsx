@@ -1,4 +1,5 @@
 import { Storefront } from "@/components/storefront/storefront";
+import { hasAdminSession } from "@/server/auth/session";
 
 interface HomeProps {
   searchParams: Promise<{ producto?: string | string[] }>;
@@ -20,6 +21,8 @@ export default async function Home({ searchParams }: HomeProps) {
     <Storefront
       initialProductSlug={productParam ?? null}
       mercadoPagoEnabled={mercadoPagoConfigured()}
+      // Validated on the server (session + active membership); never from client state.
+      showAdminNav={await hasAdminSession()}
     />
   );
 }

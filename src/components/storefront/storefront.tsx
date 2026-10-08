@@ -216,7 +216,7 @@ export function Storefront({
     { href: "#menu", label: "Menú", icon: UtensilsCrossed },
     { href: "#carrito", label: "Carrito", icon: ShoppingBag, badge: itemCount },
     { href: "#checkout", label: "Checkout", icon: CircleDollarSign },
-    ...(showAdminNav ? [{ href: "/bunker", label: "Admin", icon: Settings2 }] : [])
+    ...(showAdminNav ? [{ href: "/bunker/admin", label: "Admin", icon: Settings2 }] : [])
   ];
 
   return (
