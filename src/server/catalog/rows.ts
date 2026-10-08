@@ -60,7 +60,7 @@ export const PRODUCT_SELECT = [
   "is_published, is_available, is_featured, contains_alcohol",
   "product_images(storage_path, alt_text, sort_order, is_primary)",
   "product_option_groups(default_option_ids, minimum_selections_override, maximum_selections_override, sort_order, " +
-    "option_groups(id, name, selection_mode, minimum_selections, maximum_selections, is_required, sort_order, " +
+    "option_groups(id, name, selection_mode, minimum_selections, maximum_selections, is_required, sort_order, applicable_category_kinds, " +
     "options(id, name, price_delta_cents:price_delta_cents::text, is_available, sort_order)))"
 ].join(", ");
 
@@ -80,6 +80,7 @@ const optionGroupRowSchema = z.object({
   maximum_selections: smallInt,
   is_required: z.boolean(),
   sort_order: smallInt,
+  applicable_category_kinds: z.array(z.enum(enums.category_kind)).min(1),
   options: z.array(optionRowSchema)
 });
 

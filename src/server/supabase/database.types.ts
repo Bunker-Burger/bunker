@@ -92,6 +92,7 @@ export type Database = {
       }
       option_groups: {
         Row: {
+          applicable_category_kinds: Database["public"]["Enums"]["category_kind"][]
           created_at: string
           id: string
           is_required: boolean
@@ -104,6 +105,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applicable_category_kinds?: Database["public"]["Enums"]["category_kind"][]
           created_at?: string
           id?: string
           is_required?: boolean
@@ -116,6 +118,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applicable_category_kinds?: Database["public"]["Enums"]["category_kind"][]
           created_at?: string
           id?: string
           is_required?: boolean
@@ -633,6 +636,41 @@ export type Database = {
           },
         ]
       }
+      store_business_hours: {
+        Row: {
+          closes_at: string
+          created_at: string
+          day_of_week: number
+          id: string
+          opens_at: string
+          store_id: string
+        }
+        Insert: {
+          closes_at: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          opens_at: string
+          store_id: string
+        }
+        Update: {
+          closes_at?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          opens_at?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_business_hours_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_payment_methods: {
         Row: {
           created_at: string
@@ -682,12 +720,13 @@ export type Database = {
           business_hours: Json
           created_at: string
           currency: string
-          delivery_fee_cents: number
+          delivery_fee_cents: number | null
           id: string
           is_open: boolean
           is_public: boolean
           name: string
           slug: string
+          status_override: Database["public"]["Enums"]["store_status_override"]
           timezone: string
           updated_at: string
           whatsapp_e164: string
@@ -696,12 +735,13 @@ export type Database = {
           business_hours?: Json
           created_at?: string
           currency?: string
-          delivery_fee_cents?: number
+          delivery_fee_cents?: number | null
           id?: string
           is_open?: boolean
           is_public?: boolean
           name: string
           slug: string
+          status_override?: Database["public"]["Enums"]["store_status_override"]
           timezone?: string
           updated_at?: string
           whatsapp_e164: string
@@ -710,12 +750,13 @@ export type Database = {
           business_hours?: Json
           created_at?: string
           currency?: string
-          delivery_fee_cents?: number
+          delivery_fee_cents?: number | null
           id?: string
           is_open?: boolean
           is_public?: boolean
           name?: string
           slug?: string
+          status_override?: Database["public"]["Enums"]["store_status_override"]
           timezone?: string
           updated_at?: string
           whatsapp_e164?: string
@@ -749,6 +790,7 @@ export type Database = {
         | "percent_off"
         | "buy_x_get_y"
         | "free_delivery"
+      store_status_override: "auto" | "open" | "paused" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -897,6 +939,7 @@ export const Constants = {
         "buy_x_get_y",
         "free_delivery",
       ],
+      store_status_override: ["auto", "open", "paused", "closed"],
     },
   },
 } as const

@@ -1,20 +1,28 @@
-export interface AuthoritativeOption {
+import type {
+  ConfigurableOption,
+  ConfigurableOptionGroup,
+  ConfigurableProduct,
+  OptionSelectionMode,
+  ProductType
+} from "@/domain/types";
+
+export type AuthoritativeOption = ConfigurableOption;
+
+export interface AuthoritativeOptionGroup extends ConfigurableOptionGroup {
   id: string;
   name: string;
-  priceDeltaCents: bigint;
-  available: boolean;
-}
-
-export interface AuthoritativeOptionGroup {
-  id: string;
+  selectionMode: OptionSelectionMode;
+  required: boolean;
   minSelections: number;
   maxSelections: number;
   options: AuthoritativeOption[];
+  applicableTypes: readonly ProductType[];
 }
 
-export interface AuthoritativeProduct {
+export interface AuthoritativeProduct extends ConfigurableProduct {
   id: string;
   name: string;
+  type: ProductType;
   priceCents: bigint;
   available: boolean;
   optionGroups: AuthoritativeOptionGroup[];

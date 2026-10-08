@@ -1,6 +1,6 @@
 export type ProductType = "burger" | "sandwich" | "fries" | "beverage" | "other";
 
-export interface ProductOption {
+export interface ConfigurableOption {
   id: string;
   name: string;
   priceDeltaCents: bigint;
@@ -10,25 +10,92 @@ export interface ProductOption {
 /** Persisted selection semantics; never inferred from min/max cardinality. */
 export type OptionSelectionMode = "single" | "multiple";
 
-export interface OptionGroup {
+export interface ConfigurableOptionGroup {
   id: string;
   name: string;
   selectionMode: OptionSelectionMode;
   required: boolean;
   minSelections: number;
   maxSelections: number;
-  defaultOptionIds: string[];
-  options: ProductOption[];
+  options: readonly ConfigurableOption[];
+  applicableTypes?: readonly ProductType[];
 }
 
-export interface Product {
+export interface ConfigurableProduct {
   id: string;
+  name: string;
+  type: ProductType;
+  priceCents: bigint;
+  optionGroups: readonly ConfigurableOptionGroup[];
+}
+
+export type ProductOption = ConfigurableOption;
+
+export interface OptionGroup extends ConfigurableOptionGroup {
+  required: boolean;
+  defaultOptionIds: string[];
+  options: ProductOption[];
+  applicableTypes: readonly ProductType[];
+}
+
+export type OptionSelectionErrorCode =
+  | "UNKNOWN_GROUP"
+  | "UNKNOWN_OPTION"
+  | "OPTION_UNAVAILABLE"
+  | "REQUIRED_GROUP_EMPTY"
+  | "BELOW_MIN_SELECTIONS"
+  | "EXCEEDS_MAX_SELECTIONS"
+  | "SINGLE_SELECT_MULTIPLE_CHOICES"
+  | "INAPPLICABLE_GROUP"
+  | "DUPLICATE_SELECTION";
+
+export interface OptionSelectionError {
+  groupId: string;
+  optionId?: string | undefined;
+  code: OptionSelectionErrorCode;
+  message: string;
+}
+
+export type PublicationErrorCode =
+  | "MISSING_NAME"
+  | "MISSING_SLUG"
+  | "MISSING_DESCRIPTION"
+  | "NEGATIVE_PRICE"
+  | "ZERO_OR_NEGATIVE_PRICE"
+  | "ALCOHOL_BEVERAGE"
+  | "INVALID_CARDINALITY"
+  | "MISSING_DEFAULT_OPTION"
+  | "UNAVAILABLE_DEFAULT_OPTION"
+  | "DEFAULT_BELOW_MIN"
+  | "DEFAULT_EXCEEDS_MAX"
+  | "DEFAULT_DUPLICATES"
+  | "DEFAULT_SINGLE_SELECT_MULTIPLE"
+  | "INAPPLICABLE_OPTION_GROUP"
+  | "INSUFFICIENT_AVAILABLE_OPTIONS";
+
+export interface PublicationError {
+  code: PublicationErrorCode;
+  message: string;
+  groupId?: string | undefined;
+  optionId?: string | undefined;
+}
+
+export interface ValidatedOptionSelection {
+  unitPriceCents: bigint;
+  normalizedSelections: SelectedOptions;
+  selectedDetails: Array<{
+    groupId: string;
+    groupName: string;
+    optionId: string;
+    optionName: string;
+    priceDeltaCents: bigint;
+  }>;
+}
+
+export interface Product extends ConfigurableProduct {
   slug: string;
   categoryId: string;
-  type: ProductType;
-  name: string;
   description: string;
-  priceCents: bigint;
   compareAtPriceCents?: bigint;
   /** Null when the product has no photo yet. */
   imageUrl: string | null;

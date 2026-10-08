@@ -1,4 +1,12 @@
 import { describe, expect, it } from "vitest";
+import {
+  getApplicableOptionGroups,
+  isPublishable,
+  validateOptionSelection,
+  validateProductPublication
+} from "@/domain/options";
+import { createAuthoritativeQuote } from "@/server/checkout/quote";
+import type { AuthoritativeProduct, PaymentQuotesPort, PricingRepository } from "@/server/payments/ports";
 import { parseRows, toCategories, toProducts, toPromotionRules, toStoreSettings } from "./adapters";
 import { categoryRowSchema, productRowSchema, promotionRowSchema, storeRowSchema } from "./rows";
 
@@ -103,6 +111,7 @@ describe("nulls", () => {
               maximum_selections: 3,
               is_required: true,
               sort_order: 10,
+              applicable_category_kinds: ["burger"],
               options: [{ id: "o-simple", name: "Simple", price_delta_cents: "0", is_available: true, sort_order: 10 }]
             }
           }
@@ -194,6 +203,7 @@ describe("selection mode", () => {
       maximum_selections: maximum,
       is_required: minimum > 0,
       sort_order: 0,
+      applicable_category_kinds: ["burger"],
       options: []
     }
   });
@@ -257,7 +267,7 @@ describe("ordering", () => {
       minimum_selections_override: null,
       maximum_selections_override: null,
       sort_order: linkOrder,
-      option_groups: { id, name: id, selection_mode: "multiple", minimum_selections: 0, maximum_selections: 3, is_required: false, sort_order: groupOrder, options }
+      option_groups: { id, name: id, selection_mode: "multiple", minimum_selections: 0, maximum_selections: 3, is_required: false, sort_order: groupOrder, applicable_category_kinds: ["burger"], options }
     });
     const option = (id: string, sortOrder: number) => ({ id, name: id, price_delta_cents: "0", is_available: true, sort_order: sortOrder });
     const [row] = parsedProducts([
@@ -324,6 +334,7 @@ describe("sold out", () => {
               maximum_selections: 2,
               is_required: false,
               sort_order: 0,
+              applicable_category_kinds: ["side"],
               options: [{ id: "o-cheddar", name: "Cheddar", price_delta_cents: "80000", is_available: false, sort_order: 0 }]
             }
           }
@@ -336,3 +347,329 @@ describe("sold out", () => {
     expect(result.value[0]?.optionGroups[0]?.options[0]).toMatchObject({ available: false, priceDeltaCents: 80000n });
   });
 });
+
+describe("applicability through Supabase adapter", () => {
+  it("un grupo exclusivo de otra categoría no se renderiza para bebida, no se acepta en selección, impide publicación y es rechazado por el servidor autoritativo", async () => {
+    // 1. Data equivalent to what the real Supabase adapter produces:
+    // A beverage product row erroneously linked to the seed burger group (0199b2c8-40b0-7000-8000-000000000301)
+    const [row] = parsedProducts([
+      productRow({
+        id: "0199b2c8-40b0-7000-8000-000000000202",
+        slug: "gaseosa-lata",
+        name: "Gaseosa lata 354 ml",
+        description: "Bien fría para acompañar tu pedido. Sin alcohol.",
+        category_id: "c-drinks",
+        base_price_cents: "140000",
+        is_published: true,
+        is_available: true,
+        product_option_groups: [
+          {
+            default_option_ids: ["0199b2c8-40b0-7000-8000-000000000401"],
+            minimum_selections_override: null,
+            maximum_selections_override: null,
+            sort_order: 10,
+            option_groups: {
+              id: "0199b2c8-40b0-7000-8000-000000000301", // 'Tamaño / medallones' (burger exclusive)
+              name: "Tamaño / medallones",
+              selection_mode: "single",
+              minimum_selections: 1,
+              maximum_selections: 1,
+              is_required: true,
+              sort_order: 10,
+              applicable_category_kinds: ["burger"],
+              options: [
+                {
+                  id: "0199b2c8-40b0-7000-8000-000000000401",
+                  name: "Doble (2× 100 g)",
+                  price_delta_cents: "0",
+                  is_available: true,
+                  sort_order: 10
+                }
+              ]
+            }
+          }
+        ]
+      })
+    ]);
+
+    const result = toProducts([row!], { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    const adaptedBeverage = result.value[0]!;
+
+    expect(adaptedBeverage.type).toBe("beverage");
+    expect(adaptedBeverage.optionGroups[0]?.applicableTypes).toEqual(["burger"]);
+
+    // a) No se renderiza para bebida
+    const applicableGroups = getApplicableOptionGroups(adaptedBeverage);
+    expect(applicableGroups).toHaveLength(0);
+    expect(applicableGroups.some((g) => g.id === "0199b2c8-40b0-7000-8000-000000000301")).toBe(false);
+
+    // b) No se acepta en selección
+    const selection = validateOptionSelection(adaptedBeverage, {
+      "0199b2c8-40b0-7000-8000-000000000301": ["0199b2c8-40b0-7000-8000-000000000401"]
+    });
+    expect(selection.ok).toBe(false);
+    if (!selection.ok) {
+      expect(selection.error.some((err) => err.code === "INAPPLICABLE_GROUP")).toBe(true);
+    }
+
+    // c) Impide configuración/publicación inválida
+    const publication = validateProductPublication(adaptedBeverage);
+    expect(publication.ok).toBe(false);
+    if (!publication.ok) {
+      expect(publication.error.some((err) => err.code === "INAPPLICABLE_OPTION_GROUP")).toBe(true);
+    }
+    expect(isPublishable(adaptedBeverage)).toBe(false);
+
+    // d) También es rechazado por el servidor autoritativo
+    const authoritativeProduct: AuthoritativeProduct = {
+      id: adaptedBeverage.id,
+      name: adaptedBeverage.name,
+      type: adaptedBeverage.type,
+      priceCents: adaptedBeverage.priceCents,
+      available: adaptedBeverage.inStock,
+      optionGroups: adaptedBeverage.optionGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        selectionMode: g.selectionMode,
+        required: g.required,
+        minSelections: g.minSelections,
+        maxSelections: g.maxSelections,
+        applicableTypes: g.applicableTypes,
+        options: g.options
+      }))
+    };
+
+    const repository: PricingRepository = {
+      async findProduct() {
+        return authoritativeProduct;
+      },
+      async getDeliveryFeeCents() {
+        return 0n;
+      },
+      async getApplicableDiscountCents() {
+        return 0n;
+      }
+    };
+    const quotes: PaymentQuotesPort = {
+      async save() {},
+      async findById() {
+        return null;
+      }
+    };
+
+    await expect(
+      createAuthoritativeQuote(
+        {
+          items: [
+            {
+              productId: adaptedBeverage.id,
+              quantity: 1,
+              optionSelections: {
+                "0199b2c8-40b0-7000-8000-000000000301": ["0199b2c8-40b0-7000-8000-000000000401"]
+              },
+              notes: ""
+            }
+          ],
+          fulfilment: "pickup",
+          paymentMethod: "transfer"
+        },
+        { repository, quotes, createId: () => "quote-test", now: () => new Date() }
+      )
+    ).rejects.toThrow(/no es aplicable a productos de tipo 'beverage'/i);
+  });
+});
+
+describe("persisted applicability with arbitrary unmapped UUID", () => {
+  const ARBITRARY_UUID = "0199b2c8-40b0-7000-8000-999999999999";
+  const ARBITRARY_OPTION_ID = "0199b2c8-40b0-7000-8000-888888888888";
+
+  const arbitraryGroupRow = {
+    id: ARBITRARY_UUID,
+    name: "Grupo Especial Arbitrario",
+    selection_mode: "single" as const,
+    minimum_selections: 1,
+    maximum_selections: 1,
+    is_required: true,
+    sort_order: 10,
+    applicable_category_kinds: ["burger" as const],
+    options: [
+      {
+        id: ARBITRARY_OPTION_ID,
+        name: "Opción Arbitraria",
+        price_delta_cents: "0",
+        is_available: true,
+        sort_order: 10
+      }
+    ]
+  };
+
+  it("adapter -> dominio conserva el dato de aplicabilidad sin mapas hardcodeados", () => {
+    const [burgerRow] = parsedProducts([
+      productRow({
+        id: "burger-arbitrary",
+        category_id: "c-burgers",
+        product_option_groups: [
+          {
+            default_option_ids: [ARBITRARY_OPTION_ID],
+            minimum_selections_override: null,
+            maximum_selections_override: null,
+            sort_order: 10,
+            option_groups: arbitraryGroupRow
+          }
+        ]
+      })
+    ]);
+
+    const result = toProducts([burgerRow!], { categories, imageBaseUrl: IMAGE_BASE });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+
+    const adaptedBurger = result.value[0]!;
+    expect(adaptedBurger.optionGroups).toHaveLength(1);
+    const adaptedGroup = adaptedBurger.optionGroups[0]!;
+    expect(adaptedGroup.id).toBe(ARBITRARY_UUID);
+    expect(adaptedGroup.applicableTypes).toEqual(["burger"]);
+  });
+
+  it("aplicable a burger => visible en getApplicableOptionGroups y válido en selección", () => {
+    const [burgerRow] = parsedProducts([
+      productRow({
+        id: "burger-arbitrary",
+        category_id: "c-burgers",
+        product_option_groups: [
+          {
+            default_option_ids: [ARBITRARY_OPTION_ID],
+            minimum_selections_override: null,
+            maximum_selections_override: null,
+            sort_order: 10,
+            option_groups: arbitraryGroupRow
+          }
+        ]
+      })
+    ]);
+
+    const result = toProducts([burgerRow!], { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    const burger = result.value[0]!;
+
+    const applicable = getApplicableOptionGroups(burger);
+    expect(applicable.map((g) => g.id)).toContain(ARBITRARY_UUID);
+
+    const selectionValidation = validateOptionSelection(burger, {
+      [ARBITRARY_UUID]: [ARBITRARY_OPTION_ID]
+    });
+    expect(selectionValidation.ok).toBe(true);
+  });
+
+  it("el mismo grupo => no aplicable en beverage: invisible, bloquea publicación y falla validación", () => {
+    const [beverageRow] = parsedProducts([
+      productRow({
+        id: "beverage-arbitrary",
+        category_id: "c-drinks",
+        slug: "bebida-arbitraria",
+        product_option_groups: [
+          {
+            default_option_ids: [ARBITRARY_OPTION_ID],
+            minimum_selections_override: null,
+            maximum_selections_override: null,
+            sort_order: 10,
+            option_groups: arbitraryGroupRow
+          }
+        ]
+      })
+    ]);
+
+    const result = toProducts([beverageRow!], { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    const beverage = result.value[0]!;
+
+    // No se renderiza / no es visible para bebida
+    const applicable = getApplicableOptionGroups(beverage);
+    expect(applicable.some((g) => g.id === ARBITRARY_UUID)).toBe(false);
+
+    // No se acepta en selección
+    const selectionValidation = validateOptionSelection(beverage, {
+      [ARBITRARY_UUID]: [ARBITRARY_OPTION_ID]
+    });
+    expect(selectionValidation.ok).toBe(false);
+    if (!selectionValidation.ok) {
+      expect(selectionValidation.error.some((e) => e.code === "INAPPLICABLE_GROUP")).toBe(true);
+    }
+
+    // Impide publicación del producto
+    const publicationValidation = validateProductPublication(beverage);
+    expect(publicationValidation.ok).toBe(false);
+    if (!publicationValidation.ok) {
+      expect(publicationValidation.error.some((e) => e.code === "INAPPLICABLE_OPTION_GROUP")).toBe(true);
+    }
+  });
+
+  it("servidor autoritativo rechaza uso del grupo arbitrario en tipo incorrecto (beverage)", async () => {
+    const authoritativeBeverage: AuthoritativeProduct = {
+      id: "beverage-arbitrary",
+      name: "Bebida Arbitraria",
+      type: "beverage",
+      priceCents: 150000n,
+      available: true,
+      optionGroups: [
+        {
+          id: ARBITRARY_UUID,
+          name: arbitraryGroupRow.name,
+          selectionMode: arbitraryGroupRow.selection_mode,
+          required: arbitraryGroupRow.is_required,
+          minSelections: arbitraryGroupRow.minimum_selections,
+          maxSelections: arbitraryGroupRow.maximum_selections,
+          applicableTypes: ["burger"], // Solo burger!
+          options: [
+            {
+              id: ARBITRARY_OPTION_ID,
+              name: "Opción Arbitraria",
+              priceDeltaCents: 0n,
+              available: true
+            }
+          ]
+        }
+      ]
+    };
+
+    const repository: PricingRepository = {
+      async findProduct() {
+        return authoritativeBeverage;
+      },
+      async getDeliveryFeeCents() {
+        return 0n;
+      },
+      async getApplicableDiscountCents() {
+        return 0n;
+      }
+    };
+    const quotes: PaymentQuotesPort = {
+      async save() {},
+      async findById() {
+        return null;
+      }
+    };
+
+    await expect(
+      createAuthoritativeQuote(
+        {
+          items: [
+            {
+              productId: "beverage-arbitrary",
+              quantity: 1,
+              optionSelections: {
+                [ARBITRARY_UUID]: [ARBITRARY_OPTION_ID]
+              },
+              notes: ""
+            }
+          ],
+          fulfilment: "pickup",
+          paymentMethod: "transfer"
+        },
+        { repository, quotes, createId: () => "quote-arb", now: () => new Date() }
+      )
+    ).rejects.toThrow(/no es aplicable a productos de tipo 'beverage'/i);
+  });
+});
+

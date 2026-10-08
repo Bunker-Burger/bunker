@@ -93,6 +93,9 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
     if (!group) {
       return catalogError("invalid_data", `products.${row.slug}: linked option group is not readable`);
     }
+    const applicableTypes = group.applicable_category_kinds.map(
+      (kind) => productTypeByKind[kind]
+    );
     groups.push({
       group: {
         id: group.id,
@@ -102,6 +105,7 @@ function toOptionGroups(row: ProductRow): Result<OptionGroup[], CatalogError> {
         minSelections: link.minimum_selections_override ?? group.minimum_selections,
         maxSelections: link.maximum_selections_override ?? group.maximum_selections,
         defaultOptionIds: [...link.default_option_ids],
+        applicableTypes,
         options: [...group.options]
           .sort((a, b) => a.sort_order - b.sort_order || byName(a, b))
           .map((option) => ({

@@ -23,6 +23,7 @@ const product: Product = {
       minSelections: 1,
       maxSelections: 1,
       defaultOptionIds: ["double"],
+      applicableTypes: ["burger"],
       options: [
         { id: "double", name: "Doble", priceDeltaCents: 0n, available: true },
         { id: "triple", name: "Triple", priceDeltaCents: 220000n, available: true }
