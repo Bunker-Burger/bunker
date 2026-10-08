@@ -157,7 +157,7 @@ jobs:
               const host = u.hostname.toLowerCase();
               const user = decodeURIComponent(u.username);
               const direct = host === `db.${ref}.supabase.co` && user === "postgres";
-              const pooler = /^aws-[0-9]+-[a-z0-9-]+\\.pooler\\.supabase\\.com$/.test(host) && user === `postgres.${ref}`;
+              const pooler = /^aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(host) && user === `postgres.${ref}`;
               if (!["postgres:", "postgresql:"].includes(u.protocol) || !(direct || pooler)) throw Error();
               console.log("Destino development validado");
             } catch {
