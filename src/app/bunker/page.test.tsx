@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import BunkerLoginPage from "./page";
 
 vi.mock("@/server/auth/admin-session", () => ({ getCurrentStoreAdmin: vi.fn() }));
+vi.mock("next/server", () => ({ connection: vi.fn(async () => undefined) }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
     throw new Error("NEXT_REDIRECT:/bunker/admin");
@@ -23,6 +25,7 @@ describe("/bunker", () => {
     });
 
     await expect(BunkerLoginPage()).rejects.toThrow("NEXT_REDIRECT:/bunker/admin");
+    expect(connection).toHaveBeenCalledOnce();
     expect(redirect).toHaveBeenCalledWith("/bunker/admin");
   });
 

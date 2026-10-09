@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
-import { ADMIN_HOME_PATH } from "./actions";
+import { ADMIN_HOME_PATH } from "./paths";
 import styles from "./admin.module.css";
 import { LoginForm } from "./login-form";
 
 export default async function BunkerLoginPage() {
+  await connection();
   const currentAdmin = await getCurrentStoreAdmin();
   if (currentAdmin.ok) redirect(ADMIN_HOME_PATH);
 

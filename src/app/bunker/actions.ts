@@ -4,9 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authenticateStoreAdmin, signOutCurrentSession } from "@/server/auth/admin-session";
-
-export const ADMIN_LOGIN_PATH = "/bunker";
-export const ADMIN_HOME_PATH = "/bunker/admin";
+import { ADMIN_HOME_PATH, ADMIN_LOGIN_PATH } from "./paths";
 
 const INVALID_CREDENTIALS_MESSAGE = "Email o contraseña incorrectos";
 const UNAVAILABLE_MESSAGE = "No pudimos iniciar sesión. Intentá nuevamente.";

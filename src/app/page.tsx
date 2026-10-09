@@ -1,4 +1,5 @@
 import { Storefront } from "@/components/storefront/storefront";
+import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { getPublicCatalog } from "@/server/catalog";
 
 interface HomeProps {
@@ -15,9 +16,12 @@ function mercadoPagoConfigured() {
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const params = await searchParams;
+  const [params, catalogResult, currentAdmin] = await Promise.all([
+    searchParams,
+    getPublicCatalog(),
+    getCurrentStoreAdmin()
+  ]);
   const productParam = Array.isArray(params.producto) ? params.producto[0] : params.producto;
-  const catalogResult = await getPublicCatalog();
   // The server's snapshot, empty included; null only when it could not be read at all.
   const initialCatalog = catalogResult.ok
     ? { products: catalogResult.value.products, categories: catalogResult.value.categories }
@@ -26,6 +30,7 @@ export default async function Home({ searchParams }: HomeProps) {
     <Storefront
       initialProductSlug={productParam ?? null}
       mercadoPagoEnabled={mercadoPagoConfigured()}
+      showAdminNav={currentAdmin.ok}
       paymentMethods={
         catalogResult.ok
           ? catalogResult.value.store.paymentMethods.filter((method) => method.enabled).map((method) => method.method)

@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
-import { ADMIN_LOGIN_PATH, logout } from "../actions";
+import { logout } from "../actions";
+import { ADMIN_LOGIN_PATH } from "../paths";
 import styles from "../admin.module.css";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

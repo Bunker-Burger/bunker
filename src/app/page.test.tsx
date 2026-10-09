@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import Home from "./page";
+
+vi.mock("@/server/auth/admin-session", () => ({ getCurrentStoreAdmin: vi.fn() }));
+
+const currentAdminMock = vi.mocked(getCurrentStoreAdmin);
 
 /*
  * BB-07: what the storefront route hands to the client. A store with nothing published is an
@@ -31,6 +36,7 @@ let tables: Record<string, unknown> | "down";
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
+  currentAdminMock.mockResolvedValue({ ok: false, error: { code: "unauthorized", message: "no session" } });
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", SUPABASE_URL);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test");
   vi.stubEnv("SUPABASE_PROJECT_ENV", "development");
@@ -65,6 +71,11 @@ const initialCatalogOf = async () => {
   return element.props.initialCatalog;
 };
 
+const showAdminNavOf = async () => {
+  const element = (await Home({ searchParams: Promise.resolve({}) })) as { props: { showAdminNav: boolean } };
+  return element.props.showAdminNav;
+};
+
 describe("/ (server render)", () => {
   it("passes an empty, real snapshot when the store has nothing published", async () => {
     expect(await initialCatalogOf()).toEqual({
@@ -76,5 +87,23 @@ describe("/ (server render)", () => {
   it("passes no snapshot (null) when the catalog cannot be read", async () => {
     tables = "down";
     expect(await initialCatalogOf()).toBeNull();
+  });
+
+  it("shows admin navigation only for a valid active store membership", async () => {
+    currentAdminMock.mockResolvedValue({
+      ok: true,
+      value: { userId: "user-1", storeId: STORE_ID, role: "owner" }
+    });
+    expect(await showAdminNavOf()).toBe(true);
+  });
+
+  it.each([
+    ["absent session", "unauthorized" as const],
+    ["expired session", "unauthorized" as const],
+    ["cross-store membership", "unauthorized" as const],
+    ["backend unavailable", "unavailable" as const]
+  ])("hides admin navigation for %s", async (_case, code) => {
+    currentAdminMock.mockResolvedValue({ ok: false, error: { code, message: "private details" } });
+    expect(await showAdminNavOf()).toBe(false);
   });
 });
