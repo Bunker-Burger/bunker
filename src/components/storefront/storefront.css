@@ -186,3 +186,22 @@ body.drawer-open { overflow: hidden; }
   .product-drawer { margin: auto; border-radius: var(--radius-xl); }
   .drawer-backdrop { align-items: center; padding: 2rem; }
 }
+
+.return-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--color-overlay); backdrop-filter: blur(4px); }
+.return-modal-card { position: relative; width: min(100%, 30rem); padding: 1.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); color: var(--color-foreground); box-shadow: var(--shadow-overlay); }
+.return-modal-close { position: absolute; top: 1rem; right: 1rem; display: grid; place-items: center; padding: .25rem; border: 0; background: transparent; color: var(--color-muted); cursor: pointer; }
+.return-modal-close:hover { color: var(--color-foreground); }
+.return-modal-body { padding: 1rem 0; text-align: center; }
+.return-modal-icon { display: flex; justify-content: center; margin-bottom: 1rem; }
+.return-modal-icon.icon-spin { color: var(--color-primary); }
+.return-modal-icon.icon-success { color: var(--color-success); }
+.return-modal-icon.icon-pending { color: var(--color-primary); }
+.return-modal-icon.icon-danger { color: var(--color-danger); }
+.return-modal-title { margin: 0 0 .5rem; font-family: var(--font-display); font-size: var(--text-headline-md); font-weight: 700; letter-spacing: var(--tracking-display); text-transform: uppercase; }
+.return-modal-desc { margin: 0 0 1rem; color: var(--color-muted); font-size: var(--text-body); }
+.return-modal-ref { display: block; margin-top: .5rem; color: var(--color-muted); font-size: var(--text-badge); }
+.return-modal-instruction { margin-bottom: 1.25rem; padding: .85rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: var(--text-body-sm); text-align: left; }
+.return-modal-instruction strong { display: block; margin-bottom: .25rem; }
+.return-modal-instruction span { color: var(--color-muted); }
+.return-modal-actions { display: flex; gap: .75rem; }
+

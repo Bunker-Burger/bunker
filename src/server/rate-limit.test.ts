@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import type { RateLimitStore } from "./rate-limit";
-import { createFixedWindowRateLimiter } from "./rate-limit";
+import {
+  AtomicRateLimitStore,
+  createFixedWindowRateLimiter,
+  DistributedRateLimitStore,
+  extractClientIp,
+  getSharedRateLimitStore,
+  MemoryRateLimitStore,
+  RemoteTransportQuotaBackend
+} from "./rate-limit";
 
-describe("createFixedWindowRateLimiter", () => {
+describe("createFixedWindowRateLimiter (P2-05)", () => {
   it("rejects requests above the injected store limit", async () => {
     let count = 0;
     const store: RateLimitStore = { async increment() { count += 1; return count; } };
@@ -12,5 +20,428 @@ describe("createFixedWindowRateLimiter", () => {
     expect(await limiter.check("ip:1")).toMatchObject({ allowed: true, remaining: 1 });
     expect(await limiter.check("ip:1")).toMatchObject({ allowed: true, remaining: 0 });
     expect(await limiter.check("ip:1")).toMatchObject({ allowed: false, remaining: 0, retryAfterMs: 60_000 });
+  });
+
+  it("fails closed safely when quota backend throws, never bypasses (P2-05)", async () => {
+    const faultyStore: RateLimitStore = {
+      increment: async () => {
+        throw new Error("Connection to quota backend lost");
+      }
+    };
+    const limiter = createFixedWindowRateLimiter({
+      store: faultyStore,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    const res = await limiter.check("ip:any");
+    expect(res.allowed).toBe(false);
+    expect(res.remaining).toBe(0);
+    expect(res.retryAfterMs).toBe(60_000);
+    expect(res.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("shares atomic quota across 2 isolated runtimes via shared network transport (P2-05)", async () => {
+    // Servidor centralizado independiente (ej. KV / Upstash / microservicio de cuota)
+    const centralStore = new Map<string, { count: number; expiresAt: number }>();
+    let networkCallsA = 0;
+    let networkCallsB = 0;
+
+    const handleTransportRequest = async (bodyJson: string): Promise<Response> => {
+      const { key, expiresAtMs, nowMs } = JSON.parse(bodyJson);
+      const existing = centralStore.get(key);
+      if (!existing || existing.expiresAt <= nowMs) {
+        centralStore.set(key, { count: 1, expiresAt: expiresAtMs });
+        return new Response(JSON.stringify({ count: 1 }), { status: 200 });
+      }
+      existing.count += 1;
+      return new Response(JSON.stringify({ count: existing.count }), { status: 200 });
+    };
+
+    // Runtime A (Lambda 1): entorno aislado con su propio fetcher de red
+    const fetcherA: typeof fetch = async (_url, init) => {
+      networkCallsA += 1;
+      return handleTransportRequest(String(init?.body));
+    };
+    const backendA = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: fetcherA
+    });
+    const storeA = new DistributedRateLimitStore(backendA);
+    const runtimeA = createFixedWindowRateLimiter({
+      store: storeA,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    // Runtime B (Lambda 2): entorno aislado con su propio fetcher de red (sin memoria compartida con A)
+    const fetcherB: typeof fetch = async (_url, init) => {
+      networkCallsB += 1;
+      return handleTransportRequest(String(init?.body));
+    };
+    const backendB = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: fetcherB
+    });
+    const storeB = new DistributedRateLimitStore(backendB);
+    const runtimeB = createFixedWindowRateLimiter({
+      store: storeB,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    // Verificar aislamiento estricto: no comparten referencias en memoria
+    expect(backendA).not.toBe(backendB);
+    expect(storeA).not.toBe(storeB);
+
+    // 6 peticiones a través de Runtime A
+    for (let i = 0; i < 6; i++) {
+      const res = await runtimeA.check("ip:shared-client");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(10 - (i + 1));
+    }
+    expect(networkCallsA).toBe(6);
+
+    // 4 peticiones a través de Runtime B
+    for (let i = 0; i < 4; i++) {
+      const res = await runtimeB.check("ip:shared-client");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(4 - (i + 1));
+    }
+    expect(networkCallsB).toBe(4);
+
+    // 11ª petición enviada a Runtime B: se bloquea con 429 (allowed: false, remaining: 0, retryAfterMs > 0)
+    const rejectedB = await runtimeB.check("ip:shared-client");
+    expect(rejectedB.allowed).toBe(false);
+    expect(rejectedB.remaining).toBe(0);
+    expect(rejectedB.retryAfterMs).toBeGreaterThan(0);
+    expect(Math.ceil(rejectedB.retryAfterMs / 1000)).toBeGreaterThanOrEqual(1);
+
+    // 12ª petición enviada a Runtime A: se bloquea igualmente
+    const rejectedA = await runtimeA.check("ip:shared-client");
+    expect(rejectedA.allowed).toBe(false);
+    expect(rejectedA.remaining).toBe(0);
+  });
+
+  it("fails closed when distributed backend is down or unreachable (P2-05)", async () => {
+    const failingFetcher: typeof fetch = async () => {
+      throw new Error("Distributed backend connection timed out / network drop");
+    };
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: failingFetcher
+    });
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const res = await limiter.check("ip:test");
+    expect(res.allowed).toBe(false);
+    expect(res.remaining).toBe(0);
+    expect(res.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("fails closed when distributed backend configuration is missing in production or requireDistributed is true (P2-05)", async () => {
+    const savedUrl = process.env.RATE_LIMIT_UPSTREAM_URL;
+    delete process.env.RATE_LIMIT_UPSTREAM_URL;
+
+    try {
+      const store = getSharedRateLimitStore({ requireDistributed: true });
+      const limiter = createFixedWindowRateLimiter({
+        store,
+        limit: 10,
+        windowMs: 60_000,
+        now: () => Date.now()
+      });
+
+      const res = await limiter.check("ip:test-prod-no-config");
+      expect(res.allowed).toBe(false);
+      expect(res.remaining).toBe(0);
+      expect(res.error).toBe("rate_limit_backend_unavailable");
+    } finally {
+      if (savedUrl !== undefined) {
+        process.env.RATE_LIMIT_UPSTREAM_URL = savedUrl;
+      }
+    }
+  });
+
+  it("enforces atomic quota under concurrency (15 simultaneous requests, exactly 10 pass, 5 reject) (P2-05)", async () => {
+    const store = new AtomicRateLimitStore();
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    const results = await Promise.all(
+      Array.from({ length: 15 }, () => limiter.check("ip:concurrent-client"))
+    );
+
+    const allowed = results.filter((r) => r.allowed);
+    const rejected = results.filter((r) => !r.allowed);
+
+    expect(allowed.length).toBe(10);
+    expect(rejected.length).toBe(5);
+    rejected.forEach((r) => {
+      expect(r.remaining).toBe(0);
+      expect(r.retryAfterMs).toBeGreaterThan(0);
+    });
+  });
+
+  it("resets quota after window expiration according to real TTL (P2-05)", async () => {
+    const store = new AtomicRateLimitStore();
+    let currentNow = 1_000_000;
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 1,
+      windowMs: 60_000,
+      now: () => currentNow
+    });
+
+    const first = await limiter.check("ip:ttl-client");
+    expect(first.allowed).toBe(true);
+
+    const second = await limiter.check("ip:ttl-client");
+    expect(second.allowed).toBe(false);
+
+    // Advance clock past TTL window (60s)
+    currentNow += 60_001;
+
+    const afterTtl = await limiter.check("ip:ttl-client");
+    expect(afterTtl.allowed).toBe(true);
+  });
+});
+
+describe("AtomicRateLimitStore / MemoryRateLimitStore (P2-05 bounded memory & eviction)", () => {
+  it("bounds memory size and evicts oldest entries at capacity", async () => {
+    const store = new MemoryRateLimitStore({ maxEntries: 3 });
+    const now = Date.now();
+    const expiry = now + 60_000;
+
+    await store.increment("ip:1", now, expiry);
+    await store.increment("ip:2", now, expiry);
+    await store.increment("ip:3", now, expiry);
+    expect(store.size()).toBe(3);
+
+    // Adding 4th entry triggers eviction of oldest entry
+    await store.increment("ip:4", now, expiry);
+    expect(store.size()).toBe(3);
+  });
+
+  it("evicts expired entries on access", async () => {
+    const store = new MemoryRateLimitStore();
+    const now = Date.now();
+    // Entry expired 10 seconds ago
+    await store.increment("ip:old", now - 20_000, now - 10_000);
+    expect(store.size()).toBe(1);
+
+    // Incrementing another key cleans up the expired one
+    await store.increment("ip:new", now, now + 60_000);
+    expect(store.size()).toBe(1);
+  });
+});
+
+describe("extractClientIp (P2-05 Vercel edge provenance & adversarial header resistance)", () => {
+  it("prioritizes x-vercel-forwarded-for set by Vercel Edge Router", () => {
+    const ip = extractClientIp({
+      "x-vercel-forwarded-for": "181.44.20.15",
+      "x-forwarded-for": "10.0.0.1, 192.168.1.1" // attacker tries to inject fake forwarded header
+    });
+    expect(ip).toBe("181.44.20.15");
+  });
+
+  it("accepts trusted x-real-ip when x-vercel-forwarded-for is absent", () => {
+    const ip = extractClientIp({
+      "x-real-ip": "181.44.20.15"
+    });
+    expect(ip).toBe("181.44.20.15");
+  });
+
+  it("neutralizes forged valid IPs in x-forwarded-for lacking trusted provenance into untrusted-client bucket", () => {
+    // Attacker rotates valid IP addresses in x-forwarded-for to try to evade rate limit
+    const ip1 = extractClientIp({ "x-forwarded-for": "198.51.100.10" });
+    const ip2 = extractClientIp({ "x-forwarded-for": "203.0.113.50, 198.51.100.20" });
+
+    // Both are untrusted because neither has x-vercel-forwarded-for nor trusted x-real-ip
+    expect(ip1).toBe("untrusted-client");
+    expect(ip2).toBe("untrusted-client");
+  });
+
+  it("neutralizes adversarial header injection by mapping invalid strings to untrusted-client", () => {
+    expect(extractClientIp({ "x-forwarded-for": "attacker-spoofed-token-1" })).toBe("untrusted-client");
+    expect(extractClientIp({ "x-forwarded-for": "999.999.999.999" })).toBe("untrusted-client");
+    expect(extractClientIp({ "x-real-ip": "<script>alert(1)</script>" })).toBe("untrusted-client");
+    expect(extractClientIp({})).toBe("untrusted-client");
+  });
+});
+
+describe("validateRateLimitUpstream & RemoteTransportQuotaBackend (P2-14)", () => {
+  it("validates upstream URL configurations across production and development environments", async () => {
+    const { validateRateLimitUpstream, rateLimitBackendKind } = await import("./rate-limit");
+
+    // Producción: HTTPS remoto obligatorio
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "sin-esquema" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "ftp://example.com" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "http://example.com" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "http://localhost:3000" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "https://localhost:3000" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "https://quota.example/inc" }).valid).toBe(true);
+
+    // Protección de credenciales: API Key sobre HTTP en texto plano queda prohibida
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://localhost:8080",
+        RATE_LIMIT_API_KEY: "secret"
+      }).valid
+    ).toBe(false);
+
+    // Desarrollo: http://localhost permitido únicamente sin API key
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://localhost:8080"
+      }).valid
+    ).toBe(true);
+
+    // Desarrollo: HTTP remoto no permitido
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://remote-server.com/inc"
+      }).valid
+    ).toBe(false);
+
+    // URL mal configurada en desarrollo reporta unavailable (nunca cae a local silencioso)
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "ftp://bad" })).toBe("unavailable");
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "sin-esquema" })).toBe("unavailable");
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "" })).toBe("local");
+  });
+
+  it("applies default 2500ms timeout and aborts hanging fetch with AbortSignal (P2-14)", async () => {
+    const { RemoteTransportQuotaBackend, DEFAULT_REMOTE_QUOTA_TIMEOUT_MS } = await import("./rate-limit");
+
+    const defaultBackend = new RemoteTransportQuotaBackend({ endpointUrl: "https://quota.example/inc" });
+    expect(defaultBackend.timeoutMs).toBe(DEFAULT_REMOTE_QUOTA_TIMEOUT_MS);
+    expect(DEFAULT_REMOTE_QUOTA_TIMEOUT_MS).toBe(2500);
+
+    let signalAborted = false;
+    const hangingFetcher: typeof fetch = async (_url, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          signalAborted = true;
+          reject(new DOMException("The operation was aborted", "AbortError"));
+        });
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: hangingFetcher,
+      timeoutMs: 50 // timeout acotado para el test
+    });
+
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const result = await limiter.check("ip:hang-test");
+    expect(signalAborted).toBe(true);
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it.each([
+    ["zero (0)", { count: 0 }],
+    ["negative (-1)", { count: -1 }],
+    ["floating point (0.5)", { count: 0.5 }],
+    ["unsafe integer exceeding MAX_SAFE_INTEGER", { count: 9007199254740992 }],
+    ["null count", { count: null }],
+    ["missing count property", { status: "ok" }]
+  ])("rejects impossible count %s and fails closed with rate_limit_backend_unavailable (P2-15)", async (_desc, responsePayload) => {
+    const { RemoteTransportQuotaBackend } = await import("./rate-limit");
+
+    const simulatedFetcher: typeof fetch = async () => {
+      return new Response(JSON.stringify(responsePayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: simulatedFetcher
+    });
+
+    // 1. Verificar que el backend lance directamente error descriptivo
+    await expect(backend.atomicIncrement("ip:test-key", 1000, 2000)).rejects.toThrow(
+      /Formato de respuesta de cuota inválido/
+    );
+
+    // 2. Verificar que createFixedWindowRateLimiter falle cerrado, bloqueando la petición con rate_limit_backend_unavailable
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const result = await limiter.check("ip:test-key");
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.retryAfterMs).toBe(60_000);
+    expect(result.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("permits valid counts 1 through 10 and rejects 11th with rate limited 429 (P2-15)", async () => {
+    const { RemoteTransportQuotaBackend } = await import("./rate-limit");
+
+    let counter = 0;
+    const incrementingFetcher: typeof fetch = async () => {
+      counter += 1;
+      return new Response(JSON.stringify({ count: counter }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: incrementingFetcher
+    });
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    // Peticiones 1..10 permitidas
+    for (let i = 1; i <= 10; i++) {
+      const res = await limiter.check("ip:test-valid");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(10 - i);
+    }
+
+    // Petición 11 rechazada con allowed=false (cuota superada)
+    const res11 = await limiter.check("ip:test-valid");
+    expect(res11.allowed).toBe(false);
+    expect(res11.remaining).toBe(0);
+    expect(res11.retryAfterMs).toBeGreaterThan(0);
   });
 });

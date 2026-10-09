@@ -11,7 +11,7 @@ Carta, carrito y checkout para Búnker Burger, Aguilares (Tucumán). La operaci�
 5. Revisar migraciones con `pnpm run db:push:dry` y aplicarlas con `pnpm run db:push`.
 6. Ejecutar `pnpm run dev`.
 
-Mercado Pago se oculta automáticamente si falta cualquiera de sus variables requeridas. Las claves secretas nunca llevan prefijo `NEXT_PUBLIC_`.
+Mercado Pago se ofrece solo si un checkout puede iniciarse (`getMercadoPagoAvailability`): Access Token, `APP_URL` http(s) válida, método habilitado por el local, `SUPABASE_SERVICE_ROLE_KEY` y, en producción, el servicio de cuota distribuida (`RATE_LIMIT_UPSTREAM_URL`). Si falta algo se oculta y su API responde 503. Ese servicio de cuota es una dependencia operacional que todavía no está desplegada. Las claves secretas nunca llevan prefijo `NEXT_PUBLIC_`.
 
 ## Scripts
 

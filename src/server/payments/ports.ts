@@ -3,6 +3,7 @@ import type {
   ConfigurableOption,
   ConfigurableOptionGroup,
   ConfigurableProduct,
+  FulfilmentMethod,
   OptionSelectionMode,
   ProductType,
   PromotionRule
@@ -50,6 +51,7 @@ export interface PaymentQuote {
   totalCents: bigint;
   /** The single promotion applied, as computed by the server; null when none applies. */
   promotion: AppliedPromotion | null;
+  fulfillmentChannel: FulfilmentMethod;
   expiresAt: Date;
 }
 
@@ -70,16 +72,20 @@ export interface PaymentQuotesPort {
 export interface PaymentAttempt {
   id: string;
   quoteId: string;
+  idempotencyKey?: string | undefined;
   externalReference: string;
   expectedAmountCents: bigint;
-  status: "pending" | "approved";
+  status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
   createdAt: Date;
-  providerPaymentId?: string;
+  providerPaymentId?: string | undefined;
+  providerPreferenceId?: string | undefined;
 }
 
 export interface PaymentAttemptsPort {
   save(attempt: PaymentAttempt): Promise<void>;
+  updatePreferenceId?(reference: string, providerPreferenceId: string): Promise<void>;
   findByExternalReference(reference: string): Promise<PaymentAttempt | null>;
+  findByIdempotencyKey?(key: string): Promise<PaymentAttempt | null>;
   markApproved(reference: string, providerPaymentId: string): Promise<void>;
 }
 
