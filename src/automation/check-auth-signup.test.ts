@@ -187,6 +187,28 @@ describe("check-auth-signup CLI: validación estricta de origen canónico (ORIGE
   }
 });
 
+describe("check-auth-signup CLI: no filtrar valores de URLs malformadas", () => {
+  it("rechaza path, query y fragmento con marcador confidencial sin imprimirlo", async () => {
+    const confidential = "SECRET_TEST_MARKER_DO_NOT_LOG_47191";
+    const origin = "https://zokkgocmcaqcujltfkjf.supabase.co";
+    for (const url of [
+      `${origin}/${confidential}`,
+      `${origin}?token=${confidential}`,
+      `${origin}#${confidential}`
+    ]) {
+      const { exitCode, stdout, stderr, summaryContent, capturedRequests } = await runCheckAuthScript({
+        env: { NEXT_PUBLIC_SUPABASE_URL: url }
+      });
+      expect(exitCode).toBe(1);
+      expect(capturedRequests).toHaveLength(0);
+      for (const output of [stdout, stderr, summaryContent]) {
+        expect(output).not.toContain(confidential);
+      }
+      expect(stdout).toContain("RESULT: FAIL");
+    }
+  });
+});
+
 describe("check-auth-signup CLI: modo predeterminado read-only (TOCTOU - P2)", () => {
   it("pasa con código 0 y realiza exactamente 1 GET (0 POSTs) cuando settings es válido", async () => {
     const { exitCode, stdout, capturedRequests, summaryContent } = await runCheckAuthScript({
