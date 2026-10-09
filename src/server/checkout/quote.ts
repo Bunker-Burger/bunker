@@ -81,7 +81,7 @@ export async function priceCheckout(checkout: CheckoutRequest, dependencies: Pri
     now: dependencies.now(),
     timezone: status.timezone
   });
-  return { lines, ...totals };
+  return { lines, fulfillmentChannel: checkout.fulfilment, ...totals };
 }
 
 /** Prices a checkout (see `priceCheckout`) and freezes it as a saved quote for online payment. */

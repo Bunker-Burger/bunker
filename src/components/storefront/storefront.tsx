@@ -52,13 +52,14 @@ import { usePublicPromotions } from "./use-public-promotions";
 import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
 import { Menu } from "./menu";
+import { OrderReturnModal } from "./order-return-modal";
 import "./storefront.css";
 
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const PENDING_PRODUCT_NOTICE = "Buscando el producto en la carta…";
 const UNVERIFIED_PRODUCT_NOTICE = "No pudimos confirmar ese producto con el local todavía. Reintentamos en un momento.";
-const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer"];
+const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer", "mercado_pago"];
 
 function removeProductParam() {
   const url = new URL(window.location.href);
@@ -66,7 +67,7 @@ function removeProductParam() {
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
-interface StorefrontProps {
+export interface StorefrontProps {
   initialProductSlug: string | null;
   mercadoPagoEnabled: boolean;
   /** Methods the store has enabled (`store_payment_methods`); the server enforces them again. */
@@ -78,6 +79,9 @@ interface StorefrontProps {
    * server could not read the catalog; the client then re-reads it and that answer is the truth.
    */
   initialCatalog?: PublicCatalogSnapshot | null | undefined;
+  initialReturnReference?: string | null;
+  initialReturnPaymentId?: string | null;
+  onCheckoutRedirect?: ((url: string) => void) | undefined;
 }
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -119,8 +123,40 @@ export function Storefront({
   paymentMethods = DEFAULT_PAYMENT_METHODS,
   showAdminNav = false,
   onInvalidProduct,
-  initialCatalog = null
+  initialCatalog = null,
+  initialReturnReference = null,
+  initialReturnPaymentId = null,
+  onCheckoutRedirect
 }: StorefrontProps) {
+  const [returnRef, setReturnRef] = useState<string | null>(() => {
+    if (initialReturnReference) return initialReturnReference;
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("ref");
+    }
+    return null;
+  });
+  const [returnPaymentId, setReturnPaymentId] = useState<string | null>(() => {
+    if (initialReturnPaymentId) return initialReturnPaymentId;
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      return searchParams.get("payment_id") ?? searchParams.get("collection_id");
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const ref = searchParams.get("ref");
+      if (ref) {
+        setReturnRef(ref);
+        setReturnPaymentId(searchParams.get("payment_id") ?? searchParams.get("collection_id"));
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const now = useNow();
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
@@ -316,6 +352,7 @@ export function Storefront({
         storeStatus={storeStatus}
         timezone={timezone}
         verificationStatus={verificationStatus}
+        onCheckoutRedirect={onCheckoutRedirect}
       />
 
       {itemCount > 0 && !keyboardOpen ? (
@@ -350,6 +387,31 @@ export function Storefront({
             closeProduct();
           }}
           product={activeProduct}
+        />
+      ) : null}
+
+      {returnRef ? (
+        <OrderReturnModal
+          externalReference={returnRef}
+          paymentId={returnPaymentId}
+          onClose={() => {
+            setReturnRef(null);
+            setReturnPaymentId(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("ref");
+            url.searchParams.delete("payment_id");
+            url.searchParams.delete("collection_id");
+            url.searchParams.delete("collection_status");
+            url.searchParams.delete("payment_type");
+            url.searchParams.delete("status");
+            url.searchParams.delete("preference_id");
+            url.searchParams.delete("merchant_order_id");
+            window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+          }}
+          onApproved={() => {
+            setCart([]);
+            clearCart();
+          }}
         />
       ) : null}
     </AppShell>
@@ -642,7 +704,8 @@ function CheckoutSection({
   quoteFreshness,
   storeStatus,
   deliveryFeeCents,
-  timezone
+  timezone,
+  onCheckoutRedirect
 }: {
   cart: CartLine[];
   products: readonly Product[];
@@ -658,14 +721,27 @@ function CheckoutSection({
   storeStatus: StoreStatusView;
   deliveryFeeCents: bigint | null;
   timezone: string;
+  onCheckoutRedirect?: ((url: string) => void) | undefined;
 }) {
   const offered: PaymentMethod[] = [
-    ...(mercadoPagoEnabled ? ["mercado-pago" as const] : []),
+    ...(mercadoPagoEnabled && paymentMethods.includes("mercado_pago") ? ["mercado-pago" as const] : []),
     ...(paymentMethods.includes("bank_transfer") ? ["transfer" as const] : []),
     ...(paymentMethods.includes("cash") ? ["cash" as const] : [])
   ];
   const [selectedPayment, setPayment] = useState<PaymentMethod | null>(null);
   const payment = selectedPayment !== null && offered.includes(selectedPayment) ? selectedPayment : offered[0] ?? null;
+
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [isSubmittingMp, setIsSubmittingMp] = useState(false);
+  const [mpError, setMpError] = useState<string | null>(null);
+  const checkoutNonceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    checkoutNonceRef.current = null;
+  }, [cart, fulfilment]);
+
+  const isCustomerValid = customerName.trim().length >= 2 && customerPhone.trim().length >= 6;
   const nowMs = now?.getTime() ?? null;
   // Display-only estimate with the same engine the server quote uses; the server recomputes it.
   const estimate = useMemo(
@@ -681,6 +757,85 @@ function CheckoutSection({
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
   const hasValidLines = cart.length > 0;
   const isVerified = verificationStatus === "verified";
+
+  const canSubmitMp =
+    acceptingOrders &&
+    isVerified &&
+    hasValidLines &&
+    !deliveryPending &&
+    isCustomerValid &&
+    !isSubmittingMp;
+
+  const handleMercadoPagoSubmit = async () => {
+    if (!canSubmitMp) return;
+    setIsSubmittingMp(true);
+    setMpError(null);
+    if (!checkoutNonceRef.current) {
+      checkoutNonceRef.current = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `nonce-${Date.now()}`;
+    }
+    try {
+      const payload = {
+        items: cart.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+          optionSelections: canonicalSelections(line.selectedOptions),
+          notes: line.notes
+        })),
+        fulfilment,
+        paymentMethod: "mercado_pago" as const,
+        customer: {
+          name: customerName.trim(),
+          phone: customerPhone.trim()
+        },
+        intentNonce: checkoutNonceRef.current
+      };
+
+      const res = await fetch("/api/checkout/mercado-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          setMpError("El local no está recibiendo pedidos en este momento.");
+        } else if (res.status === 429) {
+          setMpError("Demasiadas solicitudes. Por favor esperá un minuto antes de reintentar.");
+        } else if (res.status === 503) {
+          setMpError("Mercado Pago no está disponible en este momento.");
+        } else if (data?.error === "invalid_cart") {
+          checkoutNonceRef.current = null;
+          onCartRejected();
+          setMpError("El carrito cambió de precio o disponibilidad. Revisá el pedido.");
+        } else {
+          setMpError(data?.message || "No se pudo iniciar el pago con Mercado Pago.");
+        }
+        setIsSubmittingMp(false);
+        return;
+      }
+
+      if (data?.checkoutUrl) {
+        checkoutNonceRef.current = null;
+        if (onCheckoutRedirect) {
+          onCheckoutRedirect(data.checkoutUrl);
+        } else if (typeof window.location.assign === "function") {
+          window.location.assign(data.checkoutUrl);
+        } else {
+          window.location.href = data.checkoutUrl;
+        }
+      } else {
+        setMpError("Respuesta inesperada de Mercado Pago.");
+        setIsSubmittingMp(false);
+      }
+    } catch {
+      setMpError("Error de conexión al procesar el pago. Revisá tu conexión a internet.");
+      setIsSubmittingMp(false);
+    }
+  };
 
   // Only ids, quantities, notes and choices go to the server, which prices them and builds the
   // WhatsApp message; nothing is requested while the order could not be sent anyway.
@@ -720,11 +875,25 @@ function CheckoutSection({
     ? "Verificando el local…"
     : !acceptingOrders
       ? "No se pueden enviar pedidos ahora"
-      : payment === "mercado-pago"
-        ? "Mercado Pago próximamente"
-        : serverCheckout.kind === "loading"
-          ? "Calculando el total…"
-          : "Enviar pedido por WhatsApp";
+      : serverCheckout.kind === "loading"
+        ? "Calculando el total…"
+        : "Enviar pedido por WhatsApp";
+
+  const mpButtonLabel = isSubmittingMp
+    ? "Conectando con Mercado Pago…"
+    : storeStatus.kind === "ready" && storeStatus.checking
+      ? "Verificando el local…"
+      : !acceptingOrders
+        ? "No se pueden enviar pedidos ahora"
+        : !hasValidLines
+          ? "El carrito está vacío"
+          : !isVerified
+            ? "Verificando disponibilidad…"
+            : deliveryPending
+              ? "Confirmando costo de envío…"
+              : !isCustomerValid
+                ? "Ingresá nombre y teléfono"
+                : "Pagar con Mercado Pago";
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
@@ -741,12 +910,46 @@ function CheckoutSection({
 
           <fieldset className="choice-group payment-group">
             <legend>Método de pago</legend>
-            {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note="Pagá online de forma segura" onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
+            {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note="Pagá online de forma segura con tarjeta o dinero en cuenta" onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
             {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia" note="Pedí el alias por WhatsApp y enviá el comprobante por ese chat" onChange={() => setPayment("transfer")} value="transfer" /> : null}
             {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note="Tené el importe justo al recibir o retirar" onChange={() => setPayment("cash")} value="cash" /> : null}
           </fieldset>
+
+          {payment === "mercado-pago" ? (
+            <div className="customer-fields" data-testid="mp-customer-fields">
+              <label htmlFor="customer-name">
+                Nombre y apellido
+                <input
+                  id="customer-name"
+                  name="customerName"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Ej: Juan Pérez"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  required
+                />
+              </label>
+              <label htmlFor="customer-phone">
+                Teléfono / WhatsApp
+                <input
+                  id="customer-phone"
+                  name="customerPhone"
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="Ej: 11 1234-5678"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  required
+                />
+              </label>
+            </div>
+          ) : null}
+
           <p className="checkout-whatsapp-note">
-            No te pedimos datos acá: tu nombre{fulfilment === "delivery" ? ", la dirección" : ""} y el pago se coordinan en el chat de WhatsApp del local.
+            {payment === "mercado-pago"
+              ? `Solo te pedimos nombre y teléfono para identificar tu pago. La entrega${fulfilment === "delivery" ? " y dirección" : ""} se coordina por WhatsApp tras abonar.`
+              : `No te pedimos datos acá: tu nombre${fulfilment === "delivery" ? ", la dirección" : ""} y el pago se coordinan en el chat de WhatsApp del local.`}
           </p>
         </div>
 
@@ -781,8 +984,23 @@ function CheckoutSection({
               {CHECKOUT_ERRORS[serverCheckout.code] ?? "No pudimos calcular el total con el local. Probá de nuevo en un momento."}
             </p>
           ) : null}
+          {payment === "mercado-pago" && mpError ? (
+            <p className="store-status-note text-warning" data-testid="mp-error" role="alert">
+              {mpError}
+            </p>
+          ) : null}
           {/* Only a total recomputed by the server yields a link; a browser estimate never confirms an order. */}
-          {confirmed ? (
+          {payment === "mercado-pago" ? (
+            <button
+              className="whatsapp-button"
+              data-testid="mp-submit-button"
+              disabled={!canSubmitMp}
+              onClick={handleMercadoPagoSubmit}
+              type="button"
+            >
+              {mpButtonLabel}
+            </button>
+          ) : confirmed ? (
             <a className="whatsapp-button" href={confirmed.url} rel="noopener noreferrer" target="_blank">
               Enviar pedido por WhatsApp
             </a>
@@ -792,9 +1010,11 @@ function CheckoutSection({
             </button>
           )}
           <small>
-            {confirmed
-              ? "Se abre WhatsApp con tu pedido para que el local lo confirme. El carrito queda guardado en este dispositivo."
-              : "Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo."}
+            {payment === "mercado-pago"
+              ? "Serás redirigido al sitio seguro de Mercado Pago. Al finalizar el pago volverás a esta página para coordinar la entrega por WhatsApp."
+              : confirmed
+                ? "Se abre WhatsApp con tu pedido para que el local lo confirme. El carrito queda guardado en este dispositivo."
+                : "Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo."}
           </small>
         </div>
       </div>
