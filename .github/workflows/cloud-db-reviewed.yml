@@ -1,7 +1,7 @@
 name: Cloud DB — ejecución revisada (main)
 
 # El workflow privilegiado SOLO se ejecuta desde el código de main.
-# No ejecutar desde una PR ni copiar scripts JS/npm de su checkout.
+# No ejecutar desde una PR ni copiar scripts JS/pnpm de su checkout.
 on:
   workflow_dispatch:
     inputs:
@@ -110,9 +110,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+      # pnpm desde Corepack (incluido en Node), fijado por `packageManager` de main: sin acciones
+      # de terceros ni caché compartida en un job con secretos.
+      - name: Habilitar pnpm de main con Corepack
+        run: corepack enable
       - name: Instalar dependencias confiables de main
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Recuperar solamente archivos SQL del SHA exacto y verificar su identidad
         shell: bash
@@ -152,7 +155,7 @@ jobs:
           done < <(git ls-tree -r -z --name-only "$REVIEWED_SHA" -- "$directory")
           [[ "$count" -gt 0 ]] || { echo "::error::No existen SQL para revisar en el commit"; exit 1; }
           echo "SQL de SHA aprobado: $count archivos, directorio $directory"
-          # NO ejecutar scripts, npm ni otros artefactos del SHA de la PR.
+          # NO ejecutar scripts, pnpm ni otros artefactos del SHA de la PR.
 
       - name: Confirmar presencia de credencial cloud (sin revelar valor)
         env:
@@ -186,17 +189,17 @@ jobs:
         if: needs.authorize.outputs.operation == 'pgTAP'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
-        run: npx supabase test db --db-url "$SUPABASE_DEV_DB_URL"
+        run: pnpm exec supabase test db --db-url "$SUPABASE_DEV_DB_URL"
       - name: Previsualizar migraciones (sin escritura)
         if: needs.authorize.outputs.operation == 'dry-run'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
-        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL" --dry-run
+        run: pnpm exec supabase db push --db-url "$SUPABASE_DEV_DB_URL" --dry-run
       - name: Aplicar migraciones a development (confirmación previa obligatoria)
         if: needs.authorize.outputs.operation == 'apply' && inputs.confirm_project == 'zokkgocmcaqcujltfkjf'
         env:
           SUPABASE_DEV_DB_URL: ${{ secrets.SUPABASE_DEV_DB_URL }}
-        run: npx supabase db push --db-url "$SUPABASE_DEV_DB_URL"
+        run: pnpm exec supabase db push --db-url "$SUPABASE_DEV_DB_URL"
 
       - name: Registrar resultado de pgTAP para el SHA revisado
         if: needs.authorize.outputs.operation == 'pgTAP' && success()

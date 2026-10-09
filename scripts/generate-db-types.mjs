@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Regenerates src/server/supabase/database.types.ts from the cloud DEVELOPMENT project.
 //
-//   npm run db:types         write the file
-//   npm run db:types:check   exit 1 if the committed file is out of date
+//   pnpm run db:types         write the file
+//   pnpm run db:types:check   exit 1 if the committed file is out of date
 //
 // Source (first one set wins, read from the environment or .env.local):
 //   SUPABASE_DEV_DB_URL        Postgres URL of the development project (needs Docker for the CLI's pg-meta)
-//   SUPABASE_DEV_PROJECT_REF   development project ref (needs `npx supabase login` or SUPABASE_ACCESS_TOKEN)
+//   SUPABASE_DEV_PROJECT_REF   development project ref (needs `pnpm exec supabase login` or SUPABASE_ACCESS_TOKEN)
 // The production project is never a source: SUPABASE_PRODUCTION_PROJECT_REF is rejected.
 
 import { execFileSync } from "node:child_process";
@@ -37,7 +37,7 @@ if (dbUrl) {
 
 let generated;
 try {
-  generated = execFileSync("npx", ["--no-install", "supabase", "gen", "types", "--lang", "typescript", "--schema", "public", ...source], {
+  generated = execFileSync("pnpm", ["exec", "supabase", "gen", "types", "--lang", "typescript", "--schema", "public", ...source], {
     encoding: "utf8",
     shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "inherit"]
@@ -52,7 +52,7 @@ const normalized = generated.replace(/\r\n/g, "\n").trimEnd() + "\n";
 
 if (check) {
   const current = readFileSync(target, "utf8").replace(/\r\n/g, "\n");
-  if (current !== normalized) fail("database.types.ts is out of date; run `npm run db:types` and commit the result");
+  if (current !== normalized) fail("database.types.ts is out of date; run `pnpm run db:types` and commit the result");
   console.log("db:types: database.types.ts is up to date");
 } else {
   writeFileSync(target, normalized);

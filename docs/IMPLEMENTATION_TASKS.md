@@ -14,7 +14,7 @@ Este documento traduce el plan maestro a tareas autosuficientes. Cada tarea corr
 - Supabase se usa exclusivamente en la nube: un proyecto de desarrollo y otro de producción. No se usa Docker ni stack local.
 - Durante el desarrollo, el repositorio canónico es `Bunker-Burger/bunker`; al cerrar el proyecto se transferirá completo a `Lautaro073/bunker`, conservando historial, Issues y PRs.
 - Cada agente debe trabajar en una rama propia, respetar cambios ajenos, escribir pruebas primero cuando corresponda y abrir PR contra `main`.
-- Antes del PR: `npm run lint`, `npm run typecheck`, `npm test` y las pruebas específicas de la tarea. GitHub Actions repite los gates en cada PR.
+- Antes del PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las pruebas específicas de la tarea. GitHub Actions repite los gates en cada PR.
 - Una tarea no puede darse por terminada si solo deja mocks, TODOs o una interfaz visual sin integrar.
 
 ## Orden recomendado
@@ -45,7 +45,7 @@ Dejar una base reproducible que compile y permita a todos los demás agentes tra
 
 ### Criterios de aceptación
 
-- Una clonación limpia con Node 22 ejecuta `npm ci` reproduciblemente.
+- Una clonación limpia con Node 22 ejecuta `pnpm install --frozen-lockfile` reproduciblemente.
 - Lint, typecheck, tests y build pasan.
 - El workflow de GitHub Actions arranca en PR y `main` sin `startup_failure`.
 - El lockfile está versionado y no hay rangos flotantes en dependencias directas.
@@ -571,7 +571,7 @@ Publicar con entornos separados, previews seguras y un proceso de rollback docum
 
 ### Criterios de aceptación
 
-- Preview y producción compilan desde `npm ci`.
+- Preview y producción compilan desde `pnpm install --frozen-lockfile`.
 - Ningún secreto está versionado o expuesto al browser.
 - Smoke test cubre carta, WhatsApp, login admin y MP cuando esté habilitado.
 - Se puede revertir aplicación y migración compatible sin perder datos.
