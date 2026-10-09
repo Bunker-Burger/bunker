@@ -1,0 +1,68 @@
+name: Supabase Auth — registro público deshabilitado (main)
+
+# Evidencia reproducible de BB-11: el proyecto cloud de desarrollo rechaza registros directos a Auth y
+# mantiene el login por email para admins aprovisionados. Solo corre código confiable de main.
+# Por defecto se ejecuta en modo solo lectura (GET /auth/v1/settings).
+# El probe activo de POST solo se ejecuta con opt-in explícito (run_active_probe: true) sobre development.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_project_ref:
+        description: "Ref del proyecto autorizado (development: zokkgocmcaqcujltfkjf)"
+        required: true
+        type: choice
+        options:
+          - zokkgocmcaqcujltfkjf
+        default: zokkgocmcaqcujltfkjf
+      run_active_probe:
+        description: "Opt-in explícito: enviar probe POST a /auth/v1/signup (solo development)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-auth-config
+  cancel-in-progress: false
+
+jobs:
+  auth-signup-disabled:
+    name: Auth sin registro público (cloud)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout exclusivo de main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Validar allowlist de proyecto de desarrollo antes de ejecutar
+        shell: bash
+        env:
+          EXPECTED_PROJECT_REF: ${{ inputs.expected_project_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EXPECTED_PROJECT_REF" != "zokkgocmcaqcujltfkjf" ]]; then
+            echo "::error::Proyecto no autorizado en allowlist: $EXPECTED_PROJECT_REF"
+            exit 1
+          fi
+          echo "Proyecto development autorizado: $EXPECTED_PROJECT_REF"
+      - name: Verificar configuración de Auth (sin imprimir claves)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPECTED_PROJECT_REF: ${{ inputs.expected_project_ref }}
+          RUN_ACTIVE_PROBE: ${{ inputs.run_active_probe }}
+        run: |
+          args=()
+          if [ "$RUN_ACTIVE_PROBE" = "true" ]; then
+            args+=("--active-probe")
+          fi
+          node scripts/check-auth-signup.mjs "${args[@]}"
