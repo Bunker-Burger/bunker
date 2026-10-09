@@ -1,19 +1,23 @@
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authenticateStoreAdmin } from "@/server/auth/admin-session";
-import { login } from "./actions";
+import { authenticateStoreAdmin, signOutCurrentSession } from "@/server/auth/admin-session";
+import { login, logout } from "./actions";
 
 vi.mock("@/server/auth/admin-session", () => ({
-  authenticateStoreAdmin: vi.fn()
+  authenticateStoreAdmin: vi.fn(),
+  signOutCurrentSession: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
-  redirect: vi.fn(() => {
-    throw new Error("NEXT_REDIRECT:/bunker/admin");
+  redirect: vi.fn((path: string) => {
+    throw new Error(`NEXT_REDIRECT:${path}`);
   })
 }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const authenticateMock = vi.mocked(authenticateStoreAdmin);
+const signOutMock = vi.mocked(signOutCurrentSession);
 const redirectMock = vi.mocked(redirect);
 const initialState = { message: null };
 
@@ -83,5 +87,26 @@ describe("login", () => {
       message: "No pudimos iniciar sesión. Intentá nuevamente."
     });
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("logout", () => {
+  it("signs out locally, purges authenticated views, and redirects to the fixed login path", async () => {
+    signOutMock.mockResolvedValue();
+
+    await expect(logout()).rejects.toThrow("NEXT_REDIRECT:/bunker");
+
+    expect(signOutMock).toHaveBeenCalledOnce();
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
+    expect(redirectMock).toHaveBeenCalledWith("/bunker");
+  });
+
+  it("remains idempotent when the session is absent or signout fails", async () => {
+    signOutMock.mockRejectedValue(new Error("session already absent"));
+
+    await expect(logout()).rejects.toThrow("NEXT_REDIRECT:/bunker");
+
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
+    expect(redirectMock).toHaveBeenCalledWith("/bunker");
   });
 });

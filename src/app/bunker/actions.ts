@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { authenticateStoreAdmin } from "@/server/auth/admin-session";
+import { authenticateStoreAdmin, signOutCurrentSession } from "@/server/auth/admin-session";
 
 export const ADMIN_LOGIN_PATH = "/bunker";
 export const ADMIN_HOME_PATH = "/bunker/admin";
@@ -31,4 +32,14 @@ export async function login(_previousState: LoginActionState, formData: FormData
   if (outcome.kind === "unavailable") return { message: UNAVAILABLE_MESSAGE };
 
   redirect(ADMIN_HOME_PATH);
+}
+
+export async function logout(): Promise<never> {
+  try {
+    await signOutCurrentSession();
+  } catch {
+    // Logout is idempotent: an absent/revoked session is already the desired state.
+  }
+  revalidatePath("/", "layout");
+  redirect(ADMIN_LOGIN_PATH);
 }
