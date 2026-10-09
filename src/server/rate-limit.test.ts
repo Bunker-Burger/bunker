@@ -282,3 +282,112 @@ describe("extractClientIp (P2-05 Vercel edge provenance & adversarial header res
     expect(extractClientIp({})).toBe("untrusted-client");
   });
 });
+
+describe("validateRateLimitUpstream & RemoteTransportQuotaBackend (P2-14)", () => {
+  it("validates upstream URL configurations across production and development environments", async () => {
+    const { validateRateLimitUpstream, rateLimitBackendKind } = await import("./rate-limit");
+
+    // Producción: HTTPS remoto obligatorio
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "sin-esquema" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "ftp://example.com" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "http://example.com" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "http://localhost:3000" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "https://localhost:3000" }).valid).toBe(false);
+    expect(validateRateLimitUpstream({ NODE_ENV: "production", RATE_LIMIT_UPSTREAM_URL: "https://quota.example/inc" }).valid).toBe(true);
+
+    // Protección de credenciales: API Key sobre HTTP en texto plano queda prohibida
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://localhost:8080",
+        RATE_LIMIT_API_KEY: "secret"
+      }).valid
+    ).toBe(false);
+
+    // Desarrollo: http://localhost permitido únicamente sin API key
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://localhost:8080"
+      }).valid
+    ).toBe(true);
+
+    // Desarrollo: HTTP remoto no permitido
+    expect(
+      validateRateLimitUpstream({
+        NODE_ENV: "development",
+        RATE_LIMIT_UPSTREAM_URL: "http://remote-server.com/inc"
+      }).valid
+    ).toBe(false);
+
+    // URL mal configurada en desarrollo reporta unavailable (nunca cae a local silencioso)
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "ftp://bad" })).toBe("unavailable");
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "sin-esquema" })).toBe("unavailable");
+    expect(rateLimitBackendKind({}, { NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "" })).toBe("local");
+  });
+
+  it("applies default 2500ms timeout and aborts hanging fetch with AbortSignal (P2-14)", async () => {
+    const { RemoteTransportQuotaBackend, DEFAULT_REMOTE_QUOTA_TIMEOUT_MS } = await import("./rate-limit");
+
+    const defaultBackend = new RemoteTransportQuotaBackend({ endpointUrl: "https://quota.example/inc" });
+    expect(defaultBackend.timeoutMs).toBe(DEFAULT_REMOTE_QUOTA_TIMEOUT_MS);
+    expect(DEFAULT_REMOTE_QUOTA_TIMEOUT_MS).toBe(2500);
+
+    let signalAborted = false;
+    const hangingFetcher: typeof fetch = async (_url, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          signalAborted = true;
+          reject(new DOMException("The operation was aborted", "AbortError"));
+        });
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: hangingFetcher,
+      timeoutMs: 50 // timeout acotado para el test
+    });
+
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const result = await limiter.check("ip:hang-test");
+    expect(signalAborted).toBe(true);
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("fails closed when remote quota response has invalid or missing count", async () => {
+    const { RemoteTransportQuotaBackend } = await import("./rate-limit");
+
+    const malformedFetcher: typeof fetch = async () => {
+      return new Response(JSON.stringify({ status: "ok" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: malformedFetcher
+    });
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const result = await limiter.check("ip:malformed-test");
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe("rate_limit_backend_unavailable");
+  });
+});

@@ -97,10 +97,19 @@ export interface RemoteQuotaTransportResponse {
 }
 
 /**
- * P2-05: Backend de cuota distribuida a través de transporte de red HTTP.
+ * P2-14: Timeout finito para el transporte de cuota distribuida remota (en milisegundos).
+ * Limita el tiempo de espera a 2.5s antes de abortar con AbortSignal y fallar cerrado (HTTP 503),
+ * evitando cuelgues indefinidos de la función serverless y garantizando que 0 peticiones se envíen a MP.
+ */
+export const DEFAULT_REMOTE_QUOTA_TIMEOUT_MS = 2500;
+
+/**
+ * P2-05 / P2-14: Backend de cuota distribuida a través de transporte de red HTTP.
  * Desacopla runtimes serverless (Lambdas/Edge) comunicando con un servicio centralizado de cuota.
  */
 export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
+  readonly timeoutMs: number;
+
   constructor(
     private options: {
       endpointUrl: string;
@@ -108,7 +117,17 @@ export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
       apiKey?: string;
       timeoutMs?: number;
     }
-  ) {}
+  ) {
+    const configuredTimeout =
+      options.timeoutMs ??
+      (typeof process !== "undefined" && process.env.RATE_LIMIT_TIMEOUT_MS
+        ? Number(process.env.RATE_LIMIT_TIMEOUT_MS)
+        : undefined);
+    this.timeoutMs =
+      typeof configuredTimeout === "number" && Number.isFinite(configuredTimeout) && configuredTimeout > 0
+        ? configuredTimeout
+        : DEFAULT_REMOTE_QUOTA_TIMEOUT_MS;
+  }
 
   async atomicIncrement(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
     const fetchFn = this.options.fetcher ?? fetch;
@@ -128,8 +147,8 @@ export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
 
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeoutId =
-      controller && this.options.timeoutMs
-        ? setTimeout(() => controller.abort(), this.options.timeoutMs)
+      controller && this.timeoutMs > 0
+        ? setTimeout(() => controller.abort(), this.timeoutMs)
         : null;
 
     const init: RequestInit = {
@@ -149,7 +168,7 @@ export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
       }
 
       const json = (await response.json()) as RemoteQuotaTransportResponse;
-      if (typeof json?.count !== "number") {
+      if (typeof json?.count !== "number" || !Number.isFinite(json.count)) {
         throw new Error("Formato de respuesta de cuota inválido: falta count");
       }
       return json.count;
@@ -369,17 +388,101 @@ export class UnavailableRateLimitStore implements RateLimitStore {
 
 export type RateLimitBackendKind = "distributed" | "local" | "unavailable";
 
+export interface RateLimitUpstreamValidation {
+  valid: boolean;
+  url?: string | undefined;
+  apiKey?: string | undefined;
+  reason?: string | undefined;
+}
+
+export function isLoopbackHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "0.0.0.0"
+  );
+}
+
 /**
- * Which quota backend a configuration yields, without building it: `distributed` with
+ * P2-14: Validación centralizada de la configuración del servicio remoto de cuota (RATE_LIMIT_UPSTREAM_URL).
+ * Reglas de seguridad:
+ * 1. La URL debe estar presente, bien formada y parseable por URL().
+ * 2. Esquemas permitidos: únicamente 'https:' o 'http:'. Cualquier otro ('ftp:', 'file:', etc.) es inválido.
+ * 3. En producción (NODE_ENV === 'production'): HTTPS remoto obligatorio (se prohíbe 'http:' y hosts loopback/localhost).
+ * 4. Fuera de producción (desarrollo/test): 'http:' solo se admite para loopback/localhost.
+ * 5. Protección de credenciales: RATE_LIMIT_API_KEY NUNCA puede ser enviada por 'http:' en texto claro.
+ */
+export function validateRateLimitUpstream(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): RateLimitUpstreamValidation {
+  const rawUrl = environment.RATE_LIMIT_UPSTREAM_URL?.trim();
+  if (!rawUrl) {
+    return { valid: false, reason: "missing" };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return { valid: false, reason: "invalid_url" };
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return { valid: false, reason: "unsupported_protocol" };
+  }
+
+  const isProduction = environment.NODE_ENV === "production";
+  const isLoopback = isLoopbackHost(parsed.hostname);
+  const apiKey = environment.RATE_LIMIT_API_KEY?.trim() || undefined;
+
+  // En producción: HTTPS remoto obligatorio (prohibido http: y prohibido loopback/localhost)
+  if (isProduction) {
+    if (parsed.protocol !== "https:") {
+      return { valid: false, reason: "production_requires_https" };
+    }
+    if (isLoopback) {
+      return { valid: false, reason: "production_requires_remote_host" };
+    }
+  } else {
+    // Fuera de producción: http: solo permitido contra localhost / loopback controlado
+    if (parsed.protocol === "http:" && !isLoopback) {
+      return { valid: false, reason: "remote_http_forbidden" };
+    }
+  }
+
+  // RATE_LIMIT_API_KEY nunca puede transmitirse por HTTP en texto claro
+  if (parsed.protocol === "http:" && apiKey) {
+    return { valid: false, reason: "api_key_over_http_forbidden" };
+  }
+
+  return {
+    valid: true,
+    url: parsed.toString(),
+    ...(apiKey ? { apiKey } : {})
+  };
+}
+
+/**
+ * Which quota backend a configuration yields, without building it: `distributed` with a valid
  * `RATE_LIMIT_UPSTREAM_URL`; otherwise `unavailable` when a distributed backend is required (or in
- * production) and `local` in development. `getSharedRateLimitStore` and the Mercado Pago
- * availability guard both decide from here, so the storefront never offers what the route refuses.
+ * production, or with an invalid upstream configured) and `local` in development.
+ * `getSharedRateLimitStore` and the Mercado Pago availability guard both decide from here,
+ * so the storefront never offers what the route refuses.
  */
 export function rateLimitBackendKind(
   options: { requireDistributed?: boolean } = {},
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): RateLimitBackendKind {
-  if (environment.RATE_LIMIT_UPSTREAM_URL?.trim()) return "distributed";
+  const upstream = validateRateLimitUpstream(environment);
+  if (upstream.valid) return "distributed";
+
+  // P2-14: Si se configuró RATE_LIMIT_UPSTREAM_URL pero no es válida, la configuración es defectuosa.
+  // NUNCA caer silenciosamente a memoria local en desarrollo cuando hay una URL mal configurada.
+  const hasConfiguredUpstream = Boolean(environment.RATE_LIMIT_UPSTREAM_URL?.trim());
+  if (hasConfiguredUpstream) return "unavailable";
+
   return options.requireDistributed || environment.NODE_ENV === "production" ? "unavailable" : "local";
 }
 
@@ -387,29 +490,47 @@ export function getSharedRateLimitStore(options?: {
   backend?: DistributedQuotaBackend;
   maxEntries?: number;
   requireDistributed?: boolean;
+  timeoutMs?: number;
 }): RateLimitStore {
   if (options?.backend) {
     return new DistributedRateLimitStore(options.backend);
   }
 
-  const kind = rateLimitBackendKind(options?.requireDistributed ? { requireDistributed: true } : {});
+  const kind = rateLimitBackendKind(
+    options?.requireDistributed ? { requireDistributed: true } : {},
+    process.env
+  );
+
   if (kind === "distributed") {
-    const apiKey = process.env.RATE_LIMIT_API_KEY?.trim();
+    const upstream = validateRateLimitUpstream(process.env);
+    if (!upstream.valid) {
+      return new UnavailableRateLimitStore("Configuración de upstream distribuido inválida");
+    }
+    const envTimeout =
+      typeof process !== "undefined" && process.env.RATE_LIMIT_TIMEOUT_MS
+        ? Number(process.env.RATE_LIMIT_TIMEOUT_MS)
+        : undefined;
+    const timeoutMs =
+      options?.timeoutMs ??
+      (typeof envTimeout === "number" && Number.isFinite(envTimeout) && envTimeout > 0
+        ? envTimeout
+        : DEFAULT_REMOTE_QUOTA_TIMEOUT_MS);
+
     return new DistributedRateLimitStore(
       new RemoteTransportQuotaBackend({
-        endpointUrl: process.env.RATE_LIMIT_UPSTREAM_URL!.trim(),
-        ...(apiKey ? { apiKey } : {})
+        endpointUrl: upstream.url!,
+        ...(upstream.apiKey ? { apiKey: upstream.apiKey } : {}),
+        timeoutMs
       })
     );
   }
 
-  // P2-05: En producción o cuando se exige cuota distribuida,
-  // si no hay backend distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente),
+  // P2-05 / P2-14: En producción o cuando se exige cuota distribuida (o configuración inválida),
   // NUNCA caer silenciosamente en memoria local por proceso.
   // Falla cerrado (503) garantizando que no haya bypass entre réplicas / cold starts.
   if (kind === "unavailable") {
     return new UnavailableRateLimitStore(
-      "No hay servicio de cuota distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente en producción)"
+      "No hay servicio de cuota distribuido válido configurado (RATE_LIMIT_UPSTREAM_URL ausente o inválido)"
     );
   }
 

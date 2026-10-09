@@ -119,6 +119,11 @@ describe("Home and Mercado Pago availability", () => {
     ["APP_URL has no scheme", { APP_URL: "sin-esquema" }],
     ["APP_URL is ftp", { APP_URL: "ftp://example.com" }],
     ["production has no distributed quota service", { RATE_LIMIT_UPSTREAM_URL: undefined }],
+    ["production has empty quota service url", { RATE_LIMIT_UPSTREAM_URL: "" }],
+    ["production has quota url without scheme", { RATE_LIMIT_UPSTREAM_URL: "sin-esquema" }],
+    ["production has ftp quota service url", { RATE_LIMIT_UPSTREAM_URL: "ftp://example.com" }],
+    ["production has http quota service url", { RATE_LIMIT_UPSTREAM_URL: "http://example.com" }],
+    ["production has http quota service with api key", { RATE_LIMIT_UPSTREAM_URL: "http://example.com", RATE_LIMIT_API_KEY: "secret" }],
     ["payments cannot be stored durably", { SUPABASE_SERVICE_ROLE_KEY: undefined }]
   ])("keeps the menu up and hides Mercado Pago when %s", async (_case, overrides) => {
     stubEnvironment(overrides);

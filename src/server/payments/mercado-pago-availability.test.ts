@@ -56,9 +56,27 @@ describe("getMercadoPagoAvailability", () => {
     ["no Supabase project", without(completeProduction, "NEXT_PUBLIC_SUPABASE_URL"), ["persistence"]],
     ["no access token", without(completeProduction, "MERCADO_PAGO_ACCESS_TOKEN"), ["config"]],
     ["an APP_URL without a scheme", { ...completeProduction, APP_URL: "sin-esquema" }, ["config"]],
-    ["an ftp APP_URL", { ...completeProduction, APP_URL: "ftp://example.com" }, ["config"]]
+    ["an ftp APP_URL", { ...completeProduction, APP_URL: "ftp://example.com" }, ["config"]],
+    ["upstream without scheme", { ...completeProduction, RATE_LIMIT_UPSTREAM_URL: "sin-esquema" }, ["rate_limit_backend"]],
+    ["ftp upstream", { ...completeProduction, RATE_LIMIT_UPSTREAM_URL: "ftp://example.com" }, ["rate_limit_backend"]],
+    ["http upstream in production", { ...completeProduction, RATE_LIMIT_UPSTREAM_URL: "http://example.com" }, ["rate_limit_backend"]],
+    ["http localhost in production", { ...completeProduction, RATE_LIMIT_UPSTREAM_URL: "http://localhost:3000" }, ["rate_limit_backend"]],
+    ["http upstream with API key in production", { ...completeProduction, RATE_LIMIT_UPSTREAM_URL: "http://example.com", RATE_LIMIT_API_KEY: "secret" }, ["rate_limit_backend"]]
   ])("is unavailable, without throwing, with %s", (_case, environment, reasons) => {
     expect(getMercadoPagoAvailability({ environment, storePaymentMethods: methods(true) })).toEqual({ available: false, reasons });
+  });
+
+  it("marks rate_limit_backend unavailable in development when upstream is explicitly misconfigured", () => {
+    const devInvalid = { ...completeProduction, NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "ftp://invalid" };
+    expect(getMercadoPagoAvailability({ environment: devInvalid, storePaymentMethods: methods(true) })).toEqual({
+      available: false,
+      reasons: ["rate_limit_backend"]
+    });
+  });
+
+  it("accepts http localhost upstream in development when no API key is sent over plaintext", () => {
+    const devLocalhost = { ...completeProduction, NODE_ENV: "development", RATE_LIMIT_UPSTREAM_URL: "http://localhost:8080" };
+    expect(getMercadoPagoAvailability({ environment: devLocalhost, storePaymentMethods: methods(true) }).available).toBe(true);
   });
 
   it("requires the store to have enabled the method, and treats unreadable methods as disabled", () => {
