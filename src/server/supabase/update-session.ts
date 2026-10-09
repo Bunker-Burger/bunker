@@ -12,15 +12,16 @@ export async function updateSupabaseSession(request: NextRequest): Promise<NextR
   const client = createServerClient<Database>(config.value.url, config.value.publishableKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll: (cookiesToSet) => {
+      setAll: (cookiesToSet, headersToSet) => {
         for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
         response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
+        for (const [name, value] of Object.entries(headersToSet)) response.headers.set(name, value);
       }
     }
   });
 
   await client.auth.getClaims();
-  response.headers.set("Cache-Control", "private, no-store");
+  if (!response.headers.has("Cache-Control")) response.headers.set("Cache-Control", "private, no-store");
   return response;
 }

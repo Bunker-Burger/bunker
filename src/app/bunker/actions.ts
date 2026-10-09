@@ -11,7 +11,10 @@ const UNAVAILABLE_MESSAGE = "No pudimos iniciar sesión. Intentá nuevamente.";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().max(320).email(),
-  password: z.string().min(1).max(1024)
+  password: z
+    .string()
+    .max(1024)
+    .refine((password) => password.trim().length > 0)
 });
 
 export interface LoginActionState {

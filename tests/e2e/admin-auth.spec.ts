@@ -2,6 +2,13 @@ import { expect, test } from "@playwright/test";
 
 const adminEmail = process.env.SUPABASE_TEST_ADMIN_EMAIL;
 const adminPassword = process.env.SUPABASE_TEST_ADMIN_PASSWORD;
+const hasDevelopmentAuthConfig = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY &&
+    process.env.SUPABASE_PROJECT_ENV === "development" &&
+    adminEmail &&
+    adminPassword
+);
 
 test("login is private and direct anonymous admin access returns to it", async ({ page }) => {
   await page.goto("/bunker/admin");
@@ -14,6 +21,8 @@ test("login is private and direct anonymous admin access returns to it", async (
 });
 
 test("invalid credentials reveal neither account existence nor a redirect target", async ({ page }) => {
+  test.skip(!hasDevelopmentAuthConfig, "complete development Auth configuration is not available");
+
   await page.goto("/bunker?returnTo=https://evil.example");
   await page.getByRole("textbox", { name: "Email" }).fill("nobody@example.com");
   await page.getByLabel("Contraseña").fill("definitely-wrong");
@@ -24,7 +33,7 @@ test("invalid credentials reveal neither account existence nor a redirect target
 });
 
 test("the sole owner can enter, sees Admin navigation, logs out, and cannot return", async ({ page }) => {
-  test.skip(!adminEmail || !adminPassword, "development owner credentials are not configured");
+  test.skip(!hasDevelopmentAuthConfig, "complete development Auth configuration is not available");
 
   await page.goto("/bunker");
   await page.getByRole("textbox", { name: "Email" }).fill(adminEmail!);

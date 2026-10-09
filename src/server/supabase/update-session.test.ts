@@ -20,7 +20,7 @@ type CookieToSet = {
 
 interface CookieAdapter {
   getAll(): Array<{ name: string; value: string }>;
-  setAll(cookies: CookieToSet[]): void;
+  setAll(cookies: CookieToSet[], headers?: Record<string, string>): void;
 }
 
 beforeEach(() => {
@@ -42,13 +42,20 @@ describe("updateSupabaseSession", () => {
       auth: {
         getClaims: async () => {
           expect(options.cookies.getAll()).toEqual([expect.objectContaining({ name: "existing", value: "1" })]);
-          options.cookies.setAll([
+          options.cookies.setAll(
+            [
+              {
+                name: "sb-refresh",
+                value: "new-token",
+                options: { httpOnly: true, path: "/", sameSite: "lax", secure: true }
+              }
+            ],
             {
-              name: "sb-refresh",
-              value: "new-token",
-              options: { httpOnly: true, path: "/", sameSite: "lax", secure: true }
+              "Cache-Control": "private, no-store, max-age=0",
+              Expires: "0",
+              Pragma: "no-cache"
             }
-          ]);
+          );
           return { data: { claims: { sub: "user-1" } }, error: null };
         }
       }
@@ -64,6 +71,9 @@ describe("updateSupabaseSession", () => {
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(response.headers.get("set-cookie")).toContain("SameSite=lax");
     expect(response.headers.get("set-cookie")).toContain("Secure");
+    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect(response.headers.get("expires")).toBe("0");
+    expect(response.headers.get("pragma")).toBe("no-cache");
   });
 
   it("calls getClaims rather than getSession and returns a no-store response after refresh", async () => {

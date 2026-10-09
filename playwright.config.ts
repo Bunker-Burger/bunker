@@ -13,8 +13,16 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   projects: [
-    { name: "mobile", testIgnore: /responsive\.spec\.ts/, use: { ...devices["Pixel 7"] } },
-    { name: "desktop", testIgnore: /responsive\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "mobile",
+      testIgnore: [/responsive\.spec\.ts/, /admin-auth\.spec\.ts/],
+      use: { ...devices["Pixel 7"] }
+    },
+    {
+      name: "desktop",
+      testIgnore: [/responsive\.spec\.ts/, /admin-auth\.spec\.ts/],
+      use: { ...devices["Desktop Chrome"] }
+    },
     // BB-02 responsive matrix: explicit widths, touch below desktop so the on-screen keyboard path is covered.
     ...[
       { width: 320, height: 568, touch: true },

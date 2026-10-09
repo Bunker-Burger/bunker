@@ -77,6 +77,18 @@ describe("authenticateStoreAdmin", () => {
     await expect(authenticateStoreAdmin(credentials, membershipFailure.value)).resolves.toEqual({ kind: "unavailable" });
     expect(membershipFailure.signOut).not.toHaveBeenCalled();
   });
+
+  it.each([408, 429])("maps HTTP %i auth failures to unavailable", async (status) => {
+    const deps = dependencies({
+      signInResult: {
+        data: { user: null, session: null },
+        error: new AuthApiError("temporary auth failure", status, "temporary_failure")
+      }
+    });
+
+    await expect(authenticateStoreAdmin(credentials, deps.value)).resolves.toEqual({ kind: "unavailable" });
+    expect(deps.requireStoreAdmin).not.toHaveBeenCalled();
+  });
 });
 
 describe("current admin session", () => {

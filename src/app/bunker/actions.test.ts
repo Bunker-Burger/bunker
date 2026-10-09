@@ -54,6 +54,7 @@ describe("login", () => {
     ["malformed email", "not-an-email", "secret"],
     ["whitespace email", "   ", "secret"],
     ["empty password", "owner@example.com", ""],
+    ["whitespace password", "owner@example.com", "   "],
     ["oversized email", `${"a".repeat(310)}@example.com`, "secret"],
     ["oversized password", "owner@example.com", "x".repeat(1025)]
   ])("rejects %s without contacting Supabase", async (_case, email, password) => {

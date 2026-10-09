@@ -46,7 +46,14 @@ export interface AdminLogoutDependencies {
 
 function loginErrorIsUnavailable(error: AuthError) {
   const status = error.status;
-  return isAuthRetryableFetchError(error) || status === undefined || status >= 500 || status < 400;
+  return (
+    isAuthRetryableFetchError(error) ||
+    status === undefined ||
+    status === 408 ||
+    status === 429 ||
+    status >= 500 ||
+    status < 400
+  );
 }
 
 async function defaultDependencies(): Promise<Result<AdminAuthDependencies, CatalogError>> {
