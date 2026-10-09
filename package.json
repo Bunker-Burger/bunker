@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run src/server/catalog/supabase-catalog-repository.integration.test.ts",
+    "test:integration": "node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run src/server/catalog/supabase-catalog-repository.integration.test.ts src/server/auth/admin-session.integration.test.ts",
     "test:e2e": "playwright test",
     "db:push": "supabase db push --linked",
     "db:push:dry": "supabase db push --linked --dry-run",
