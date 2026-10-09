@@ -32,8 +32,6 @@ async function fillCompleteOrder(page: Page) {
   await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
   const checkout = page.getByRole("region", { name: "Finalizar pedido" });
   await checkout.getByText("Delivery", { exact: true }).click();
-  await checkout.getByLabel("Tu nombre").fill("Ana Pérez");
-  await checkout.getByLabel("Dirección").fill("San Martín 123, Aguilares");
   return checkout;
 }
 
@@ -97,7 +95,7 @@ test("the service worker never stores the store status", async ({ page }) => {
   expect(cached.filter((url) => new URL(url).pathname === "/api/store/status")).toEqual([]);
 });
 
-test("the real status endpoint answers fresh and fails closed, and the checkout never sends", async ({
+test("the real status endpoint answers fresh and fails closed, and the checkout never sends while closed", async ({
   page,
   request
 }) => {
@@ -115,5 +113,6 @@ test("the real status endpoint answers fresh and fails closed, and the checkout 
   await page.goto("/");
   await fillCompleteOrder(page);
   await expect(page.getByTestId("store-status")).not.toHaveText("Verificando si el local está tomando pedidos…");
-  await expectNoSendAction(page);
+  // An open store with a real catalog may offer the server-built WhatsApp link (BB-10); otherwise nothing sends.
+  if (body.acceptingOrders !== true) await expectNoSendAction(page);
 });

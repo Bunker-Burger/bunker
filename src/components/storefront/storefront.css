@@ -97,6 +97,7 @@
 .customer-fields label, .notes-field { display: grid; gap: .35rem; color: var(--color-muted); font-size: var(--text-body-sm); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .customer-fields input, .notes-field textarea { min-height: 3rem; padding: .75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-field); color: var(--color-foreground); letter-spacing: var(--tracking-normal); text-transform: none; }
 .customer-fields input:focus-visible, .notes-field textarea:focus-visible { border-color: var(--color-primary); outline: 1px solid var(--color-primary); outline-offset: 0; }
+.checkout-whatsapp-note { margin: 0; color: var(--color-muted); font-size: var(--text-body-sm); }
 .payment-choice { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .65rem; margin-bottom: .55rem; padding: .8rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-raised); cursor: pointer; }
 .payment-choice.active { border-color: var(--color-primary); }
 .payment-choice span { display: grid; }
