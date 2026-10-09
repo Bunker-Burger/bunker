@@ -48,6 +48,10 @@ export interface MercadoPagoCheckoutDependencies {
   fetcher?: typeof fetch;
   createId(): string;
   now(): Date;
+  /** Monotonic clock for the concurrent-attempt wait (defaults to `performance.now()`). */
+  elapsedMs?(): number;
+  /** Cancels a pending wait for a concurrent attempt (the route passes `request.signal`). */
+  signal?: AbortSignal;
 }
 
 function failure(code: MercadoPagoCheckoutErrorCode, message: string) {
@@ -202,7 +206,9 @@ export async function prepareMercadoPagoCheckout(
           attempts: dependencies.attempts,
           storeStatus: async () => status.value,
           createId: dependencies.createId,
-          now: dependencies.now
+          now: dependencies.now,
+          ...(dependencies.elapsedMs ? { elapsedMs: dependencies.elapsedMs } : {}),
+          ...(dependencies.signal ? { signal: dependencies.signal } : {})
         }
       );
     } catch {

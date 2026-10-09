@@ -10,9 +10,23 @@ export interface MercadoPagoConfig {
   publicKey?: string;
 }
 
+/**
+ * `missing`: required variables that are absent. `invalid`: present but unusable (e.g. an
+ * `APP_URL` that is not an http(s) URL). Either one disables Mercado Pago; detection never throws,
+ * so a bad value of this optional payment method cannot break the pages that ask for it.
+ */
 export type MercadoPagoConfigDetection =
-  | { enabled: false; missing: string[] }
+  | { enabled: false; missing: string[]; invalid?: string[] }
   | { enabled: true; config: MercadoPagoConfig };
+
+function parsePublicAppUrl(raw: string): URL | null {
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
+}
 
 function getEnvValue(env: Readonly<Record<string, string | undefined>>, ...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -38,10 +52,8 @@ export function detectMercadoPagoConfig(
 
   if (missing.length > 0) return { enabled: false, missing };
 
-  const appUrl = new URL(rawAppUrl!);
-  if (appUrl.protocol !== "https:" && appUrl.protocol !== "http:") {
-    throw new Error("APP_URL debe usar HTTP o HTTPS");
-  }
+  const appUrl = parsePublicAppUrl(rawAppUrl!);
+  if (!appUrl) return { enabled: false, missing: [], invalid: ["APP_URL"] };
 
   const webhookSecret = getEnvValue(environment, "MERCADO_PAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET");
 
@@ -88,8 +100,47 @@ interface PreferenceDependencies {
   /** Re-checked at payment time: the store may have closed since the quote was made. */
   storeStatus(): Promise<StoreStatus>;
   createId(): string;
+  /** Business clock (quote expiry, timestamps). May be frozen for a whole request. */
   now(): Date;
+  /**
+   * Monotonic clock in milliseconds, used only to measure how long a lost race has waited.
+   * Defaults to `performance.now()`; never derived from `now()`, which a request may freeze.
+   */
+  elapsedMs?(): number;
+  /** Aborts the wait for a concurrent winner (e.g. the client went away). */
+  signal?: AbortSignal;
   inFlightMap?: Map<string, Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }>>;
+}
+
+/** Longest real time a race loser waits for the winner's preference before failing safe. */
+export const CONCURRENT_ATTEMPT_WAIT_MS = 3_000;
+/** Hard cap on winner lookups, independent of any clock. */
+export const CONCURRENT_ATTEMPT_MAX_POLLS = 25;
+
+/** A concurrent attempt owns the idempotency key but did not publish its preference in time. */
+export class ConcurrentAttemptPendingError extends Error {
+  constructor(message = "El intento de pago concurrente no se resolvió a tiempo.") {
+    super(message);
+    this.name = "ConcurrentAttemptPendingError";
+  }
+}
+
+function waitFor(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new ConcurrentAttemptPendingError("Espera del intento concurrente cancelada."));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new ConcurrentAttemptPendingError("Espera del intento concurrente cancelada."));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 const inFlightPreferenceCreations = new Map<
@@ -168,11 +219,17 @@ export async function createCheckoutProPreference(
       if (isUniqueConflict && dependencies.attempts.findByIdempotencyKey) {
         // P1-11: El perdedor de la carrera atómica en DB NUNCA debe continuar a ejecutar un POST concurrente a Mercado Pago!
         // Espera/lee al ganador con timeout acotado y valida quote, monto, estado y vigencia.
-        const startTime = dependencies.now().getTime();
-        const maxWaitMs = 3000;
+        // P1-11B: la duración se mide con un reloj monotónico, nunca con `now()` (la ruta lo congela
+        // por request), y además hay un tope de lecturas: termina aunque el reloj de negocio no avance.
+        const elapsedMs = dependencies.elapsedMs ?? (() => performance.now());
+        const startedAt = elapsedMs();
         let pollDelayMs = 40;
 
-        while (dependencies.now().getTime() - startTime < maxWaitMs) {
+        for (let poll = 0; poll < CONCURRENT_ATTEMPT_MAX_POLLS; poll++) {
+          const remainingMs = CONCURRENT_ATTEMPT_WAIT_MS - (elapsedMs() - startedAt);
+          if (remainingMs <= 0) break;
+          if (dependencies.signal?.aborted) throw new ConcurrentAttemptPendingError("Espera del intento concurrente cancelada.");
+
           const winning = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
           if (!winning) {
             throw saveError;
@@ -197,11 +254,14 @@ export async function createCheckoutProPreference(
             };
           }
 
-          await new Promise((r) => setTimeout(r, pollDelayMs));
+          await waitFor(Math.min(pollDelayMs, Math.max(0, remainingMs)), dependencies.signal);
           pollDelayMs = Math.min(pollDelayMs * 1.5, 200);
         }
 
-        throw new Error("Tiempo de espera agotado aguardando la resolución del intento concurrente.");
+        // Fail safe: the loser never creates a second remote preference for the same key.
+        throw new ConcurrentAttemptPendingError(
+          "Tiempo de espera agotado aguardando la resolución del intento concurrente."
+        );
       } else {
         throw saveError;
       }

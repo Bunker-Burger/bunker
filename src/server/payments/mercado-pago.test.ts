@@ -42,12 +42,17 @@ describe("detectMercadoPagoConfig", () => {
     });
   });
 
-  it("throws when APP_URL protocol is not http or https", () => {
-    expect(() => detectMercadoPagoConfig({
-      MERCADO_PAGO_ACCESS_TOKEN: "token",
-      MERCADO_PAGO_WEBHOOK_SECRET: "secret",
-      APP_URL: "ftp://bunker.example"
-    })).toThrow("APP_URL debe usar HTTP o HTTPS");
+  // P2-13: an unusable APP_URL disables this optional method instead of throwing into the page.
+  it.each([
+    ["without a scheme", "sin-esquema"],
+    ["with an unsupported protocol", "ftp://example.com"],
+    ["that is not a URL at all", "http://"]
+  ])("disables Mercado Pago, without throwing, for an APP_URL %s", (_case, appUrl) => {
+    expect(detectMercadoPagoConfig({ MERCADO_PAGO_ACCESS_TOKEN: "token", APP_URL: appUrl })).toEqual({
+      enabled: false,
+      missing: [],
+      invalid: ["APP_URL"]
+    });
   });
 });
 

@@ -367,6 +367,22 @@ export class UnavailableRateLimitStore implements RateLimitStore {
   }
 }
 
+export type RateLimitBackendKind = "distributed" | "local" | "unavailable";
+
+/**
+ * Which quota backend a configuration yields, without building it: `distributed` with
+ * `RATE_LIMIT_UPSTREAM_URL`; otherwise `unavailable` when a distributed backend is required (or in
+ * production) and `local` in development. `getSharedRateLimitStore` and the Mercado Pago
+ * availability guard both decide from here, so the storefront never offers what the route refuses.
+ */
+export function rateLimitBackendKind(
+  options: { requireDistributed?: boolean } = {},
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): RateLimitBackendKind {
+  if (environment.RATE_LIMIT_UPSTREAM_URL?.trim()) return "distributed";
+  return options.requireDistributed || environment.NODE_ENV === "production" ? "unavailable" : "local";
+}
+
 export function getSharedRateLimitStore(options?: {
   backend?: DistributedQuotaBackend;
   maxEntries?: number;
@@ -376,12 +392,12 @@ export function getSharedRateLimitStore(options?: {
     return new DistributedRateLimitStore(options.backend);
   }
 
-  const upstreamUrl = process.env.RATE_LIMIT_UPSTREAM_URL?.trim();
-  if (upstreamUrl) {
+  const kind = rateLimitBackendKind(options?.requireDistributed ? { requireDistributed: true } : {});
+  if (kind === "distributed") {
     const apiKey = process.env.RATE_LIMIT_API_KEY?.trim();
     return new DistributedRateLimitStore(
       new RemoteTransportQuotaBackend({
-        endpointUrl: upstreamUrl,
+        endpointUrl: process.env.RATE_LIMIT_UPSTREAM_URL!.trim(),
         ...(apiKey ? { apiKey } : {})
       })
     );
@@ -391,8 +407,7 @@ export function getSharedRateLimitStore(options?: {
   // si no hay backend distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente),
   // NUNCA caer silenciosamente en memoria local por proceso.
   // Falla cerrado (503) garantizando que no haya bypass entre réplicas / cold starts.
-  const isProduction = process.env.NODE_ENV === "production";
-  if (options?.requireDistributed || isProduction) {
+  if (kind === "unavailable") {
     return new UnavailableRateLimitStore(
       "No hay servicio de cuota distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente en producción)"
     );

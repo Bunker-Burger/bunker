@@ -1,6 +1,6 @@
 import { Storefront } from "@/components/storefront/storefront";
 import { getPublicCatalog } from "@/server/catalog";
-import { detectMercadoPagoConfig } from "@/server/payments/mercado-pago";
+import { getMercadoPagoAvailability } from "@/server/payments/mercado-pago-availability";
 
 interface HomeProps {
   searchParams: Promise<{
@@ -23,10 +23,15 @@ export default async function Home({ searchParams }: HomeProps) {
   const initialCatalog = catalogResult.ok
     ? { products: catalogResult.value.products, categories: catalogResult.value.categories }
     : null;
+  // Offered only when a checkout could actually start (config, store method, durable storage and
+  // production quota); a payment method that cannot be read counts as disabled. Never throws.
+  const mercadoPago = getMercadoPagoAvailability({
+    storePaymentMethods: catalogResult.ok ? catalogResult.value.store.paymentMethods : null
+  });
   return (
     <Storefront
       initialProductSlug={productParam ?? null}
-      mercadoPagoEnabled={detectMercadoPagoConfig().enabled}
+      mercadoPagoEnabled={mercadoPago.available}
       paymentMethods={
         catalogResult.ok
           ? catalogResult.value.store.paymentMethods.filter((method) => method.enabled).map((method) => method.method)

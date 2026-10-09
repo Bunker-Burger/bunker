@@ -3,6 +3,7 @@ import {
   mercadoPagoCheckoutResponse,
   prepareMercadoPagoCheckout
 } from "@/server/checkout/mercadopago-checkout";
+import { getMercadoPagoAvailability } from "@/server/payments/mercado-pago-availability";
 import { getPaymentPersistencePorts } from "@/server/payments/payment-repository";
 import {
   createFixedWindowRateLimiter,
@@ -65,8 +66,12 @@ export async function POST(request: Request) {
     (body as Record<string, unknown>).intentNonce = idempotencyHeader.trim();
   }
 
+  // Business clock for this request (quote expiry, timestamps). Durations such as the wait for a
+  // concurrent attempt use a monotonic clock inside the payment module, never this frozen value.
   const now = new Date();
-  const ports = getPaymentPersistencePorts();
+  // The same guard that decides whether the storefront offers Mercado Pago; the checks below
+  // (persistence ports, config inside the checkout) remain as defense in depth.
+  const ports = getMercadoPagoAvailability().available ? getPaymentPersistencePorts() : null;
   if (!ports) {
     return Response.json(
       { error: "unavailable", message: "El servicio de pagos no está disponible en este momento." },
@@ -80,7 +85,8 @@ export async function POST(request: Request) {
     quotes: ports.quotes,
     attempts: ports.attempts,
     createId: () => crypto.randomUUID(),
-    now: () => now
+    now: () => now,
+    signal: request.signal
   });
 
   return mercadoPagoCheckoutResponse(result);

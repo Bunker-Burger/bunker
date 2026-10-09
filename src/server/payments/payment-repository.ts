@@ -259,18 +259,31 @@ export function createInMemoryPaymentRepository(): {
   return { quotes, attempts };
 }
 
+type Environment = Readonly<Record<string, string | undefined>>;
+
+/** Durable payment storage settings (service role + valid project), or null when incomplete. */
+function persistenceSettings(environment: Environment): { url: string; serviceRoleKey: string } | null {
+  const serviceRoleKey = environment.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const configResult = readSupabaseConfig(environment);
+  return serviceRoleKey && configResult.ok ? { url: configResult.value.url, serviceRoleKey } : null;
+}
+
+/**
+ * Whether quotes and attempts can be stored durably. Same rule as `getPaymentPersistencePorts`,
+ * without creating a client, so availability checks can run during a page render.
+ */
+export function isPaymentPersistenceConfigured(environment: Environment = process.env): boolean {
+  return persistenceSettings(environment) !== null;
+}
+
 export function getPaymentPersistencePorts(options?: {
   storeId?: string;
 }): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } | null {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const configResult = readSupabaseConfig();
+  const settings = persistenceSettings(process.env);
+  if (!settings) return null;
 
-  if (serviceRoleKey && configResult.ok) {
-    const serviceClient = createClient<Database>(configResult.value.url, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    return createSupabasePaymentRepository(serviceClient, options);
-  }
-
-  return null;
+  const serviceClient = createClient<Database>(settings.url, settings.serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  return createSupabasePaymentRepository(serviceClient, options);
 }
