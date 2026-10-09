@@ -10,25 +10,39 @@ import type {
   QuoteLine
 } from "../payments/ports";
 
-interface QuoteDependencies {
+interface PricingDependencies {
   repository: PricingRepository;
-  quotes: PaymentQuotesPort;
   /** Authoritative store status; the only source of the delivery fee. */
   storeStatus(): Promise<StoreStatus>;
-  createId(): string;
   now(): Date;
+}
+
+interface QuoteDependencies extends PricingDependencies {
+  quotes: PaymentQuotesPort;
+  createId(): string;
+}
+
+/** Totals of a checkout as the server prices it; nothing is saved. */
+export type CheckoutPricing = Omit<PaymentQuote, "id" | "expiresAt">;
+
+/** The cart names a product or option the catalog does not offer as requested right now. */
+export class InvalidCheckoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidCheckoutError";
+  }
 }
 
 function priceLine(
   item: CheckoutRequest["items"][number],
   product: AuthoritativeProduct
 ): QuoteLine {
-  if (!product.available) throw new Error(`Producto no disponible: ${item.productId}`);
+  if (!product.available) throw new InvalidCheckoutError(`Producto no disponible: ${item.productId}`);
 
   const validation = validateOptionSelection(product, item.optionSelections);
   if (!validation.ok) {
     const first = validation.error[0]!;
-    throw new Error(`Opción inválida: ${first.message}`);
+    throw new InvalidCheckoutError(`Opción inválida: ${first.message}`);
   }
 
   return {
@@ -46,35 +60,40 @@ function priceLine(
   };
 }
 
-export async function createAuthoritativeQuote(
-  checkout: CheckoutRequest,
-  dependencies: QuoteDependencies
-): Promise<PaymentQuote> {
+/**
+ * Prices a checkout from authoritative data only: store status (closed, paused or without a
+ * delivery fee throws `StoreNotAcceptingOrdersError`), persisted products, options and promotions.
+ */
+export async function priceCheckout(checkout: CheckoutRequest, dependencies: PricingDependencies): Promise<CheckoutPricing> {
   // Closed, paused or without a delivery fee: no quote, so nothing can be paid or sent.
   const status = await dependencies.storeStatus();
   const deliveryCents = deliveryChargeCents(status, checkout.fulfilment);
   const lines: QuoteLine[] = [];
   for (const item of checkout.items) {
     const product = await dependencies.repository.findProduct(item.productId);
-    if (!product) throw new Error(`Producto inexistente: ${item.productId}`);
+    if (!product) throw new InvalidCheckoutError(`Producto inexistente: ${item.productId}`);
     lines.push(priceLine(item, product));
   }
 
   // One promotion at most, chosen and computed here from the persisted rules; nothing the
   // browser sends (prices, totals, promotion ids) takes part in it.
-  const now = dependencies.now();
   const totals = quoteCart(lines, await dependencies.repository.listPromotions(), checkout.fulfilment, deliveryCents, {
-    now,
+    now: dependencies.now(),
     timezone: status.timezone
   });
+  return { lines, ...totals };
+}
+
+/** Prices a checkout (see `priceCheckout`) and freezes it as a saved quote for online payment. */
+export async function createAuthoritativeQuote(
+  checkout: CheckoutRequest,
+  dependencies: QuoteDependencies
+): Promise<PaymentQuote> {
+  const now = dependencies.now();
+  const pricing = await priceCheckout(checkout, { ...dependencies, now: () => now });
   const quote: PaymentQuote = {
     id: dependencies.createId(),
-    lines,
-    subtotalCents: totals.subtotalCents,
-    discountCents: totals.discountCents,
-    deliveryCents: totals.deliveryCents,
-    totalCents: totals.totalCents,
-    promotion: totals.promotion,
+    ...pricing,
     expiresAt: new Date(now.getTime() + 15 * 60_000)
   };
   await dependencies.quotes.save(quote);

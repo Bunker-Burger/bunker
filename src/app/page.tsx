@@ -26,6 +26,11 @@ export default async function Home({ searchParams }: HomeProps) {
     <Storefront
       initialProductSlug={productParam ?? null}
       mercadoPagoEnabled={mercadoPagoConfigured()}
+      paymentMethods={
+        catalogResult.ok
+          ? catalogResult.value.store.paymentMethods.filter((method) => method.enabled).map((method) => method.method)
+          : undefined
+      }
       initialProducts={initialProducts}
     />
   );
