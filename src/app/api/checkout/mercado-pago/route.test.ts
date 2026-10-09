@@ -83,6 +83,27 @@ describe("Mercado Pago Route Handlers (BB-14)", () => {
     expect(res.status).toBe(429);
   });
 
+  it("POST /api/checkout/mercado-pago neutralizes rotating valid IPs lacking Vercel provenance (P2-05)", async () => {
+    const createRotatingIpReq = (ip: string) =>
+      new Request("http://localhost:3000/api/checkout/mercado-pago", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": ip
+        },
+        body: JSON.stringify({})
+      });
+
+    // 10 requests with distinct valid IPs without Vercel provenance
+    for (let i = 1; i <= 10; i++) {
+      await POST(createRotatingIpReq(`198.51.100.${i}`));
+    }
+
+    // 11th request with fresh valid IP is still rate limited (429)
+    const res = await POST(createRotatingIpReq("198.51.100.99"));
+    expect(res.status).toBe(429);
+  });
+
   it("GET /api/checkout/mercado-pago/status fails closed with 503 if persistence is not configured (P1-02)", async () => {
     const prevKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;

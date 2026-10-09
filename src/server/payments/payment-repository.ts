@@ -91,22 +91,37 @@ export function createSupabasePaymentRepository(
 
   const attempts: PaymentAttemptsPort = {
     async save(attempt: PaymentAttempt): Promise<void> {
-      const { error } = await client.from("payment_attempts").insert({
+      const { error } = await client.from("payment_attempts").upsert({
         id: attempt.id,
         store_id: storeId,
         quote_id: attempt.quoteId,
         amount_cents: Number(attempt.expectedAmountCents),
         currency: "ARS",
         external_reference: attempt.externalReference,
-        idempotency_key: attempt.id,
+        idempotency_key: attempt.idempotencyKey ?? attempt.id,
         provider: "mercado_pago",
         provider_preference_id: attempt.providerPreferenceId ?? null,
         provider_payment_id: attempt.providerPaymentId ?? null,
         status: attempt.status,
         expires_at: new Date(attempt.createdAt.getTime() + 15 * 60_000).toISOString()
-      });
+      }, { onConflict: "external_reference" });
       if (error) {
         throw new Error(`Error al persistir attempt: ${error.message}`);
+      }
+    },
+
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
+      const { error } = await client
+        .from("payment_attempts")
+        .update({
+          provider_preference_id: providerPreferenceId,
+          status: "pending",
+          updated_at: new Date().toISOString()
+        })
+        .eq("external_reference", reference);
+
+      if (error) {
+        throw new Error(`Error al actualizar preference_id: ${error.message}`);
       }
     },
 
@@ -121,6 +136,28 @@ export function createSupabasePaymentRepository(
       return {
         id: data.id,
         quoteId: data.quote_id ?? "",
+        idempotencyKey: data.idempotency_key ?? undefined,
+        externalReference: data.external_reference,
+        expectedAmountCents: BigInt(data.amount_cents),
+        status: data.status as PaymentAttempt["status"],
+        createdAt: new Date(data.created_at),
+        providerPaymentId: data.provider_payment_id ?? undefined,
+        providerPreferenceId: data.provider_preference_id ?? undefined
+      };
+    },
+
+    async findByIdempotencyKey(key: string): Promise<PaymentAttempt | null> {
+      const { data, error } = await client
+        .from("payment_attempts")
+        .select("*")
+        .eq("idempotency_key", key)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return {
+        id: data.id,
+        quoteId: data.quote_id ?? "",
+        idempotencyKey: data.idempotency_key ?? undefined,
         externalReference: data.external_reference,
         expectedAmountCents: BigInt(data.amount_cents),
         status: data.status as PaymentAttempt["status"],
@@ -170,9 +207,27 @@ export function createInMemoryPaymentRepository(): {
     async save(attempt: PaymentAttempt): Promise<void> {
       attemptsMap.set(attempt.externalReference, { ...attempt });
     },
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
+      const found = attemptsMap.get(reference);
+      if (found) {
+        attemptsMap.set(reference, {
+          ...found,
+          providerPreferenceId,
+          status: "pending"
+        });
+      }
+    },
     async findByExternalReference(reference: string): Promise<PaymentAttempt | null> {
       const found = attemptsMap.get(reference);
       return found ? { ...found } : null;
+    },
+    async findByIdempotencyKey(key: string): Promise<PaymentAttempt | null> {
+      for (const att of attemptsMap.values()) {
+        if ((att.idempotencyKey ?? att.id) === key) {
+          return { ...att };
+        }
+      }
+      return null;
     },
     async markApproved(reference: string, providerPaymentId: string): Promise<void> {
       const found = attemptsMap.get(reference);

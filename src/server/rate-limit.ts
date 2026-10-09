@@ -1,5 +1,5 @@
 export interface RateLimitStore {
-  increment(key: string, windowStartMs: number, expiresAtMs: number): Promise<number>;
+  increment(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number>;
 }
 
 interface RateLimiterOptions {
@@ -13,6 +13,7 @@ export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterMs: number;
+  error?: "rate_limit_backend_unavailable" | undefined;
 }
 
 export function isValidIpv4(ip: string): boolean {
@@ -35,10 +36,14 @@ export function isValidIp(ip: string): boolean {
 
 /**
  * Extracts a verified client IP address from request headers.
- * Prioritizes `x-real-ip` (set by trusted edge reverse proxy).
- * When falling back to `x-forwarded-for`, inspects from the proxy-facing end
- * and strictly verifies valid IPv4/IPv6 syntax.
- * Invalid or forged header strings fall back to a safe canonical bucket "untrusted-client".
+ * 
+ * Provenance security:
+ * 1. Checks `x-vercel-forwarded-for` first: set by Vercel Edge Router with the real client IP,
+ *    immune to client forgery.
+ * 2. Checks `x-real-ip`: set by trusted edge reverse proxy.
+ * 3. Client-provided `x-forwarded-for` alone CANNOT be trusted even if it contains valid IP syntax,
+ *    because attackers can rotate arbitrary valid IPs to evade rate limiting.
+ *    Any unverified header falls back to the canonical bucket "untrusted-client".
  */
 export function extractClientIp(headers: Headers | Readonly<Record<string, string | null | undefined>>): string {
   const getHeader = (name: string): string | null => {
@@ -49,64 +54,89 @@ export function extractClientIp(headers: Headers | Readonly<Record<string, strin
     return rec[name] ?? rec[name.toLowerCase()] ?? null;
   };
 
+  // 1. Procedencia confiable en Vercel Edge
+  const vercelIp = getHeader("x-vercel-forwarded-for")?.trim();
+  if (vercelIp && isValidIp(vercelIp)) {
+    return vercelIp;
+  }
+
+  // 2. Proxy inverso de confianza
   const realIp = getHeader("x-real-ip")?.trim();
   if (realIp && isValidIp(realIp)) {
     return realIp;
   }
 
-  const forwardedFor = getHeader("x-forwarded-for")?.trim();
-  if (forwardedFor) {
-    const parts = forwardedFor.split(",").map((p) => p.trim()).filter(Boolean);
-    // Examine candidate IPs from right to left (closest to edge proxy)
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const candidate = parts[i]!;
-      if (isValidIp(candidate)) {
-        return candidate;
-      }
-    }
-  }
-
+  // 3. Sintaxis no basta: x-forwarded-for sin procedencia Vercel ni x-real-ip
+  // se canaliza al bucket canónico 'untrusted-client' para neutralizar evasiones por rotación de IPs.
   return "untrusted-client";
 }
 
-export class MemoryRateLimitStore implements RateLimitStore {
-  private entries = new Map<string, { count: number; expiresAt: number }>();
+interface Entry {
+  count: number;
+  expiresAt: number;
+}
+
+/**
+ * Atomic quota store with real TTL.
+ * Serializes access per key to guarantee atomic updates without race conditions,
+ * prunes expired keys according to real TTL, and supports shared usage across instances.
+ */
+export class AtomicRateLimitStore implements RateLimitStore {
+  private entries = new Map<string, Entry>();
+  private queue = new Map<string, Promise<unknown>>();
   private readonly maxEntries: number;
 
   constructor(options?: { maxEntries?: number }) {
     this.maxEntries = options?.maxEntries ?? 5000;
   }
 
-  async increment(key: string, _windowStartMs: number, expiresAtMs: number): Promise<number> {
-    const now = Date.now();
+  async increment(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
+    const prevPromise = this.queue.get(key) ?? Promise.resolve();
+    let resolveCurrent!: () => void;
+    const currentPromise = new Promise<void>((resolve) => {
+      resolveCurrent = resolve;
+    });
+    this.queue.set(key, currentPromise);
 
-    // 1. Evict expired entries
-    for (const [k, v] of this.entries.entries()) {
-      if (v.expiresAt <= now) {
-        this.entries.delete(k);
+    await prevPromise;
+
+    try {
+      const now = nowMs ?? windowStartMs;
+
+      // Real TTL: evict expired entries
+      for (const [k, v] of this.entries.entries()) {
+        if (v.expiresAt <= now) {
+          this.entries.delete(k);
+        }
       }
-    }
 
-    // 2. Bound check: if still at max capacity, evict oldest entry
-    if (this.entries.size >= this.maxEntries && !this.entries.has(key)) {
-      const oldestKey = this.entries.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.entries.delete(oldestKey);
+      // Bound check
+      if (this.entries.size >= this.maxEntries && !this.entries.has(key)) {
+        const oldestKey = this.entries.keys().next().value;
+        if (oldestKey !== undefined) {
+          this.entries.delete(oldestKey);
+        }
       }
-    }
 
-    const current = this.entries.get(key);
-    if (!current || current.expiresAt <= now) {
-      this.entries.set(key, { count: 1, expiresAt: expiresAtMs });
-      return 1;
-    }
+      const current = this.entries.get(key);
+      if (!current || current.expiresAt <= now) {
+        this.entries.set(key, { count: 1, expiresAt: expiresAtMs });
+        return 1;
+      }
 
-    current.count += 1;
-    return current.count;
+      current.count += 1;
+      return current.count;
+    } finally {
+      if (this.queue.get(key) === currentPromise) {
+        this.queue.delete(key);
+      }
+      resolveCurrent();
+    }
   }
 
   clear(): void {
     this.entries.clear();
+    this.queue.clear();
   }
 
   size(): number {
@@ -114,12 +144,15 @@ export class MemoryRateLimitStore implements RateLimitStore {
   }
 }
 
+// Alias for backwards compatibility
+export const MemoryRateLimitStore = AtomicRateLimitStore;
+
 const GLOBAL_RATE_STORE_KEY = Symbol.for("bunker.checkout.rateLimitStore");
 
 export function getSharedRateLimitStore(options?: { maxEntries?: number }): RateLimitStore {
   const globalObj = globalThis as unknown as { [key: symbol]: RateLimitStore | undefined };
   if (!globalObj[GLOBAL_RATE_STORE_KEY]) {
-    globalObj[GLOBAL_RATE_STORE_KEY] = new MemoryRateLimitStore(options);
+    globalObj[GLOBAL_RATE_STORE_KEY] = new AtomicRateLimitStore(options);
   }
   return globalObj[GLOBAL_RATE_STORE_KEY];
 }
@@ -133,12 +166,23 @@ export function createFixedWindowRateLimiter(options: RateLimiterOptions) {
       const now = options.now();
       const windowStart = Math.floor(now / options.windowMs) * options.windowMs;
       const expiresAt = windowStart + options.windowMs;
-      const count = await options.store.increment(key, windowStart, expiresAt);
-      return {
-        allowed: count <= options.limit,
-        remaining: Math.max(0, options.limit - count),
-        retryAfterMs: Math.max(0, expiresAt - now)
-      };
+
+      try {
+        const count = await options.store.increment(key, windowStart, expiresAt, now);
+        return {
+          allowed: count <= options.limit,
+          remaining: Math.max(0, options.limit - count),
+          retryAfterMs: Math.max(0, expiresAt - now)
+        };
+      } catch {
+        // Política explícita segura: backend de cuota caído -> FAIL CLOSED, jamás bypass!
+        return {
+          allowed: false,
+          remaining: 0,
+          retryAfterMs: options.windowMs,
+          error: "rate_limit_backend_unavailable"
+        };
+      }
     }
   };
 }

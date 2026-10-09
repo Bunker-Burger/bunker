@@ -96,16 +96,31 @@ export async function createCheckoutProPreference(
 ): Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }> {
   assertAcceptingOrders(await dependencies.storeStatus());
   const attemptId = dependencies.createId();
+  const idempotencyKey = attemptId;
+  const externalReference = attemptId;
+
+  // P2-08: Persistir intento e idempotency key durable ANTES de crear preferencia remota
+  // Si la base de datos falla al guardar el attempt, NUNCA se invoca Mercado Pago.
+  await dependencies.attempts.save({
+    id: attemptId,
+    quoteId: input.quote.id,
+    idempotencyKey,
+    externalReference,
+    expectedAmountCents: input.quote.totalCents,
+    status: "pending",
+    createdAt: dependencies.now()
+  });
+
   const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
   const response = await dependencies.fetcher("https://api.mercadopago.com/checkout/preferences", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${dependencies.config.accessToken}`,
       "Content-Type": "application/json",
-      "X-Idempotency-Key": attemptId
+      "X-Idempotency-Key": idempotencyKey
     },
     body: JSON.stringify({
-      external_reference: attemptId,
+      external_reference: externalReference,
       items: [{
         id: input.quote.id,
         title: `Pedido Bunker Burger ${input.quote.id}`,
@@ -120,9 +135,9 @@ export async function createCheckoutProPreference(
       },
       notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook`,
       back_urls: {
-        success: `${dependencies.config.appUrl}/?payment=success&ref=${attemptId}`,
-        pending: `${dependencies.config.appUrl}/?payment=pending&ref=${attemptId}`,
-        failure: `${dependencies.config.appUrl}/?payment=failure&ref=${attemptId}`
+        success: `${dependencies.config.appUrl}/?payment=success&ref=${externalReference}`,
+        pending: `${dependencies.config.appUrl}/?payment=pending&ref=${externalReference}`,
+        failure: `${dependencies.config.appUrl}/?payment=failure&ref=${externalReference}`
       },
       auto_return: "approved",
       expires: true,
@@ -131,13 +146,22 @@ export async function createCheckoutProPreference(
   });
   if (!response.ok) throw new Error(`Mercado Pago rechazó la preferencia (${response.status})`);
   const parsed = preferenceResponseSchema.parse(await response.json());
-  await dependencies.attempts.save({
-    id: attemptId,
-    quoteId: input.quote.id,
-    externalReference: attemptId,
-    expectedAmountCents: input.quote.totalCents,
-    status: "pending",
-    createdAt: dependencies.now()
-  });
-  return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference: attemptId };
+
+  // P2-08: Completar provider_preference_id al volver exitosamente de Mercado Pago
+  if (dependencies.attempts.updatePreferenceId) {
+    await dependencies.attempts.updatePreferenceId(externalReference, parsed.id);
+  } else {
+    await dependencies.attempts.save({
+      id: attemptId,
+      quoteId: input.quote.id,
+      idempotencyKey,
+      externalReference,
+      expectedAmountCents: input.quote.totalCents,
+      status: "pending",
+      createdAt: dependencies.now(),
+      providerPreferenceId: parsed.id
+    });
+  }
+
+  return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference };
 }

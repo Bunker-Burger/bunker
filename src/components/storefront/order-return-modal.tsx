@@ -33,6 +33,12 @@ export function OrderReturnModal({
     attempt: 1
   });
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onApprovedRef = useRef(onApproved);
+  useEffect(() => {
+    onApprovedRef.current = onApproved;
+  }, [onApproved]);
+
+  const notifiedApprovedRef = useRef<string | null>(null);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -71,7 +77,10 @@ export function OrderReturnModal({
               whatsappUrl: data.whatsappUrl ?? null,
               totalCents: data.totalCents ?? "0"
             });
-            onApproved?.();
+            if (notifiedApprovedRef.current !== externalReference) {
+              notifiedApprovedRef.current = externalReference;
+              onApprovedRef.current?.();
+            }
             return;
           }
 
@@ -120,7 +129,7 @@ export function OrderReturnModal({
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [externalReference, paymentId, onApproved]);
+  }, [externalReference, paymentId]);
 
   return (
     <div

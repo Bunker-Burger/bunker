@@ -23,6 +23,21 @@ export async function POST(request: Request) {
 
   const rateCheck = await checkoutRateLimiter.check(`checkout:mp:${clientIp}`);
   if (!rateCheck.allowed) {
+    if (rateCheck.error === "rate_limit_backend_unavailable") {
+      return Response.json(
+        {
+          error: "service_unavailable",
+          message: "El servicio de verificación de cuota no está disponible temporalmente."
+        },
+        {
+          status: 503,
+          headers: {
+            "Retry-After": Math.ceil(rateCheck.retryAfterMs / 1000).toString(),
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    }
     return Response.json(
       {
         error: "rate_limited",

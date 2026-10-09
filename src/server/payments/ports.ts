@@ -72,6 +72,7 @@ export interface PaymentQuotesPort {
 export interface PaymentAttempt {
   id: string;
   quoteId: string;
+  idempotencyKey?: string | undefined;
   externalReference: string;
   expectedAmountCents: bigint;
   status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
@@ -82,7 +83,9 @@ export interface PaymentAttempt {
 
 export interface PaymentAttemptsPort {
   save(attempt: PaymentAttempt): Promise<void>;
+  updatePreferenceId?(reference: string, providerPreferenceId: string): Promise<void>;
   findByExternalReference(reference: string): Promise<PaymentAttempt | null>;
+  findByIdempotencyKey?(key: string): Promise<PaymentAttempt | null>;
   markApproved(reference: string, providerPaymentId: string): Promise<void>;
 }
 

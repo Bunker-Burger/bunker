@@ -82,13 +82,14 @@ describe("createInMemoryPaymentRepository", () => {
     expect(retrievedPickup?.fulfillmentChannel).toBe("pickup");
   });
 
-  it("saves, finds, and marks approved payment attempts", async () => {
+  it("saves, finds, updates preferenceId, and marks approved payment attempts", async () => {
     const repo = createInMemoryPaymentRepository();
     const createdAt = new Date("2026-10-09T01:00:00Z");
 
     const attempt: PaymentAttempt = {
       id: "attempt-uuid-1",
       quoteId: "quote-123",
+      idempotencyKey: "idem-key-1",
       externalReference: "attempt-uuid-1",
       expectedAmountCents: 420000n,
       status: "pending",
@@ -98,6 +99,14 @@ describe("createInMemoryPaymentRepository", () => {
     await repo.attempts.save(attempt);
     const found = await repo.attempts.findByExternalReference("attempt-uuid-1");
     expect(found).toEqual(attempt);
+
+    const foundByIdem = await repo.attempts.findByIdempotencyKey!("idem-key-1");
+    expect(foundByIdem).toEqual(attempt);
+
+    await repo.attempts.updatePreferenceId!("attempt-uuid-1", "pref-mp-999");
+    const withPref = await repo.attempts.findByExternalReference("attempt-uuid-1");
+    expect(withPref?.providerPreferenceId).toBe("pref-mp-999");
+    expect(withPref?.status).toBe("pending");
 
     await repo.attempts.markApproved("attempt-uuid-1", "mp-payment-999");
     const updated = await repo.attempts.findByExternalReference("attempt-uuid-1");
@@ -231,5 +240,72 @@ describe("createSupabasePaymentRepository adapter (P2-03)", () => {
     };
 
     await expect(repo.quotes.save(quote)).rejects.toThrow("Error al persistir quote: database connection lost");
+  });
+
+  it("persists attempts, updates preferenceId, and finds by idempotencyKey", async () => {
+    const attemptsTable: Array<Record<string, unknown>> = [];
+
+    const mockClient = {
+      from(table: string) {
+        expect(table).toBe("payment_attempts");
+        return {
+          upsert(row: Record<string, unknown>) {
+            attemptsTable.push(row);
+            return Promise.resolve({ error: null });
+          },
+          insert(row: Record<string, unknown>) {
+            attemptsTable.push(row);
+            return Promise.resolve({ error: null });
+          },
+          select() {
+            return {
+              eq(col: string, val: unknown) {
+                return {
+                  maybeSingle() {
+                    const found = attemptsTable.find((r) => r[col] === val);
+                    return Promise.resolve({ data: found ?? null, error: null });
+                  }
+                };
+              }
+            };
+          },
+          update(updates: Record<string, unknown>) {
+            return {
+              eq(col: string, val: unknown) {
+                const found = attemptsTable.find((r) => r[col] === val);
+                if (found) Object.assign(found, updates);
+                return Promise.resolve({ error: null });
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient<Database>;
+
+    const repo = createSupabasePaymentRepository(mockClient);
+    const attempt: PaymentAttempt = {
+      id: "att-supa-1",
+      quoteId: "quote-supa-1",
+      idempotencyKey: "idem-key-supa-1",
+      externalReference: "att-supa-1",
+      expectedAmountCents: 150000n,
+      status: "pending",
+      createdAt: new Date("2026-10-09T01:00:00Z")
+    };
+
+    await repo.attempts.save(attempt);
+    expect(attemptsTable[0]?.idempotency_key).toBe("idem-key-supa-1");
+
+    const byRef = await repo.attempts.findByExternalReference("att-supa-1");
+    expect(byRef?.idempotencyKey).toBe("idem-key-supa-1");
+
+    const byIdem = await repo.attempts.findByIdempotencyKey!("idem-key-supa-1");
+    expect(byIdem?.externalReference).toBe("att-supa-1");
+
+    await repo.attempts.updatePreferenceId!("att-supa-1", "pref-mp-supa-999");
+    expect(attemptsTable[0]?.provider_preference_id).toBe("pref-mp-supa-999");
+
+    const updated = await repo.attempts.findByExternalReference("att-supa-1");
+    expect(updated?.providerPreferenceId).toBe("pref-mp-supa-999");
   });
 });

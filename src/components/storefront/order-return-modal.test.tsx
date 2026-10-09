@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrderReturnModal } from "./order-return-modal";
 
@@ -138,5 +139,55 @@ describe("OrderReturnModal (BB-14)", () => {
     render(<OrderReturnModal externalReference="ext_ref_123" onClose={onClose} />);
     await userEvent.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("P1-07: avoids re-render loops with parent state changes and fires onApproved exactly once with bounded fetches", async () => {
+    let fetchCount = 0;
+    const parentApprovedSpy = vi.fn();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/checkout/mercado-pago/status")) {
+          fetchCount += 1;
+          return json({
+            status: "approved",
+            externalReference: "ext_ref_cycle_test",
+            paymentReference: "pay_111222",
+            totalCents: "500000",
+            whatsappUrl: "https://wa.me/12345"
+          });
+        }
+        return json({ error: "not_found" }, 404);
+      })
+    );
+
+    function ParentContainer() {
+      const [parentState, setParentState] = useState<number>(0);
+      return (
+        <div>
+          <span data-testid="parent-counter">Count: {parentState}</span>
+          <OrderReturnModal
+            externalReference="ext_ref_cycle_test"
+            onClose={() => {}}
+            onApproved={() => {
+              parentApprovedSpy();
+              setParentState((c) => c + 1);
+            }}
+          />
+        </div>
+      );
+    }
+
+    render(<ParentContainer />);
+
+    await waitFor(() => {
+      expect(screen.getByText("¡Pago acreditado con éxito!")).toBeInTheDocument();
+      expect(screen.getByTestId("parent-counter")).toHaveTextContent("Count: 1");
+    });
+
+    expect(parentApprovedSpy).toHaveBeenCalledTimes(1);
+    expect(fetchCount).toBe(1);
   });
 });

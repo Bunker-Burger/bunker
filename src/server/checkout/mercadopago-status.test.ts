@@ -457,4 +457,472 @@ describe("checkMercadoPagoPaymentStatus", () => {
     const attempt = await repo.attempts.findByExternalReference("ext-ref-tamper-url");
     expect(attempt?.status).toBe("pending");
   });
+
+  describe("P2-06A: Reconciliación multi-resultado y paginación en Mercado Pago", () => {
+    it("resuelve [pending, approved] seleccionando el pago aprobado", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-multi-1"));
+      await repo.attempts.save({
+        id: "att-multi-1",
+        quoteId: "quote-multi-1",
+        externalReference: "ext-multi-pending-approved",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 2, limit: 30, offset: 0 },
+            results: [
+              {
+                id: 101,
+                external_reference: "ext-multi-pending-approved",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "pending"
+              },
+              {
+                id: 102,
+                external_reference: "ext-multi-pending-approved",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-multi-pending-approved" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      expect(res.status).toBe("approved");
+      if (res.status === "approved") {
+        expect(res.paymentReference).toBe("102");
+      }
+    });
+
+    it("resuelve [rejected, approved] acreditando el pago aprobado tardío o reintentado", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-multi-2"));
+      await repo.attempts.save({
+        id: "att-multi-2",
+        quoteId: "quote-multi-2",
+        externalReference: "ext-multi-rejected-approved",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 2, limit: 30, offset: 0 },
+            results: [
+              {
+                id: 201,
+                external_reference: "ext-multi-rejected-approved",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "rejected"
+              },
+              {
+                id: 202,
+                external_reference: "ext-multi-rejected-approved",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-multi-rejected-approved" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      expect(res.status).toBe("approved");
+      if (res.status === "approved") {
+        expect(res.paymentReference).toBe("202");
+      }
+    });
+
+    it("no acredita ante mismatch de moneda o monto", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-mismatch"));
+      await repo.attempts.save({
+        id: "att-mismatch",
+        quoteId: "quote-mismatch",
+        externalReference: "ext-mismatch",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 2, limit: 30, offset: 0 },
+            results: [
+              // Mismatch moneda (USD en lugar de ARS)
+              {
+                id: 301,
+                external_reference: "ext-mismatch",
+                currency_id: "USD",
+                transaction_amount: 15000,
+                status: "approved"
+              },
+              // Mismatch monto ($500 en lugar de $15000)
+              {
+                id: 302,
+                external_reference: "ext-mismatch",
+                currency_id: "ARS",
+                transaction_amount: 500,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-mismatch" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      // Los pagos con mismatch son ignorados: no se acredita
+      expect(res.status).toBe("pending");
+    });
+
+    it("rechaza casos ambiguos con múltiples pagos aprobados distintos", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-ambiguous"));
+      await repo.attempts.save({
+        id: "att-ambiguous",
+        quoteId: "quote-ambiguous",
+        externalReference: "ext-ambiguous",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 2, limit: 30, offset: 0 },
+            results: [
+              {
+                id: 401,
+                external_reference: "ext-ambiguous",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              },
+              {
+                id: 402,
+                external_reference: "ext-ambiguous",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-ambiguous" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      // Caso ambiguo no se acredita automáticamente
+      expect(res.status).toBe("pending");
+    });
+
+    it("sigue la paginación a la página siguiente para encontrar el pago aprobado", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-paged"));
+      await repo.attempts.save({
+        id: "att-paged",
+        quoteId: "quote-paged",
+        externalReference: "ext-paged",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async (input) => {
+        const url = String(input);
+        if (url.includes("offset=0")) {
+          return new Response(
+            JSON.stringify({
+              paging: { total: 2, limit: 1, offset: 0 },
+              results: [
+                {
+                  id: 501,
+                  external_reference: "ext-paged",
+                  currency_id: "ARS",
+                  transaction_amount: 15000,
+                  status: "rejected"
+                }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+        if (url.includes("offset=1")) {
+          return new Response(
+            JSON.stringify({
+              paging: { total: 2, limit: 1, offset: 1 },
+              results: [
+                {
+                  id: 502,
+                  external_reference: "ext-paged",
+                  currency_id: "ARS",
+                  transaction_amount: 15000,
+                  status: "approved"
+                }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-paged" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      expect(res.status).toBe("approved");
+      if (res.status === "approved") {
+        expect(res.paymentReference).toBe("502");
+      }
+    });
+  });
+
+  describe("P2-06B: Separación de vencimiento de preferencia vs estado real del pago", () => {
+    it("mantiene status pending para pago offline/pendiente en MP aun superando los 15 min de la quote", async () => {
+      const repo = createInMemoryPaymentRepository();
+      // Quote vencida hace 30 minutos
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-offline-pending", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-offline-pending",
+        quoteId: "quote-offline-pending",
+        externalReference: "ext-offline-pending",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      // Pago iniciado en MP que está en proceso / pending (ej. boleto Rapipago)
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 1, limit: 30, offset: 0 },
+            results: [
+              {
+                id: 601,
+                external_reference: "ext-offline-pending",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "pending"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-offline-pending" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z") // 30 min después de la expiración de la quote
+        }
+      );
+
+      // P2-06B: NO expira porque el pago en MP ya fue iniciado y está pending
+      expect(res.status).toBe("pending");
+    });
+
+    it("acredita pago aprobado tardío aun cuando hayan pasado más de 15 min de la quote", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-late-approved", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-late-approved",
+        quoteId: "quote-late-approved",
+        externalReference: "ext-late-approved",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 1, limit: 30, offset: 0 },
+            results: [
+              {
+                id: 701,
+                external_reference: "ext-late-approved",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-late-approved" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      expect(res.status).toBe("approved");
+      if (res.status === "approved") {
+        expect(res.paymentReference).toBe("701");
+      }
+    });
+
+    it("mantiene status pending ante caída del proveedor aun superando 15 min de la quote", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-provider-down", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-provider-down",
+        quoteId: "quote-provider-down",
+        externalReference: "ext-provider-down",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      // MP API caída o con error 500
+      const fetcher: typeof fetch = async () =>
+        new Response(JSON.stringify({ error: "internal_error" }), { status: 500 });
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-provider-down" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      // P2-06B: Ante caída del proveedor no se declara expirado falsamente
+      expect(res.status).toBe("pending");
+    });
+
+    it("declara expired solo ante ausencia real de pago y tiempo de quote superado", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-real-absence", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-real-absence",
+        quoteId: "quote-real-absence",
+        externalReference: "ext-real-absence",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      // Búsqueda exitosa que confirma 0 pagos iniciados en MP
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            paging: { total: 0, limit: 30, offset: 0 },
+            results: []
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-real-absence" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      // Ausencia real de pago + quote expirada = expired
+      expect(res.status).toBe("expired");
+    });
+  });
 });

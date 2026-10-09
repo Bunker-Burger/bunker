@@ -124,4 +124,138 @@ describe("createCheckoutProPreference", () => {
     expect(requests).toBe(0);
     expect(attempts).toEqual([]);
   });
+
+  describe("P2-08: Persistencia previa de attempt y trazabilidad durable", () => {
+    it("persiste attempt e idempotency key ANTES de llamar a Mercado Pago y completa providerPreferenceId al volver", async () => {
+      const orderOfOperations: string[] = [];
+      let preferenceUpdatedWith: { ref: string; prefId: string } | null = null;
+
+      const fetcher: typeof fetch = async () => {
+        orderOfOperations.push("mercadopago_call");
+        return new Response(JSON.stringify({ id: "pref-mp-777", init_point: "https://mp.example/pay" }), { status: 201 });
+      };
+
+      const port: PaymentAttemptsPort = {
+        async save(attempt) {
+          orderOfOperations.push("db_save_attempt");
+          expect(attempt.idempotencyKey).toBe("attempt-order-test");
+          expect(attempt.externalReference).toBe("attempt-order-test");
+          expect(attempt.status).toBe("pending");
+        },
+        async updatePreferenceId(reference, providerPreferenceId) {
+          orderOfOperations.push("db_update_preference_id");
+          preferenceUpdatedWith = { ref: reference, prefId: providerPreferenceId };
+        },
+        async findByExternalReference() { return null; },
+        async markApproved() {}
+      };
+
+      const result = await createCheckoutProPreference(
+        {
+          quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+          customer: { name: "Ana Pérez", phone: "+5491155551234" }
+        },
+        {
+          config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+          fetcher,
+          attempts: port,
+          storeStatus: storeStatus("open"),
+          createId: () => "attempt-order-test",
+          now: () => new Date("2026-10-06T12:00:00Z")
+        }
+      );
+
+      expect(result.preferenceId).toBe("pref-mp-777");
+      // STRICT ORDER OF OPERATIONS:
+      // 1. db_save_attempt FIRST
+      // 2. mercadopago_call SECOND
+      // 3. db_update_preference_id THIRD
+      expect(orderOfOperations).toEqual([
+        "db_save_attempt",
+        "mercadopago_call",
+        "db_update_preference_id"
+      ]);
+      expect(preferenceUpdatedWith).toEqual({
+        ref: "attempt-order-test",
+        prefId: "pref-mp-777"
+      });
+    });
+
+    it("falla y NUNCA llama a Mercado Pago si ocurre un error al persistir el attempt en DB (P2-08)", async () => {
+      let fetchCalls = 0;
+      const fetcher: typeof fetch = async () => {
+        fetchCalls += 1;
+        return new Response(JSON.stringify({ id: "pref-1", init_point: "https://mp.example/pay" }), { status: 201 });
+      };
+
+      const failingPort: PaymentAttemptsPort = {
+        async save() {
+          throw new Error("Database connection failure on attempt insert");
+        },
+        async findByExternalReference() { return null; },
+        async markApproved() {}
+      };
+
+      await expect(
+        createCheckoutProPreference(
+          {
+            quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+            customer: { name: "Ana Pérez", phone: "+5491155551234" }
+          },
+          {
+            config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+            fetcher,
+            attempts: failingPort,
+            storeStatus: storeStatus("open"),
+            createId: () => "attempt-fail-test",
+            now: () => new Date("2026-10-06T12:00:00Z")
+          }
+        )
+      ).rejects.toThrow("Database connection failure on attempt insert");
+
+      // Critical invariant: NO cobrable preference created remotely if DB fails to persist attempt
+      expect(fetchCalls).toBe(0);
+    });
+
+    it("mantiene el intento rastreable en base de datos si Mercado Pago hace timeout o falla la red (P2-08)", async () => {
+      const attempts = new Map();
+      const port: PaymentAttemptsPort = {
+        async save(attempt) {
+          attempts.set(attempt.id, attempt);
+        },
+        async findByExternalReference(ref) {
+          return attempts.get(ref) ?? null;
+        },
+        async markApproved() {}
+      };
+
+      const timeoutFetcher: typeof fetch = async () => {
+        throw new Error("Network timeout contacting Mercado Pago");
+      };
+
+      await expect(
+        createCheckoutProPreference(
+          {
+            quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+            customer: { name: "Ana Pérez", phone: "+5491155551234" }
+          },
+          {
+            config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+            fetcher: timeoutFetcher,
+            attempts: port,
+            storeStatus: storeStatus("open"),
+            createId: () => "attempt-timeout-test",
+            now: () => new Date("2026-10-06T12:00:00Z")
+          }
+        )
+      ).rejects.toThrow("Network timeout contacting Mercado Pago");
+
+      // The attempt was already persisted prior to the call, so it is durable and traceable!
+      const saved = attempts.get("attempt-timeout-test");
+      expect(saved).toBeDefined();
+      expect(saved.externalReference).toBe("attempt-timeout-test");
+      expect(saved.idempotencyKey).toBe("attempt-timeout-test");
+      expect(saved.expectedAmountCents).toBe(1_500_000n);
+    });
+  });
 });
