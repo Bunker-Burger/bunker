@@ -18,6 +18,31 @@ describe("detectMercadoPagoConfig", () => {
       accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.example"
     } });
   });
+
+  it("accepts MERCADOPAGO_* variable naming and VERCEL_URL fallback", () => {
+    expect(detectMercadoPagoConfig({
+      MERCADOPAGO_ACCESS_TOKEN: "mp-token",
+      MERCADOPAGO_WEBHOOK_SECRET: "mp-secret",
+      VERCEL_URL: "bunker-preview.vercel.app",
+      NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY: "public-key"
+    })).toEqual({
+      enabled: true,
+      config: {
+        accessToken: "mp-token",
+        webhookSecret: "mp-secret",
+        appUrl: "https://bunker-preview.vercel.app",
+        publicKey: "public-key"
+      }
+    });
+  });
+
+  it("throws when APP_URL protocol is not http or https", () => {
+    expect(() => detectMercadoPagoConfig({
+      MERCADO_PAGO_ACCESS_TOKEN: "token",
+      MERCADO_PAGO_WEBHOOK_SECRET: "secret",
+      APP_URL: "ftp://bunker.example"
+    })).toThrow("APP_URL debe usar HTTP o HTTPS");
+  });
 });
 
 function storeStatus(statusOverride: StoreOperatingSettings["statusOverride"]) {
@@ -56,11 +81,16 @@ describe("createCheckoutProPreference", () => {
       now: () => new Date("2026-10-06T12:00:00Z")
     });
 
-    expect(result).toEqual({ preferenceId: "pref-1", checkoutUrl: "https://mp.example/pay" });
+    expect(result).toEqual({ preferenceId: "pref-1", checkoutUrl: "https://mp.example/pay", externalReference: "attempt-1" });
     expect(requests[0]?.init?.headers).toMatchObject({ Authorization: "Bearer secret-token", "X-Idempotency-Key": "attempt-1" });
     expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
       external_reference: "attempt-1",
-      items: [{ quantity: 1, unit_price: 15000, currency_id: "ARS" }]
+      items: [{ quantity: 1, unit_price: 15000, currency_id: "ARS" }],
+      back_urls: {
+        success: "https://bunker.example/?payment=success&ref=attempt-1",
+        pending: "https://bunker.example/?payment=pending&ref=attempt-1",
+        failure: "https://bunker.example/?payment=failure&ref=attempt-1"
+      }
     });
     expect(attempts.get("attempt-1")).toMatchObject({ quoteId: "quote-1", expectedAmountCents: 1_500_000n, status: "pending" });
   });

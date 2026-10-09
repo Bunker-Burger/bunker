@@ -72,9 +72,10 @@ export interface PaymentAttempt {
   quoteId: string;
   externalReference: string;
   expectedAmountCents: bigint;
-  status: "pending" | "approved";
+  status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
   createdAt: Date;
-  providerPaymentId?: string;
+  providerPaymentId?: string | undefined;
+  providerPreferenceId?: string | undefined;
 }
 
 export interface PaymentAttemptsPort {

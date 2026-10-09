@@ -1,0 +1,253 @@
+import { describe, expect, it } from "vitest";
+import type { StoreOperatingSettings } from "@/domain/store-status";
+import { evaluateStoreStatus } from "@/domain/store-status";
+import type { Catalog } from "@/domain/types";
+import { ok } from "@/lib/result";
+import {
+  prepareMercadoPagoCheckout,
+  mercadoPagoCheckoutResponse
+} from "./mercadopago-checkout";
+import { createInMemoryPaymentRepository } from "../payments/payment-repository";
+
+const STORE_ID = "0199b2c8-40b0-7000-8000-000000000001";
+const PRODUCT_ID = "0199b2c8-40b0-7000-8000-000000000201";
+
+function mockCatalog(options?: { mpEnabled?: boolean }): Catalog {
+  return {
+    store: {
+      id: STORE_ID,
+      name: "Búnker Burger",
+      slug: "bunker-burger",
+      whatsappE164: "+5493815550000",
+      timezone: "America/Argentina/Tucuman",
+      currency: "ARS",
+      statusOverride: "open",
+      isPublic: true,
+      deliveryFeeCents: 150000n,
+      businessHours: [],
+      paymentMethods: [
+        { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
+        { method: "bank_transfer", displayName: "Transferencia", instructions: "", enabled: true, sortOrder: 20 },
+        { method: "mercado_pago", displayName: "Mercado Pago", instructions: "", enabled: options?.mpEnabled ?? true, sortOrder: 30 }
+      ]
+    },
+    categories: [],
+    products: [
+      {
+        id: PRODUCT_ID,
+        type: "burger",
+        categoryId: "c1",
+        name: "Smash Clásica",
+        slug: "smash-clasica",
+        description: "Doble carne",
+        priceCents: 800000n,
+        featured: true,
+        published: true,
+        inStock: true,
+        containsAlcohol: false,
+        imageUrl: null,
+        optionGroups: []
+      }
+    ],
+    promotions: []
+  };
+}
+
+function mockStoreStatus(override: StoreOperatingSettings["statusOverride"] = "open") {
+  return async () =>
+    ok(
+      evaluateStoreStatus(
+        {
+          timezone: "America/Argentina/Tucuman",
+          statusOverride: override,
+          deliveryFeeCents: 150000n,
+          businessHours: []
+        },
+        new Date("2026-10-09T01:00:00Z")
+      )
+    );
+}
+
+describe("prepareMercadoPagoCheckout", () => {
+  it("TC-SEC-01 (strict): rechaza con invalid_request si el payload inyecta claves desconocidas como precios", async () => {
+    const repo = createInMemoryPaymentRepository();
+    const maliciousPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 2, unitPriceCents: 100, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" },
+      totalCents: 200
+    };
+
+    const result = await prepareMercadoPagoCheckout(maliciousPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-attempt-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("invalid_request");
+  });
+
+  it("TC-SEC-01 (authoritative): calcula autoritativamente con la base de datos sin recibir precios del navegador", async () => {
+    const repo = createInMemoryPaymentRepository();
+    const mpRequests: Array<{ input: RequestInfo | URL; init?: RequestInit | undefined }> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      mpRequests.push({ input, init });
+      return new Response(JSON.stringify({ id: "pref-100", init_point: "https://mp.example/checkout" }), { status: 201 });
+    };
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 2, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      fetcher,
+      createId: () => "uuid-attempt-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // 2x 800000n = 1600000n ($16.000)
+    expect(result.value.quote.totalCents).toBe(1600000n);
+    expect(result.value.preferenceId).toBe("pref-100");
+    expect(result.value.checkoutUrl).toBe("https://mp.example/checkout");
+    expect(result.value.externalReference).toBe("uuid-attempt-1");
+
+    // Verificar que en MP se envió el precio autoritativo
+    const sentBody = JSON.parse(String(mpRequests[0]?.init?.body));
+    expect(sentBody.items[0]?.unit_price).toBe(16000); // 1600000 / 100
+  });
+
+  it("TC-VAL-01 & TC-VAL-02: rechaza si faltan nombre o teléfono para Mercado Pago", async () => {
+    const repo = createInMemoryPaymentRepository();
+
+    const missingCustomer = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago"
+    };
+
+    const result = await prepareMercadoPagoCheckout(missingCustomer, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("invalid_request");
+  });
+
+  it("TC-STORE-01: rechaza crear preferencia si el local está cerrado o en pausa", async () => {
+    const repo = createInMemoryPaymentRepository();
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("closed"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("store_closed");
+  });
+
+  it("TC-ENV-01: responde payment_method_unavailable (503) si faltan keys de Mercado Pago", async () => {
+    const repo = createInMemoryPaymentRepository();
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({ enabled: false, missing: ["MERCADO_PAGO_ACCESS_TOKEN"] }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("payment_method_unavailable");
+
+    const response = mercadoPagoCheckoutResponse(result);
+    expect(response.status).toBe(503);
+  });
+
+  it("rechaza si el comercio tiene deshabilitado Mercado Pago", async () => {
+    const repo = createInMemoryPaymentRepository();
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog({ mpEnabled: false })),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("payment_method_unavailable");
+  });
+});

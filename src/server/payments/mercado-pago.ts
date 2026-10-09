@@ -3,35 +3,62 @@ import { z } from "zod";
 import { assertAcceptingOrders, type StoreStatus } from "@/domain/store-status";
 import type { PaymentAttemptsPort } from "./ports";
 
-const REQUIRED_ENV = [
-  "MERCADO_PAGO_ACCESS_TOKEN",
-  "MERCADO_PAGO_WEBHOOK_SECRET",
-  "APP_URL"
-] as const;
-
 export interface MercadoPagoConfig {
   accessToken: string;
   webhookSecret: string;
   appUrl: string;
+  publicKey?: string;
 }
 
 export type MercadoPagoConfigDetection =
   | { enabled: false; missing: string[] }
   | { enabled: true; config: MercadoPagoConfig };
 
-export function detectMercadoPagoConfig(environment: Readonly<Record<string, string | undefined>>): MercadoPagoConfigDetection {
-  const missing = REQUIRED_ENV.filter((key) => !environment[key]?.trim());
-  if (missing.length > 0) return { enabled: false, missing: [...missing] };
-  const appUrl = new URL(environment.APP_URL!.trim());
+function getEnvValue(env: Readonly<Record<string, string | undefined>>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+export function detectMercadoPagoConfig(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): MercadoPagoConfigDetection {
+  const missing: string[] = [];
+
+  const accessToken = getEnvValue(environment, "MERCADO_PAGO_ACCESS_TOKEN", "MERCADOPAGO_ACCESS_TOKEN");
+  if (!accessToken) missing.push("MERCADO_PAGO_ACCESS_TOKEN");
+
+  const webhookSecret = getEnvValue(environment, "MERCADO_PAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET");
+  if (!webhookSecret) missing.push("MERCADO_PAGO_WEBHOOK_SECRET");
+
+  let rawAppUrl = getEnvValue(environment, "APP_URL", "NEXT_PUBLIC_APP_URL");
+  if (!rawAppUrl && environment.VERCEL_URL?.trim()) {
+    rawAppUrl = `https://${environment.VERCEL_URL.trim()}`;
+  }
+  if (!rawAppUrl) missing.push("APP_URL");
+
+  if (missing.length > 0) return { enabled: false, missing };
+
+  const appUrl = new URL(rawAppUrl!);
   if (appUrl.protocol !== "https:" && appUrl.protocol !== "http:") {
     throw new Error("APP_URL debe usar HTTP o HTTPS");
   }
+
+  const publicKey = getEnvValue(
+    environment,
+    "NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY",
+    "NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY"
+  );
+
   return {
     enabled: true,
     config: {
-      accessToken: environment.MERCADO_PAGO_ACCESS_TOKEN!.trim(),
-      webhookSecret: environment.MERCADO_PAGO_WEBHOOK_SECRET!.trim(),
-      appUrl: appUrl.href.replace(/\/$/, "")
+      accessToken: accessToken!,
+      webhookSecret: webhookSecret!,
+      appUrl: appUrl.href.replace(/\/+$/, ""),
+      ...(publicKey ? { publicKey } : {})
     }
   };
 }
@@ -66,7 +93,7 @@ interface PreferenceDependencies {
 export async function createCheckoutProPreference(
   input: PreferenceInput,
   dependencies: PreferenceDependencies
-): Promise<{ preferenceId: string; checkoutUrl: string }> {
+): Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }> {
   assertAcceptingOrders(await dependencies.storeStatus());
   const attemptId = dependencies.createId();
   const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
@@ -93,9 +120,9 @@ export async function createCheckoutProPreference(
       },
       notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook`,
       back_urls: {
-        success: `${dependencies.config.appUrl}/?payment=success`,
-        pending: `${dependencies.config.appUrl}/?payment=pending`,
-        failure: `${dependencies.config.appUrl}/?payment=failure`
+        success: `${dependencies.config.appUrl}/?payment=success&ref=${attemptId}`,
+        pending: `${dependencies.config.appUrl}/?payment=pending&ref=${attemptId}`,
+        failure: `${dependencies.config.appUrl}/?payment=failure&ref=${attemptId}`
       },
       auto_return: "approved",
       expires: true,
@@ -112,5 +139,5 @@ export async function createCheckoutProPreference(
     status: "pending",
     createdAt: dependencies.now()
   });
-  return { preferenceId: parsed.id, checkoutUrl: parsed.init_point };
+  return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference: attemptId };
 }
