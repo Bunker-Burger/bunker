@@ -134,7 +134,7 @@ try {
   }
 
   canonicalOrigin = `https://${expectedHost}`;
-} catch (err) {
+} catch {
   report("Invalid URL format.");
   finish(false);
 }
