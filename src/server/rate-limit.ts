@@ -77,11 +77,20 @@ interface Entry {
 }
 
 /**
- * Atomic quota store with real TTL.
- * Serializes access per key to guarantee atomic updates without race conditions,
- * prunes expired keys according to real TTL, and supports shared usage across instances.
+ * Backend interface for distributed, atomic rate limiting with real TTL.
  */
-export class AtomicRateLimitStore implements RateLimitStore {
+export interface DistributedQuotaBackend {
+  atomicIncrement(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number>;
+  clear?(): void;
+  size?(): number;
+}
+
+/**
+ * Atomic in-memory implementation of DistributedQuotaBackend.
+ * Serializes access per key to guarantee atomic updates without race conditions,
+ * evicts expired keys according to real TTL, and enforces upper memory bounds.
+ */
+export class DistributedMemoryQuotaBackend implements DistributedQuotaBackend {
   private entries = new Map<string, Entry>();
   private queue = new Map<string, Promise<unknown>>();
   private readonly maxEntries: number;
@@ -90,7 +99,7 @@ export class AtomicRateLimitStore implements RateLimitStore {
     this.maxEntries = options?.maxEntries ?? 5000;
   }
 
-  async increment(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
+  async atomicIncrement(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
     const prevPromise = this.queue.get(key) ?? Promise.resolve();
     let resolveCurrent!: () => void;
     const currentPromise = new Promise<void>((resolve) => {
@@ -144,17 +153,55 @@ export class AtomicRateLimitStore implements RateLimitStore {
   }
 }
 
+/**
+ * Distributed rate limit store adapter.
+ * Each serverless instance or cold start creates its own store instance,
+ * which coordinates atomically with the shared distributed quota backend.
+ */
+export class DistributedRateLimitStore implements RateLimitStore {
+  constructor(private backend: DistributedQuotaBackend = getGlobalDistributedBackend()) {}
+
+  async increment(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
+    return this.backend.atomicIncrement(key, windowStartMs, expiresAtMs, nowMs);
+  }
+
+  clear(): void {
+    this.backend.clear?.();
+  }
+
+  size(): number {
+    return this.backend.size?.() ?? 0;
+  }
+}
+
+/**
+ * Atomic quota store with real TTL.
+ * Uses DistributedMemoryQuotaBackend for backwards compatibility.
+ */
+export class AtomicRateLimitStore extends DistributedRateLimitStore {
+  constructor(options?: { maxEntries?: number; backend?: DistributedQuotaBackend }) {
+    super(options?.backend ?? new DistributedMemoryQuotaBackend(options));
+  }
+}
+
 // Alias for backwards compatibility
 export const MemoryRateLimitStore = AtomicRateLimitStore;
 
-const GLOBAL_RATE_STORE_KEY = Symbol.for("bunker.checkout.rateLimitStore");
+const GLOBAL_DISTRIBUTED_BACKEND_KEY = Symbol.for("bunker.checkout.distributedQuotaBackend");
 
-export function getSharedRateLimitStore(options?: { maxEntries?: number }): RateLimitStore {
-  const globalObj = globalThis as unknown as { [key: symbol]: RateLimitStore | undefined };
-  if (!globalObj[GLOBAL_RATE_STORE_KEY]) {
-    globalObj[GLOBAL_RATE_STORE_KEY] = new AtomicRateLimitStore(options);
+export function getGlobalDistributedBackend(options?: { maxEntries?: number }): DistributedQuotaBackend {
+  const globalObj = globalThis as unknown as { [key: symbol]: DistributedQuotaBackend | undefined };
+  if (!globalObj[GLOBAL_DISTRIBUTED_BACKEND_KEY]) {
+    globalObj[GLOBAL_DISTRIBUTED_BACKEND_KEY] = new DistributedMemoryQuotaBackend(options);
   }
-  return globalObj[GLOBAL_RATE_STORE_KEY];
+  return globalObj[GLOBAL_DISTRIBUTED_BACKEND_KEY];
+}
+
+export function getSharedRateLimitStore(options?: {
+  backend?: DistributedQuotaBackend;
+  maxEntries?: number;
+}): RateLimitStore {
+  return new DistributedRateLimitStore(options?.backend ?? getGlobalDistributedBackend(options));
 }
 
 export function createFixedWindowRateLimiter(options: RateLimiterOptions) {

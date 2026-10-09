@@ -67,19 +67,26 @@ async function getWhatsAppUrlForApprovedQuote(
   }
 }
 
-async function searchMercadoPagoPayments(
+export interface SearchPaymentsResult {
+  ok: boolean;
+  complete: boolean;
+  results: Array<Record<string, unknown>>;
+}
+
+export async function searchMercadoPagoPayments(
   externalReference: string,
   accessToken: string,
-  fetcher: typeof fetch
-): Promise<{ ok: boolean; results: Array<Record<string, unknown>> }> {
+  fetcher: typeof fetch,
+  options?: { limit?: number; maxPages?: number }
+): Promise<SearchPaymentsResult> {
   const allResults: Array<Record<string, unknown>> = [];
   let offset = 0;
-  const limit = 30;
-  const maxPages = 5;
+  const limit = options?.limit ?? 30;
+  const maxPages = options?.maxPages ?? 5;
   let page = 0;
 
   try {
-    while (page < maxPages) {
+    while (true) {
       page += 1;
       const url = `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&offset=${offset}&limit=${limit}`;
       const res = await fetcher(url, {
@@ -88,26 +95,45 @@ async function searchMercadoPagoPayments(
       });
 
       if (!res.ok) {
-        return { ok: false, results: [] };
+        return { ok: false, complete: false, results: allResults };
       }
 
-      const data = await res.json();
-      if (!Array.isArray(data?.results)) {
-        break;
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        return { ok: false, complete: false, results: allResults };
       }
 
-      allResults.push(...data.results);
+      const raw = data as { results?: unknown; paging?: { total?: unknown } };
+      if (!Array.isArray(raw?.results)) {
+        return { ok: true, complete: false, results: allResults };
+      }
 
-      const total = typeof data.paging?.total === "number" ? data.paging.total : 0;
-      offset += data.results.length;
+      allResults.push(...raw.results);
 
-      if (offset >= total || data.results.length === 0) {
-        break;
+      // P2-06C: Si falta metadata de paging o total no es número válido, la consulta no es íntegra.
+      // NUNCA asumir total = 0 si falta metadata.
+      if (typeof raw.paging?.total !== "number" || raw.paging.total < 0) {
+        return { ok: true, complete: false, results: allResults };
+      }
+
+      const total = raw.paging.total;
+      offset += raw.results.length;
+
+      if (offset >= total || raw.results.length === 0) {
+        const isComplete = offset >= total;
+        return { ok: true, complete: isComplete, results: allResults };
+      }
+
+      if (page >= maxPages) {
+        // P2-06C: Si se alcanzó maxPages pero aún quedan resultados por consultar (offset < total),
+        // la búsqueda es PARCIAL, nunca completa!
+        return { ok: true, complete: false, results: allResults };
       }
     }
-    return { ok: true, results: allResults };
   } catch {
-    return { ok: false, results: [] };
+    return { ok: false, complete: false, results: allResults };
   }
 }
 
@@ -171,8 +197,9 @@ export async function checkMercadoPagoPaymentStatus(
     const fetcher = dependencies.fetcher ?? fetch;
     let providerError = false;
     const candidateList: Array<Record<string, unknown>> = [];
+    let searchNeeded = true;
 
-    // Caso A: El cliente proveyó payment_id
+    // Caso A: El cliente proveyó payment_id numérico
     if (paymentId && /^\d+$/.test(paymentId.trim())) {
       try {
         const mpRes = await fetcher(
@@ -183,26 +210,48 @@ export async function checkMercadoPagoPaymentStatus(
           }
         );
         if (mpRes.ok) {
-          const single = await mpRes.json();
-          if (single && typeof single === "object") candidateList.push(single);
+          const single = (await mpRes.json()) as Record<string, unknown>;
+          if (single && typeof single === "object") {
+            const matchesRef = single.external_reference === attempt.externalReference;
+            const matchesCurrency = single.currency_id === "ARS";
+            const amountCents = BigInt(Math.round(Number(single.transaction_amount) * 100));
+            const matchesAmount = amountCents === attempt.expectedAmountCents;
+
+            if (matchesRef && matchesCurrency && matchesAmount) {
+              candidateList.push(single);
+              searchNeeded = false;
+            } else {
+              // P2-06D: payment_id ajeno o discrepante (otra ref, moneda o monto).
+              // No concluyente: fallback a búsqueda server-to-server por la referencia real persistida.
+              searchNeeded = true;
+            }
+          }
+        } else if (mpRes.status === 404) {
+          // P2-06D: payment_id inexistente (404). No concluyente: fallback a búsqueda por ref.
+          searchNeeded = true;
         } else if (mpRes.status >= 500) {
           providerError = true;
+          searchNeeded = false;
         }
       } catch {
-        providerError = true;
+        searchNeeded = true;
       }
-    } else {
-      // Caso B: Retorno sin payment_id o búsqueda multi-resultado/paginada por external_reference
+    }
+
+    if (searchNeeded && !providerError) {
+      // Caso B o Fallback P2-06D: Búsqueda server-to-server por external_reference
       const searchRes = await searchMercadoPagoPayments(
         attempt.externalReference,
         configDetection.config.accessToken,
         fetcher
       );
-      if (searchRes.ok) {
-        candidateList.push(...searchRes.results);
-      } else {
-        providerError = true;
+      if (!searchRes.ok || !searchRes.complete) {
+        // P2-06C: Si la consulta a MP fue parcial, cortada por maxPages, timeout o metadata errónea,
+        // NUNCA inferir ausencia ni declarar expired ni rejected.
+        // Retornar estado indeterminado pending de verificación.
+        return { status: "pending", verifying: true };
       }
+      candidateList.push(...searchRes.results);
     }
 
     if (!providerError && candidateList.length > 0) {

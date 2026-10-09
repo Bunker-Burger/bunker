@@ -4,6 +4,8 @@ import type { RateLimitStore } from "./rate-limit";
 import {
   AtomicRateLimitStore,
   createFixedWindowRateLimiter,
+  DistributedMemoryQuotaBackend,
+  DistributedRateLimitStore,
   extractClientIp,
   MemoryRateLimitStore
 } from "./rate-limit";
@@ -40,46 +42,70 @@ describe("createFixedWindowRateLimiter (P2-05)", () => {
   });
 
   it("shares atomic quota across 2 separate serverless instances / cold starts (P2-05)", async () => {
-    const sharedStore = new AtomicRateLimitStore();
+    const sharedBackend = new DistributedMemoryQuotaBackend();
     const fixedNow = 1_000_000;
 
-    // Instance A (Lambda 1)
+    // Instance A (Lambda 1): has its own store instance
+    const storeA = new DistributedRateLimitStore(sharedBackend);
     const instanceA = createFixedWindowRateLimiter({
-      store: sharedStore,
+      store: storeA,
       limit: 10,
       windowMs: 60_000,
       now: () => fixedNow
     });
 
-    // Instance B (Lambda 2 / cold start)
-    const instanceB = createFixedWindowRateLimiter({
-      store: sharedStore,
-      limit: 10,
-      windowMs: 60_000,
-      now: () => fixedNow
-    });
-
-    // 5 requests through Instance A
-    for (let i = 0; i < 5; i++) {
+    // 6 requests through Instance A
+    for (let i = 0; i < 6; i++) {
       const res = await instanceA.check("ip:shared-client");
       expect(res.allowed).toBe(true);
     }
 
-    // 5 requests through Instance B
-    for (let i = 0; i < 5; i++) {
+    // Instance B (Lambda 2 / cold start): newly spawned, separate store instance (not same Map reference!)
+    const storeB = new DistributedRateLimitStore(sharedBackend);
+    expect(storeA).not.toBe(storeB);
+
+    const instanceB = createFixedWindowRateLimiter({
+      store: storeB,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => fixedNow
+    });
+
+    // 4 requests through Instance B
+    for (let i = 0; i < 4; i++) {
       const res = await instanceB.check("ip:shared-client");
       expect(res.allowed).toBe(true);
     }
 
     // 11th request across either instance MUST be rate limited (429 / allowed: false)
-    const rejectedA = await instanceA.check("ip:shared-client");
-    expect(rejectedA.allowed).toBe(false);
-    expect(rejectedA.remaining).toBe(0);
-    expect(rejectedA.retryAfterMs).toBeGreaterThan(0);
-
     const rejectedB = await instanceB.check("ip:shared-client");
     expect(rejectedB.allowed).toBe(false);
     expect(rejectedB.remaining).toBe(0);
+    expect(rejectedB.retryAfterMs).toBeGreaterThan(0);
+
+    const rejectedA = await instanceA.check("ip:shared-client");
+    expect(rejectedA.allowed).toBe(false);
+    expect(rejectedA.remaining).toBe(0);
+  });
+
+  it("fails closed when distributed backend is down or unreachable (P2-05)", async () => {
+    const failingBackend = {
+      async atomicIncrement() {
+        throw new Error("Distributed backend connection timed out");
+      }
+    };
+    const store = new DistributedRateLimitStore(failingBackend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => Date.now()
+    });
+
+    const res = await limiter.check("ip:test");
+    expect(res.allowed).toBe(false);
+    expect(res.remaining).toBe(0);
+    expect(res.error).toBe("rate_limit_backend_unavailable");
   });
 
   it("enforces atomic quota under concurrency (15 simultaneous requests, exactly 10 pass, 5 reject) (P2-05)", async () => {

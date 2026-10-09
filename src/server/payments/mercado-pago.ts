@@ -75,9 +75,11 @@ function centsToProviderNumber(cents: bigint): number {
   return Number(cents) / 100;
 }
 
-interface PreferenceInput {
+export interface PreferenceInput {
   quote: { id: string; totalCents: bigint; expiresAt: Date };
   customer: { name: string; phone: string };
+  idempotencyKey?: string;
+  externalReference?: string;
 }
 
 interface PreferenceDependencies {
@@ -90,78 +92,121 @@ interface PreferenceDependencies {
   now(): Date;
 }
 
+const inFlightPreferenceCreations = new Map<
+  string,
+  Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }>
+>();
+
 export async function createCheckoutProPreference(
   input: PreferenceInput,
   dependencies: PreferenceDependencies
 ): Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }> {
-  assertAcceptingOrders(await dependencies.storeStatus());
   const attemptId = dependencies.createId();
-  const idempotencyKey = attemptId;
-  const externalReference = attemptId;
+  const idempotencyKey = input.idempotencyKey ?? attemptId;
+  const initialExternalReference = input.externalReference ?? attemptId;
 
-  // P2-08: Persistir intento e idempotency key durable ANTES de crear preferencia remota
-  // Si la base de datos falla al guardar el attempt, NUNCA se invoca Mercado Pago.
-  await dependencies.attempts.save({
-    id: attemptId,
-    quoteId: input.quote.id,
-    idempotencyKey,
-    externalReference,
-    expectedAmountCents: input.quote.totalCents,
-    status: "pending",
-    createdAt: dependencies.now()
-  });
-
-  const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
-  const response = await dependencies.fetcher("https://api.mercadopago.com/checkout/preferences", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${dependencies.config.accessToken}`,
-      "Content-Type": "application/json",
-      "X-Idempotency-Key": idempotencyKey
-    },
-    body: JSON.stringify({
-      external_reference: externalReference,
-      items: [{
-        id: input.quote.id,
-        title: `Pedido Bunker Burger ${input.quote.id}`,
-        quantity: 1,
-        unit_price: centsToProviderNumber(input.quote.totalCents),
-        currency_id: "ARS"
-      }],
-      payer: {
-        name: firstName,
-        surname: surnameParts.join(" "),
-        phone: { number: input.customer.phone }
-      },
-      notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook`,
-      back_urls: {
-        success: `${dependencies.config.appUrl}/?payment=success&ref=${externalReference}`,
-        pending: `${dependencies.config.appUrl}/?payment=pending&ref=${externalReference}`,
-        failure: `${dependencies.config.appUrl}/?payment=failure&ref=${externalReference}`
-      },
-      auto_return: "approved",
-      expires: true,
-      expiration_date_to: input.quote.expiresAt.toISOString()
-    })
-  });
-  if (!response.ok) throw new Error(`Mercado Pago rechazó la preferencia (${response.status})`);
-  const parsed = preferenceResponseSchema.parse(await response.json());
-
-  // P2-08: Completar provider_preference_id al volver exitosamente de Mercado Pago
-  if (dependencies.attempts.updatePreferenceId) {
-    await dependencies.attempts.updatePreferenceId(externalReference, parsed.id);
-  } else {
-    await dependencies.attempts.save({
-      id: attemptId,
-      quoteId: input.quote.id,
-      idempotencyKey,
-      externalReference,
-      expectedAmountCents: input.quote.totalCents,
-      status: "pending",
-      createdAt: dependencies.now(),
-      providerPreferenceId: parsed.id
-    });
+  // P2-09: Deduplicación atómica en memoria para carreras concurrentes (síncrona antes de cualquier await)
+  const inFlight = inFlightPreferenceCreations.get(idempotencyKey);
+  if (inFlight) {
+    return inFlight;
   }
 
-  return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference };
+  const creationPromise = (async () => {
+    assertAcceptingOrders(await dependencies.storeStatus());
+
+    let finalAttemptId = attemptId;
+    let finalExternalReference = initialExternalReference;
+
+    // P2-09: Deduplicación durable en payment_attempts
+    if (dependencies.attempts.findByIdempotencyKey) {
+      const existing = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
+      if (existing) {
+        if (existing.providerPreferenceId) {
+          // Respuesta previa existente completa: retornar sin invocar MP nuevamente
+          return {
+            preferenceId: existing.providerPreferenceId,
+            checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${existing.providerPreferenceId}`,
+            externalReference: existing.externalReference
+          };
+        }
+        // Intento persistido previamente sin preference_id (ej. reintento tras timeout o error de red):
+        // Reusar la identidad existente para mantener el mismo external_reference y clave
+        finalAttemptId = existing.id;
+        finalExternalReference = existing.externalReference;
+      }
+    }
+
+    // P2-08: Persistir intento e idempotency key durable ANTES de crear preferencia remota
+    // Si la base de datos falla al guardar el attempt, NUNCA se invoca Mercado Pago.
+    await dependencies.attempts.save({
+      id: finalAttemptId,
+      quoteId: input.quote.id,
+      idempotencyKey,
+      externalReference: finalExternalReference,
+      expectedAmountCents: input.quote.totalCents,
+      status: "pending",
+      createdAt: dependencies.now()
+    });
+
+    const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
+    const response = await dependencies.fetcher("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${dependencies.config.accessToken}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify({
+        external_reference: finalExternalReference,
+        items: [{
+          id: input.quote.id,
+          title: `Pedido Bunker Burger ${input.quote.id}`,
+          quantity: 1,
+          unit_price: centsToProviderNumber(input.quote.totalCents),
+          currency_id: "ARS"
+        }],
+        payer: {
+          name: firstName,
+          surname: surnameParts.join(" "),
+          phone: { number: input.customer.phone }
+        },
+        notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook`,
+        back_urls: {
+          success: `${dependencies.config.appUrl}/?payment=success&ref=${finalExternalReference}`,
+          pending: `${dependencies.config.appUrl}/?payment=pending&ref=${finalExternalReference}`,
+          failure: `${dependencies.config.appUrl}/?payment=failure&ref=${finalExternalReference}`
+        },
+        auto_return: "approved",
+        expires: true,
+        expiration_date_to: input.quote.expiresAt.toISOString()
+      })
+    });
+    if (!response.ok) throw new Error(`Mercado Pago rechazó la preferencia (${response.status})`);
+    const parsed = preferenceResponseSchema.parse(await response.json());
+
+    // P2-08: Completar provider_preference_id al volver exitosamente de Mercado Pago
+    if (dependencies.attempts.updatePreferenceId) {
+      await dependencies.attempts.updatePreferenceId(finalExternalReference, parsed.id);
+    } else {
+      await dependencies.attempts.save({
+        id: finalAttemptId,
+        quoteId: input.quote.id,
+        idempotencyKey,
+        externalReference: finalExternalReference,
+        expectedAmountCents: input.quote.totalCents,
+        status: "pending",
+        createdAt: dependencies.now(),
+        providerPreferenceId: parsed.id
+      });
+    }
+
+    return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference: finalExternalReference };
+  })();
+
+  inFlightPreferenceCreations.set(idempotencyKey, creationPromise);
+  try {
+    return await creationPromise;
+  } finally {
+    inFlightPreferenceCreations.delete(idempotencyKey);
+  }
 }

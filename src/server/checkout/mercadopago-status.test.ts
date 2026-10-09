@@ -924,5 +924,330 @@ describe("checkMercadoPagoPaymentStatus", () => {
       // Ausencia real de pago + quote expirada = expired
       expect(res.status).toBe("expired");
     });
+
+    // P2-06C: Paginación total=151 y corte en página 5 conserva pending
+    it("P2-06C: total=151 con aprobado en página 6 retorna pending (nunca expired/rejected)", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-p6", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-p6",
+        quoteId: "quote-p6",
+        externalReference: "ext-p6-cutoff",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      // Simula 5 páginas devueltas (150 rechazados), con total=151 (el aprobado está en p6)
+      const fetcher: typeof fetch = async (url) => {
+        const urlStr = String(url);
+        const match = urlStr.match(/offset=(\d+)/);
+        const offset = match ? Number(match[1]) : 0;
+        return new Response(
+          JSON.stringify({
+            paging: { total: 151, limit: 30, offset },
+            results: Array.from({ length: 30 }, (_, i) => ({
+              id: 9000 + offset + i,
+              external_reference: "ext-p6-cutoff",
+              currency_id: "ARS",
+              transaction_amount: 15000,
+              status: "rejected"
+            }))
+          }),
+          { status: 200 }
+        );
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-p6-cutoff" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      // Búsqueda cortada por maxPages con resultados pendientes -> NUNCA expira ni rechaza!
+      expect(res.status).toBe("pending");
+      if (res.status === "pending") {
+        expect(res.verifying).toBe(true);
+      }
+    });
+
+    // P2-06C: Múltiples pagos aprobados cruzando la frontera de página
+    it("P2-06C: detecta ambigüedad con múltiples pagos aprobados cruzando frontera de página", async () => {
+      const repo = createInMemoryPaymentRepository();
+      await repo.quotes.save(mockQuote("quote-multi-page-ambiguity"));
+      await repo.attempts.save({
+        id: "att-multi-page-ambiguity",
+        quoteId: "quote-multi-page-ambiguity",
+        externalReference: "ext-ambiguous-pages",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date()
+      });
+
+      const fetcher: typeof fetch = async (url) => {
+        const urlStr = String(url);
+        if (urlStr.includes("offset=0")) {
+          // Página 1: un aprobado
+          return new Response(
+            JSON.stringify({
+              paging: { total: 2, limit: 1, offset: 0 },
+              results: [
+                {
+                  id: 111,
+                  external_reference: "ext-ambiguous-pages",
+                  currency_id: "ARS",
+                  transaction_amount: 15000,
+                  status: "approved"
+                }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+        // Página 2: otro aprobado distinto con mismo external_reference
+        return new Response(
+          JSON.stringify({
+            paging: { total: 2, limit: 1, offset: 1 },
+            results: [
+              {
+                id: 222,
+                external_reference: "ext-ambiguous-pages",
+                currency_id: "ARS",
+                transaction_amount: 15000,
+                status: "approved"
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-ambiguous-pages" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher
+        }
+      );
+
+      // Ambigüedad entre páginas distintas: no acredita arbitrariamente
+      expect(res.status).toBe("pending");
+      if (res.status === "pending") {
+        expect(res.verifying).toBe(true);
+      }
+    });
+
+    // P2-06C: Metadata de paging ausente o errónea
+    it("P2-06C: respuesta con paging ausente o erróneo se trata como incompleta y conserva pending", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-bad-paging", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-bad-paging",
+        quoteId: "quote-bad-paging",
+        externalReference: "ext-bad-paging",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      // Paging ausente o total no numérico
+      const fetcher: typeof fetch = async () =>
+        new Response(
+          JSON.stringify({
+            results: []
+            // Sin paging!
+          }),
+          { status: 200 }
+        );
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-bad-paging" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      // Metadata ausente -> no declara ausencia real ni expira!
+      expect(res.status).toBe("pending");
+      if (res.status === "pending") {
+        expect(res.verifying).toBe(true);
+      }
+    });
+
+    // P2-06C: Error parcial o timeout en página intermedia
+    it("P2-06C: error parcial o timeout en página intermedia conserva pending", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-partial-error", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-partial-error",
+        quoteId: "quote-partial-error",
+        externalReference: "ext-partial-error",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      const fetcher: typeof fetch = async (url) => {
+        const urlStr = String(url);
+        if (urlStr.includes("offset=0")) {
+          return new Response(
+            JSON.stringify({
+              paging: { total: 60, limit: 30, offset: 0 },
+              results: [{ id: 1, external_reference: "ext-partial-error", currency_id: "ARS", transaction_amount: 15000, status: "rejected" }]
+            }),
+            { status: 200 }
+          );
+        }
+        // Página 2 falla
+        return new Response("Timeout", { status: 504 });
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-partial-error" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      expect(res.status).toBe("pending");
+      if (res.status === "pending") {
+        expect(res.verifying).toBe(true);
+      }
+    });
+
+    // P2-06D: payment_id ajeno/404 + ref válido con pago aprobado auténtico
+    it("P2-06D: fallback a búsqueda por ref ante payment_id ajeno o 404, acreditando pago auténtico", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-foreign-id", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-foreign-id",
+        quoteId: "quote-foreign-id",
+        externalReference: "ext-valid-ref",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      const fetcher: typeof fetch = async (url) => {
+        const urlStr = String(url);
+        if (urlStr.includes("/v1/payments/999999999")) {
+          // El ID provisto por el browser retorna 404 o es ajeno
+          return new Response(JSON.stringify({ message: "Payment not found" }), { status: 404 });
+        }
+        if (urlStr.includes("/v1/payments/search?external_reference=ext-valid-ref")) {
+          // Búsqueda server-to-server por la referencia real encuentra el pago auténtico
+          return new Response(
+            JSON.stringify({
+              paging: { total: 1, limit: 30, offset: 0 },
+              results: [
+                {
+                  id: 888888888,
+                  external_reference: "ext-valid-ref",
+                  currency_id: "ARS",
+                  transaction_amount: 15000,
+                  status: "approved"
+                }
+              ]
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response("Not found", { status: 404 });
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-valid-ref", paymentId: "999999999" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z") // quote vencida > 15 min
+        }
+      );
+
+      // P2-06D: No expira falsamente; acredita el pago auténtico encontrado por referencia!
+      expect(res.status).toBe("approved");
+      if (res.status === "approved") {
+        expect(res.paymentReference).toBe("888888888");
+      }
+    });
+
+    // P2-06D: payment_id ajeno con búsqueda parcial conserva pending
+    it("P2-06D: fallback a búsqueda por ref ante payment_id ajeno conserva pending si la búsqueda es parcial", async () => {
+      const repo = createInMemoryPaymentRepository();
+      const expiredDate = new Date("2026-10-09T00:30:00Z");
+      await repo.quotes.save(mockQuote("quote-foreign-partial", 1500000n, expiredDate));
+      await repo.attempts.save({
+        id: "att-foreign-partial",
+        quoteId: "quote-foreign-partial",
+        externalReference: "ext-foreign-partial",
+        expectedAmountCents: 1500000n,
+        status: "pending",
+        createdAt: new Date("2026-10-09T00:15:00Z")
+      });
+
+      const fetcher: typeof fetch = async (url) => {
+        const urlStr = String(url);
+        if (urlStr.includes("/v1/payments/999999999")) {
+          return new Response(JSON.stringify({ message: "Not found" }), { status: 404 });
+        }
+        // Búsqueda por referencia retorna error / parcial
+        return new Response("Gateway Timeout", { status: 504 });
+      };
+
+      const res = await checkMercadoPagoPaymentStatus(
+        { ref: "ext-foreign-partial", paymentId: "999999999" },
+        {
+          attempts: repo.attempts,
+          quotes: repo.quotes,
+          detectConfig: () => ({
+            enabled: true,
+            config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+          }),
+          fetcher,
+          now: () => new Date("2026-10-09T01:00:00Z")
+        }
+      );
+
+      expect(res.status).toBe("pending");
+      if (res.status === "pending") {
+        expect(res.verifying).toBe(true);
+      }
+    });
   });
 });

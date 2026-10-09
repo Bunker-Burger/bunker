@@ -257,5 +257,109 @@ describe("createCheckoutProPreference", () => {
       expect(saved.idempotencyKey).toBe("attempt-timeout-test");
       expect(saved.expectedAmountCents).toBe(1_500_000n);
     });
+
+    it("P2-09: retorna la preferencia existente sin invocar a MP si findByIdempotencyKey ya tiene providerPreferenceId", async () => {
+      let fetchCalls = 0;
+      const fetcher: typeof fetch = async () => {
+        fetchCalls += 1;
+        return new Response(JSON.stringify({ id: "pref-new", init_point: "https://mp.example/pay" }), { status: 201 });
+      };
+
+      const port: PaymentAttemptsPort = {
+        async save() {},
+        async findByExternalReference() { return null; },
+        async findByIdempotencyKey(key) {
+          if (key === "idem-key-existing") {
+            return {
+              id: "att-existing",
+              quoteId: "quote-1",
+              idempotencyKey: "idem-key-existing",
+              externalReference: "ext-ref-existing",
+              expectedAmountCents: 1_500_000n,
+              status: "pending",
+              createdAt: new Date("2026-10-06T12:00:00Z"),
+              providerPreferenceId: "pref-already-created"
+            };
+          }
+          return null;
+        },
+        async markApproved() {}
+      };
+
+      const res = await createCheckoutProPreference(
+        {
+          quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+          customer: { name: "Ana Pérez", phone: "+5491155551234" },
+          idempotencyKey: "idem-key-existing"
+        },
+        {
+          config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+          fetcher,
+          attempts: port,
+          storeStatus: storeStatus("open"),
+          createId: () => "fresh-id",
+          now: () => new Date("2026-10-06T12:00:00Z")
+        }
+      );
+
+      expect(res.preferenceId).toBe("pref-already-created");
+      expect(res.externalReference).toBe("ext-ref-existing");
+      expect(fetchCalls).toBe(0); // Cero llamadas remotas!
+    });
+
+    it("P2-09: deduplica carreras concurrentes en createCheckoutProPreference realizando solo 1 llamada a MP", async () => {
+      let fetchCalls = 0;
+      const fetcher: typeof fetch = async () => {
+        fetchCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return new Response(JSON.stringify({ id: "pref-concurrent", init_point: "https://mp.example/pay" }), { status: 201 });
+      };
+
+      const attempts = new Map();
+      const port: PaymentAttemptsPort = {
+        async save(att) { attempts.set(att.idempotencyKey, att); },
+        async findByExternalReference(ref) { return attempts.get(ref) ?? null; },
+        async findByIdempotencyKey(key) { return attempts.get(key) ?? null; },
+        async markApproved() {}
+      };
+
+      const [res1, res2] = await Promise.all([
+        createCheckoutProPreference(
+          {
+            quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+            customer: { name: "Ana Pérez", phone: "+5491155551234" },
+            idempotencyKey: "idem-race-1"
+          },
+          {
+            config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+            fetcher,
+            attempts: port,
+            storeStatus: storeStatus("open"),
+            createId: () => "id-1",
+            now: () => new Date("2026-10-06T12:00:00Z")
+          }
+        ),
+        createCheckoutProPreference(
+          {
+            quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+            customer: { name: "Ana Pérez", phone: "+5491155551234" },
+            idempotencyKey: "idem-race-1"
+          },
+          {
+            config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "https://bunker.example" },
+            fetcher,
+            attempts: port,
+            storeStatus: storeStatus("open"),
+            createId: () => "id-2",
+            now: () => new Date("2026-10-06T12:00:00Z")
+          }
+        )
+      ]);
+
+      expect(res1.preferenceId).toBe("pref-concurrent");
+      expect(res2.preferenceId).toBe("pref-concurrent");
+      expect(res1.externalReference).toBe(res2.externalReference);
+      expect(fetchCalls).toBe(1); // Exactamente 1 llamada remota!
+    });
   });
 });

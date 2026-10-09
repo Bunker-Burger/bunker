@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 const identifier = z.string().trim().min(1).max(100);
@@ -34,3 +35,34 @@ export type CheckoutRequest = z.infer<typeof untrustedCheckoutSchema>;
 export function parseUntrustedCheckout(input: unknown): CheckoutRequest {
   return untrustedCheckoutSchema.parse(input);
 }
+
+/**
+ * P2-09: Deriva una identidad de idempotencia determinista y canónica para el checkout lógico.
+ * Garantiza longitud entre 16 y 128 caracteres para compatibilidad con la restricción de BD.
+ */
+export function deriveLogicalCheckoutIdempotencyKey(checkout: CheckoutRequest): string {
+  const canonical = {
+    customer: {
+      name: checkout.customer?.name.trim().toLowerCase(),
+      phone: checkout.customer?.phone.trim()
+    },
+    fulfilment: checkout.fulfilment,
+    paymentMethod: checkout.paymentMethod,
+    items: [...checkout.items]
+      .map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        notes: item.notes.trim(),
+        optionSelections: Object.keys(item.optionSelections)
+          .sort()
+          .map((k) => [k, [...(item.optionSelections[k] ?? [])].sort()])
+      }))
+      .sort((a, b) => a.productId.localeCompare(b.productId))
+  };
+
+  // Usar hash SHA-256 para una clave compacta y determinista (41 caracteres: checkout- + 32 hex)
+  const jsonStr = JSON.stringify(canonical);
+  const digest = createHash("sha256").update(jsonStr).digest("hex");
+  return `checkout-${digest.slice(0, 32)}`;
+}
+

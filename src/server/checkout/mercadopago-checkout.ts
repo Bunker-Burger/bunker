@@ -14,7 +14,7 @@ import type {
   PricingRepository
 } from "@/server/payments/ports";
 import { createAuthoritativeQuote, InvalidCheckoutError } from "./quote";
-import { untrustedCheckoutSchema } from "./schema";
+import { deriveLogicalCheckoutIdempotencyKey, untrustedCheckoutSchema } from "./schema";
 
 export type MercadoPagoCheckoutErrorCode =
   | "invalid_request"
@@ -67,6 +67,11 @@ function catalogPricing(catalog: Catalog): PricingRepository {
  * Recalculates product prices, options, promotions, and delivery fee on the server;
  * browser prices are never trusted. Stores frozen quote and pending attempt.
  */
+const inFlightCheckouts = new Map<
+  string,
+  Promise<Result<MercadoPagoCheckoutSuccess, MercadoPagoCheckoutError>>
+>();
+
 export async function prepareMercadoPagoCheckout(
   input: unknown,
   dependencies: MercadoPagoCheckoutDependencies
@@ -100,51 +105,89 @@ export async function prepareMercadoPagoCheckout(
     return failure("payment_method_unavailable", "Mercado Pago no está habilitado en este local.");
   }
 
-  let quote: PaymentQuote;
-  try {
-    quote = await createAuthoritativeQuote(checkout, {
-      repository: catalogPricing(catalog.value),
-      quotes: dependencies.quotes,
-      storeStatus: async () => status.value,
-      createId: dependencies.createId,
-      now: dependencies.now
-    });
-  } catch (error) {
-    if (error instanceof StoreNotAcceptingOrdersError) {
-      return failure("store_closed", "El local no está tomando pedidos ahora.");
-    }
-    if (error instanceof InvalidCheckoutError) {
-      return failure("invalid_cart", error.message);
-    }
-    return failure("unavailable", "No pudimos guardar la cotización del pedido.");
+  const customer = checkout.customer;
+  const idempotencyKey = deriveLogicalCheckoutIdempotencyKey(checkout);
+
+  // P2-09: Deduplicación atómica en memoria para carreras concurrentes (síncrona antes de cualquier await)
+  const inFlight = inFlightCheckouts.get(idempotencyKey);
+  if (inFlight) {
+    return inFlight;
   }
 
-  let preference: { preferenceId: string; checkoutUrl: string; externalReference: string };
-  try {
-    preference = await createCheckoutProPreference(
-      {
-        quote: { id: quote.id, totalCents: quote.totalCents, expiresAt: quote.expiresAt },
-        customer: { name: checkout.customer.name, phone: checkout.customer.phone }
-      },
-      {
-        config: mpDetection.config,
-        fetcher: dependencies.fetcher ?? fetch,
-        attempts: dependencies.attempts,
+  const executionPromise: Promise<Result<MercadoPagoCheckoutSuccess, MercadoPagoCheckoutError>> = (async () => {
+    // P2-09: Reusar identidad e intento existente para el mismo checkout lógico
+    if (dependencies.attempts.findByIdempotencyKey) {
+      const existingAttempt = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
+      if (existingAttempt && existingAttempt.status === "pending" && existingAttempt.quoteId) {
+        const existingQuote = await dependencies.quotes.findById(existingAttempt.quoteId);
+        const isUnexpired = existingQuote && existingQuote.expiresAt.getTime() > dependencies.now().getTime();
+        if (isUnexpired && existingAttempt.providerPreferenceId) {
+          // Respuesta previa completa (respuesta perdida o retry del cliente):
+          // Retornar la misma preferencia existente sin invocar a MP ni generar registros duplicados!
+          return ok({
+            preferenceId: existingAttempt.providerPreferenceId,
+            checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${existingAttempt.providerPreferenceId}`,
+            externalReference: existingAttempt.externalReference,
+            quote: existingQuote
+          });
+        }
+      }
+    }
+
+    let quote: PaymentQuote;
+    try {
+      quote = await createAuthoritativeQuote(checkout, {
+        repository: catalogPricing(catalog.value),
+        quotes: dependencies.quotes,
         storeStatus: async () => status.value,
         createId: dependencies.createId,
         now: dependencies.now
+      });
+    } catch (error) {
+      if (error instanceof StoreNotAcceptingOrdersError) {
+        return failure("store_closed", "El local no está tomando pedidos ahora.");
       }
-    );
-  } catch {
-    return failure("unavailable", "No pudimos generar el pago con Mercado Pago.");
-  }
+      if (error instanceof InvalidCheckoutError) {
+        return failure("invalid_cart", error.message);
+      }
+      return failure("unavailable", "No pudimos guardar la cotización del pedido.");
+    }
 
-  return ok({
-    preferenceId: preference.preferenceId,
-    checkoutUrl: preference.checkoutUrl,
-    externalReference: preference.externalReference,
-    quote
-  });
+    let preference: { preferenceId: string; checkoutUrl: string; externalReference: string };
+    try {
+      preference = await createCheckoutProPreference(
+        {
+          quote: { id: quote.id, totalCents: quote.totalCents, expiresAt: quote.expiresAt },
+          customer: { name: customer.name, phone: customer.phone },
+          idempotencyKey
+        },
+        {
+          config: mpDetection.config,
+          fetcher: dependencies.fetcher ?? fetch,
+          attempts: dependencies.attempts,
+          storeStatus: async () => status.value,
+          createId: dependencies.createId,
+          now: dependencies.now
+        }
+      );
+    } catch {
+      return failure("unavailable", "No pudimos generar el pago con Mercado Pago.");
+    }
+
+    return ok({
+      preferenceId: preference.preferenceId,
+      checkoutUrl: preference.checkoutUrl,
+      externalReference: preference.externalReference,
+      quote
+    });
+  })();
+
+  inFlightCheckouts.set(idempotencyKey, executionPromise);
+  try {
+    return await executionPromise;
+  } finally {
+    inFlightCheckouts.delete(idempotencyKey);
+  }
 }
 
 const STATUS_BY_CODE: Record<MercadoPagoCheckoutErrorCode, number> = {
