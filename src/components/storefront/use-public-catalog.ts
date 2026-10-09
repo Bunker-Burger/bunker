@@ -13,6 +13,8 @@ export type CatalogVerificationStatus = "verified" | "pending" | "unverified";
 export interface PublicCatalogView {
   products: Product[];
   verificationStatus: CatalogVerificationStatus;
+  /** Increments on every successful verification, so anything derived from a past read can tell it is stale. */
+  verifiedGeneration: number;
   recheckProducts: () => void;
 }
 
@@ -31,6 +33,7 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
   const initialProducts = rawInitial && rawInitial.length > 0 ? rawInitial : staticFallbackProducts;
   const [products, setProducts] = useState<Product[]>(() => initialProducts);
   const [verificationStatus, setVerificationStatus] = useState<CatalogVerificationStatus>("pending");
+  const [verifiedGeneration, setVerifiedGeneration] = useState(0);
   const requestIdRef = useRef(0);
   const activeControllerRef = useRef<AbortController | null>(null);
 
@@ -56,6 +59,7 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
           if (parsed && parsed.length > 0) {
             setProducts(parsed);
             setVerificationStatus("verified");
+            setVerifiedGeneration((generation) => generation + 1);
           } else {
             // Unconfirmed, incomplete or empty payload: do not treat as verified
             setVerificationStatus("unverified");
@@ -114,6 +118,7 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
   return {
     products,
     verificationStatus,
+    verifiedGeneration,
     recheckProducts
   };
 }

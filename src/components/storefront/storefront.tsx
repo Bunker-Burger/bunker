@@ -50,7 +50,7 @@ import {
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
-import { describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
+import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
 import "./storefront.css";
 
@@ -106,7 +106,7 @@ export function Storefront({
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
   const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
-  const { products, verificationStatus, recheckProducts } = usePublicCatalog({
+  const { products, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({
     initialProducts: resolvedInitialProducts
   });
   const storageDegraded = useStorageDegraded();
@@ -123,6 +123,13 @@ export function Storefront({
     () => publicPromotions.map((promotion) => toPromotionRule(promotion, productIdBySlug)),
     [publicPromotions, productIdBySlug]
   );
+  // Versions of everything a server quote depends on beyond the request itself: a new catalog
+  // verification, store status or promotion set discards any quote shown so far.
+  const quoteFreshness = JSON.stringify([
+    verifiedGeneration,
+    storeStatus.kind === "ready" ? storeStatus.status : storeStatus.kind,
+    publicPromotions
+  ]);
   const deliveryFeeCents =
     storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
   const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
@@ -326,6 +333,7 @@ export function Storefront({
         onCartRejected={recheckProducts}
         onFulfilmentChange={setFulfilment}
         paymentMethods={paymentMethods}
+        quoteFreshness={quoteFreshness}
         products={products}
         promotions={promotions}
         storeStatus={storeStatus}
@@ -641,6 +649,15 @@ function toPromotionLines(cart: CartLine[], catalogProducts: readonly Product[])
   });
 }
 
+/** Same choices, same JSON: empty groups dropped and groups in a stable order. */
+function canonicalSelections(selections: SelectedOptions): SelectedOptions {
+  return Object.fromEntries(
+    Object.entries(selections)
+      .filter(([, optionIds]) => optionIds.length > 0)
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
 /** Why the server refused to give a WhatsApp link for this cart. */
 const CHECKOUT_ERRORS: Record<string, string> = {
   store_closed: "El local no está tomando pedidos ahora.",
@@ -660,6 +677,7 @@ function CheckoutSection({
   fulfilment,
   onFulfilmentChange: setFulfilment,
   onCartRejected,
+  quoteFreshness,
   storeStatus,
   deliveryFeeCents,
   timezone
@@ -674,6 +692,7 @@ function CheckoutSection({
   fulfilment: FulfilmentMethod;
   onFulfilmentChange: (fulfilment: FulfilmentMethod) => void;
   onCartRejected: () => void;
+  quoteFreshness: string;
   storeStatus: StoreStatusView;
   deliveryFeeCents: bigint | null;
   timezone: string;
@@ -695,7 +714,8 @@ function CheckoutSection({
       }),
     [cart, products, fulfilment, deliveryFeeCents, promotions, nowMs, timezone]
   );
-  const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
+  // A status being re-read authorizes nothing until the server answers again (fail closed).
+  const acceptingOrders = acceptsOrdersNow(storeStatus);
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
   const hasValidLines = cart.length > 0;
   const isVerified = verificationStatus === "verified";
@@ -709,7 +729,7 @@ function CheckoutSection({
             items: cart.map((line) => ({
               productId: line.productId,
               quantity: line.quantity,
-              optionSelections: line.selectedOptions,
+              optionSelections: canonicalSelections(line.selectedOptions),
               notes: line.notes
             })),
             fulfilment,
@@ -718,7 +738,7 @@ function CheckoutSection({
         : null,
     [acceptingOrders, isVerified, hasValidLines, cart, fulfilment, payment]
   );
-  const serverCheckout = useWhatsAppCheckout(request);
+  const serverCheckout = useWhatsAppCheckout(request, quoteFreshness);
   const confirmed = serverCheckout.kind === "ready" ? serverCheckout.checkout : null;
   const cartRejected = serverCheckout.kind === "error" && serverCheckout.code === "invalid_cart";
 
@@ -734,13 +754,15 @@ function CheckoutSection({
 
   const totals = confirmed ?? estimate;
   const promotion = confirmed ? confirmed.promotion : estimate.promotion;
-  const blockedLabel = !acceptingOrders
-    ? "No se pueden enviar pedidos ahora"
-    : payment === "mercado-pago"
-      ? "Mercado Pago próximamente"
-      : serverCheckout.kind === "loading"
-        ? "Calculando el total…"
-        : "Enviar pedido por WhatsApp";
+  const blockedLabel = storeStatus.kind === "ready" && storeStatus.checking
+    ? "Verificando el local…"
+    : !acceptingOrders
+      ? "No se pueden enviar pedidos ahora"
+      : payment === "mercado-pago"
+        ? "Mercado Pago próximamente"
+        : serverCheckout.kind === "loading"
+          ? "Calculando el total…"
+          : "Enviar pedido por WhatsApp";
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
