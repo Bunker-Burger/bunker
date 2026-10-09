@@ -18,10 +18,10 @@ export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
   const productParam = Array.isArray(params.producto) ? params.producto[0] : params.producto;
   const catalogResult = await getPublicCatalog();
-  const initialProducts =
-    catalogResult.ok && catalogResult.value.products.length > 0
-      ? catalogResult.value.products
-      : undefined;
+  // The server's snapshot, empty included; null only when it could not be read at all.
+  const initialCatalog = catalogResult.ok
+    ? { products: catalogResult.value.products, categories: catalogResult.value.categories }
+    : null;
   return (
     <Storefront
       initialProductSlug={productParam ?? null}
@@ -31,7 +31,7 @@ export default async function Home({ searchParams }: HomeProps) {
           ? catalogResult.value.store.paymentMethods.filter((method) => method.enabled).map((method) => method.method)
           : undefined
       }
-      initialProducts={initialProducts}
+      initialCatalog={initialCatalog}
     />
   );
 }

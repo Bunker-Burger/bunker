@@ -218,6 +218,12 @@ export interface PromotionRule {
   schedule: PromotionWindow[];
 }
 
+/** What the storefront renders: products and the categories they belong to, from one read. */
+export interface PublicCatalogSnapshot {
+  products: Product[];
+  categories: Category[];
+}
+
 export interface Catalog {
   store: StoreSettings;
   categories: Category[];

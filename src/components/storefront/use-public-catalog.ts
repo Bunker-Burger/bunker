@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { products as staticFallbackProducts } from "@/data/catalog";
-import { parsePublicProducts } from "@/domain/public-products";
-import type { Product } from "@/domain/types";
+import { categories as fixtureCategories, products as fixtureProducts } from "@/data/catalog";
+import { parsePublicCatalog } from "@/domain/public-products";
+import type { Category, Product, PublicCatalogSnapshot } from "@/domain/types";
 
 export const PRODUCTS_ENDPOINT = "/api/store/products";
 export const PRODUCTS_REFRESH_MS = 60_000;
@@ -11,27 +11,35 @@ export const PRODUCTS_REFRESH_MS = 60_000;
 export type CatalogVerificationStatus = "verified" | "pending" | "unverified";
 
 export interface PublicCatalogView {
+  /** Products and categories always come from the same snapshot (never mixed across reads). */
   products: Product[];
+  categories: Category[];
   verificationStatus: CatalogVerificationStatus;
   /** Increments on every successful verification, so anything derived from a past read can tell it is stale. */
   verifiedGeneration: number;
   recheckProducts: () => void;
 }
 
-/**
- * Reads the latest published products and option configurations from the server.
- * Re-reads when the tab regains visibility/focus and periodically.
- * If the network fails or endpoint is unavailable, preserves existing products,
- * marks verificationStatus as 'unverified', never wiping lines.
- */
+/** Static demo menu, shown only when the server gave no snapshot at all (e.g. no Supabase configured). */
+const FIXTURE_SNAPSHOT: PublicCatalogSnapshot = { products: fixtureProducts, categories: fixtureCategories };
+
 export interface UsePublicCatalogOptions {
-  initialProducts?: Product[];
+  /**
+   * What the page was rendered with: the server's snapshot (possibly empty: a store with nothing
+   * published), or null when the server could not read the catalog.
+   */
+  initialCatalog?: PublicCatalogSnapshot | null;
 }
 
-export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions): PublicCatalogView {
-  const rawInitial = Array.isArray(options) ? options : options?.initialProducts;
-  const initialProducts = rawInitial && rawInitial.length > 0 ? rawInitial : staticFallbackProducts;
-  const [products, setProducts] = useState<Product[]>(() => initialProducts);
+/**
+ * Reads the latest published products, option configurations and categories from the server.
+ * Re-reads when the tab regains visibility/focus and periodically.
+ * A valid answer replaces the snapshot, empty included ("nothing published" is data, not an error).
+ * A failed or malformed answer keeps the current snapshot and marks it 'unverified'; it never
+ * empties the menu nor wipes cart lines.
+ */
+export function usePublicCatalog(options: UsePublicCatalogOptions = {}): PublicCatalogView {
+  const [snapshot, setSnapshot] = useState<PublicCatalogSnapshot>(() => options.initialCatalog ?? FIXTURE_SNAPSHOT);
   const [verificationStatus, setVerificationStatus] = useState<CatalogVerificationStatus>("pending");
   const [verifiedGeneration, setVerifiedGeneration] = useState(0);
   const requestIdRef = useRef(0);
@@ -53,15 +61,16 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
           // P1 B: Generation check after awaiting response.json() prevents old slow responses from overwriting newer ones
           if (reqId !== requestIdRef.current) return;
 
-          const parsed = parsePublicProducts(body);
+          const parsed = parsePublicCatalog(body);
           if (reqId !== requestIdRef.current) return;
 
-          if (parsed && parsed.length > 0) {
-            setProducts(parsed);
+          if (parsed) {
+            // A complete answer is the truth, even an empty menu.
+            setSnapshot(parsed);
             setVerificationStatus("verified");
             setVerifiedGeneration((generation) => generation + 1);
           } else {
-            // Unconfirmed, incomplete or empty payload: do not treat as verified
+            // Incomplete or malformed payload: keep what is shown, do not treat it as verified.
             setVerificationStatus("unverified");
           }
         } catch {
@@ -116,7 +125,8 @@ export function usePublicCatalog(options?: Product[] | UsePublicCatalogOptions):
   }, [performFetch, recheckProducts]);
 
   return {
-    products,
+    products: snapshot.products,
+    categories: snapshot.categories,
     verificationStatus,
     verifiedGeneration,
     recheckProducts

@@ -1,4 +1,4 @@
-import type { Catalog, Product } from "@/domain/types";
+import type { Catalog, Category, Product, PublicCatalogSnapshot } from "@/domain/types";
 import type { Result } from "@/lib/result";
 import type { CatalogError } from "./errors";
 
@@ -38,6 +38,29 @@ export interface SerializedPublicProduct {
   optionGroups: SerializedPublicOptionGroup[];
 }
 
+export interface SerializedPublicCategory {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  sortOrder: number;
+  visible: boolean;
+}
+
+export interface SerializedPublicCatalog {
+  products: SerializedPublicProduct[];
+  categories: SerializedPublicCategory[];
+}
+
+export function serializePublicCategories(categories: readonly Category[]): SerializedPublicCategory[] {
+  return categories.map(({ id, slug, name, type, sortOrder, visible }) => ({ id, slug, name, type, sortOrder, visible }));
+}
+
+/** Products and categories of the same read, so the menu never mixes two catalog versions. */
+export function serializePublicCatalog(catalog: PublicCatalogSnapshot): SerializedPublicCatalog {
+  return { products: serializePublicProducts(catalog.products), categories: serializePublicCategories(catalog.categories) };
+}
+
 export function serializePublicProducts(products: readonly Product[]): SerializedPublicProduct[] {
   return products.map((product) => ({
     id: product.id,
@@ -74,7 +97,8 @@ export function serializePublicProducts(products: readonly Product[]): Serialize
 
 /**
  * HTTP response for GET /api/store/products.
- * Never cached (Cache-Control: no-store), returning the fresh customer-facing products with options.
+ * Never cached (Cache-Control: no-store), returning the fresh customer-facing products with options
+ * and the visible categories of the same read. An empty menu is `{ products: [], categories: [] }`.
  */
 export function publicProductsResponse(catalogResult: Result<Catalog, CatalogError>): Response {
   const headers = { "Cache-Control": "no-store" };
@@ -82,8 +106,5 @@ export function publicProductsResponse(catalogResult: Result<Catalog, CatalogErr
     const status = catalogResult.error.code === "not_found" ? 404 : 503;
     return Response.json({ error: catalogResult.error.code }, { status, headers });
   }
-  return Response.json(
-    { products: serializePublicProducts(catalogResult.value.products) },
-    { headers }
-  );
+  return Response.json(serializePublicCatalog(catalogResult.value), { headers });
 }

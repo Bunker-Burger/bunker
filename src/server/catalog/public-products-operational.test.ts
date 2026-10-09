@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as productsRoute } from "@/app/api/store/products/route";
+import { parsePublicCatalog } from "@/domain/public-products";
 
 const SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
 const STORE_ID = "0199b2c8-40b0-7000-8000-000000000001";
@@ -84,6 +85,9 @@ const productRow = () => ({
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
+/** Rows the products table answers; [] models a store with nothing published. */
+let productRows: () => unknown[] = () => [productRow()];
+
 function fakeSupabase(url: URL, headers: Headers): Response {
   const table = url.pathname.replace("/rest/v1/", "");
   switch (table) {
@@ -94,7 +98,7 @@ function fakeSupabase(url: URL, headers: Headers): Response {
     case "promotion_rules":
       return json([]);
     case "products":
-      return json([productRow()]);
+      return json(productRows());
     default:
       return json({ message: `unexpected table ${table}` }, 404);
   }
@@ -109,6 +113,7 @@ describe("P1 A: GET /api/store/products operational freshness", () => {
     vi.stubEnv("SUPABASE_PRODUCTION_PROJECT_REF", "");
 
     capturedInits.length = 0;
+    productRows = () => [productRow()];
     productState = {
       priceCents: "780000",
       inStock: true,
@@ -187,5 +192,26 @@ describe("P1 A: GET /api/store/products operational freshness", () => {
     expect(() => {
       expect(simulatedStaleInit.cache).toBe("no-store");
     }).toThrow();
+  });
+
+  it("publica las categorías visibles de la misma lectura que los productos", async () => {
+    const response = await productsRoute();
+    const body: unknown = await response.json();
+
+    expect(body).toMatchObject({
+      categories: [{ id: CATEGORY_ID, slug: "burgers", name: "Hamburguesas", type: "burger", sortOrder: 1, visible: true }],
+      products: [{ categoryId: CATEGORY_ID }]
+    });
+    expect(parsePublicCatalog(body)?.categories.map((category) => category.id)).toEqual([CATEGORY_ID]);
+  });
+
+  it("una carta sin productos publicados responde 200 con listas vacías válidas, no un error", async () => {
+    productRows = () => [];
+    const response = await productsRoute();
+
+    expect(response.status).toBe(200);
+    const body: unknown = await response.json();
+    expect(body).toMatchObject({ products: [] });
+    expect(parsePublicCatalog(body)).toEqual({ products: [], categories: [expect.objectContaining({ id: CATEGORY_ID })] });
   });
 });

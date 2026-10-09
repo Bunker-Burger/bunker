@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePublicProducts } from "./public-products";
+import { parsePublicCatalog, parsePublicProducts } from "./public-products";
 
 const VALID_SAMPLE_PAYLOAD = {
   products: [
@@ -145,5 +145,47 @@ describe("parsePublicProducts strict DTO validation (P1 A)", () => {
     expect(parsePublicProducts([])).toBeNull();
     expect(parsePublicProducts({})).toBeNull();
     expect(parsePublicProducts({ products: "not-an-array" })).toBeNull();
+  });
+});
+
+describe("parsePublicCatalog: productos y categorías de una misma lectura", () => {
+  const category = { id: "cat-burgers", slug: "hamburguesas", name: "Hamburguesas", type: "burger", sortOrder: 10, visible: true };
+
+  it("acepta productos y categorías válidos", () => {
+    const parsed = parsePublicCatalog({ ...VALID_SAMPLE_PAYLOAD, categories: [category] });
+    expect(parsed?.products).toHaveLength(1);
+    expect(parsed?.categories).toEqual([category]);
+  });
+
+  it("acepta una carta vacía verificada: listas vacías no son un error", () => {
+    expect(parsePublicCatalog({ products: [], categories: [] })).toEqual({ products: [], categories: [] });
+  });
+
+  it("rechaza el payload si faltan las categorías o no son una lista", () => {
+    expect(parsePublicCatalog({ products: [] })).toBeNull();
+    expect(parsePublicCatalog({ products: [], categories: null })).toBeNull();
+    expect(parsePublicCatalog({ products: [], categories: {} })).toBeNull();
+    expect(parsePublicCatalog({ categories: [] })).toBeNull();
+  });
+
+  it.each([
+    ["sin id", { ...category, id: "" }],
+    ["sin slug", { ...category, slug: undefined }],
+    ["nombre vacío", { ...category, name: "  " }],
+    ["tipo desconocido", { ...category, type: "pizza" }],
+    ["sortOrder no entero", { ...category, sortOrder: 1.5 }],
+    ["sortOrder como texto", { ...category, sortOrder: "10" }],
+    ["visible no booleano", { ...category, visible: "true" }]
+  ])("rechaza todo el snapshot ante una categoría inválida (%s)", (_case, broken) => {
+    expect(parsePublicCatalog({ ...VALID_SAMPLE_PAYLOAD, categories: [category, broken] })).toBeNull();
+  });
+
+  it("rechaza categorías con id repetido", () => {
+    expect(parsePublicCatalog({ products: [], categories: [category, { ...category, name: "Otra" }] })).toBeNull();
+  });
+
+  it("un producto inválido invalida el snapshot aunque las categorías sean válidas", () => {
+    const broken = { products: [{ ...VALID_SAMPLE_PAYLOAD.products[0], published: "yes" }], categories: [category] };
+    expect(parsePublicCatalog(broken)).toBeNull();
   });
 });

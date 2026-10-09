@@ -2,7 +2,6 @@
 
 import {
   Banknote,
-  Check,
   ChevronRight,
   CircleDollarSign,
   Minus,
@@ -14,7 +13,7 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   addCartLine,
   clearCart,
@@ -31,12 +30,12 @@ import {
   validateOptionSelection
 } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
-import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
+import { promotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule } from "@/domain/public-promotions";
-import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, SelectedOptions } from "@/domain/types";
+import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
-import { categoryLabels, products as fallbackProducts, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
+import { STORE_TIMEZONE } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -52,17 +51,14 @@ import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-c
 import { usePublicPromotions } from "./use-public-promotions";
 import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
+import { Menu } from "./menu";
 import "./storefront.css";
 
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
-const categories = Object.keys(categoryLabels) as StoreCategory[];
+const PENDING_PRODUCT_NOTICE = "Buscando el producto en la carta…";
+const UNVERIFIED_PRODUCT_NOTICE = "No pudimos confirmar ese producto con el local todavía. Reintentamos en un momento.";
 const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer"];
-
-// Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
-function revealInScroller(event: FocusEvent<HTMLElement>) {
-  event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
-}
 
 function removeProductParam() {
   const url = new URL(window.location.href);
@@ -77,7 +73,31 @@ interface StorefrontProps {
   paymentMethods?: readonly PaymentMethodKind[] | undefined;
   showAdminNav?: boolean;
   onInvalidProduct?: () => void;
-  initialProducts?: Product[] | undefined;
+  /**
+   * Snapshot the page was rendered with (empty when nothing is published), or null when the
+   * server could not read the catalog; the client then re-reads it and that answer is the truth.
+   */
+  initialCatalog?: PublicCatalogSnapshot | null | undefined;
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Keeps Tab and Shift+Tab inside the open dialog (aria-modal alone does not stop the keyboard). */
+function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (!container) return;
+  const focusable = [...container.querySelectorAll<HTMLElement>(FOCUSABLE)];
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first || !last) return;
+  const active = document.activeElement;
+  const outside = !container.contains(active);
+  if (event.shiftKey && (active === first || outside)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || outside)) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string): CartLine {
@@ -99,16 +119,13 @@ export function Storefront({
   paymentMethods = DEFAULT_PAYMENT_METHODS,
   showAdminNav = false,
   onInvalidProduct,
-  initialProducts
+  initialCatalog = null
 }: StorefrontProps) {
   const now = useNow();
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
-  const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
-  const { products, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({
-    initialProducts: resolvedInitialProducts
-  });
+  const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog });
   const storageDegraded = useStorageDegraded();
 
   /** Promotion items name products by slug; the cart uses the storefront's product ids. */
@@ -137,22 +154,14 @@ export function Storefront({
   const cardContext = now
     ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
     : null;
-  const [category, setCategory] = useState<StoreCategory>("burgers");
   const [editingLine, setEditingLine] = useState<CartLine | null>(null);
 
-  const isKnownSlug = useCallback(
-    (slug: string) => products.some((product) => product.slug === slug),
-    [products]
-  );
-
-  const [initialSlugInvalid] = useState(
-    () => initialProductSlug !== null && !resolvedInitialProducts.some((p) => p.slug === initialProductSlug)
-  );
-  const [activeSlug, setActiveSlug] = useState(initialSlugInvalid ? null : initialProductSlug);
-  const [notice, setNotice] = useState(initialSlugInvalid ? INVALID_PRODUCT_NOTICE : "");
+  // The product in the URL (or being edited). It is only judged against a verified catalog: a
+  // server-rendered or fallback copy may be stale, so an unknown slug waits for the fresh read.
+  const [activeSlug, setActiveSlug] = useState(initialProductSlug);
+  const [notice, setNotice] = useState("");
   const [revalidationNotice, setRevalidationNotice] = useRevalidationNotice();
   const onInvalidProductRef = useRef(onInvalidProduct);
-  const invalidSlugHandled = useRef(false);
 
   // Only revalidate the persisted cart when the catalog has been verified against the server.
   // Never wipe or alter cart lines while verification is pending or if it failed (503 / network).
@@ -174,33 +183,35 @@ export function Storefront({
     onInvalidProductRef.current = onInvalidProduct;
   }, [onInvalidProduct]);
 
-  const rejectInvalidSlug = useCallback(() => {
-    removeProductParam();
-    onInvalidProductRef.current?.();
-  }, []);
-
   useEffect(() => {
-    if (!initialSlugInvalid || invalidSlugHandled.current) return;
-    invalidSlugHandled.current = true;
-    rejectInvalidSlug();
-  }, [initialSlugInvalid, rejectInvalidSlug]);
-
-  useEffect(() => {
-    const syncRoute = () => {
-      const slug = new URL(window.location.href).searchParams.get("producto");
-      if (slug !== null && !isKnownSlug(slug)) {
-        setNotice(INVALID_PRODUCT_NOTICE);
-        setActiveSlug(null);
-        rejectInvalidSlug();
-        return;
-      }
-      setActiveSlug(slug);
-    };
+    const syncRoute = () => setActiveSlug(new URL(window.location.href).searchParams.get("producto"));
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, [isKnownSlug, rejectInvalidSlug]);
+  }, []);
 
-  const activeProduct = activeSlug ? products.find((product) => product.slug === activeSlug) : undefined;
+  const activeProduct = activeSlug
+    ? products.find((product) => product.published && product.slug === activeSlug)
+    : undefined;
+  const slugUnresolved = activeSlug !== null && activeProduct === undefined;
+  const slugRejected = slugUnresolved && verificationStatus === "verified";
+
+  // A verified catalog without the product (never existed, or retired since the page or the
+  // fallback was rendered): close it, clean the URL and say so. Pending/unverified keeps the URL.
+  const [rejection, setRejection] = useState<{ slug: string; id: number } | null>(null);
+  if (slugRejected) {
+    setRejection((previous) => ({ slug: activeSlug, id: (previous?.id ?? 0) + 1 }));
+    setActiveSlug(null);
+    setEditingLine(null);
+    setNotice(INVALID_PRODUCT_NOTICE);
+  }
+  useEffect(() => {
+    if (!rejection) return;
+    if (new URL(window.location.href).searchParams.get("producto") === rejection.slug) removeProductParam();
+    onInvalidProductRef.current?.();
+  }, [rejection]);
+  const linkNotice = slugUnresolved && !slugRejected
+    ? verificationStatus === "pending" ? PENDING_PRODUCT_NOTICE : UNVERIFIED_PRODUCT_NOTICE
+    : "";
 
   const openProduct = (product: Product) => {
     const url = new URL(window.location.href);
@@ -240,15 +251,6 @@ export function Storefront({
   const activeSection = useActiveSection(SECTION_IDS);
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
-  const visibleProducts = products.filter((product) => {
-    if (!product.published) return false;
-    if (product.categoryId === category) return true;
-    if (category === "burgers" && product.type === "burger") return true;
-    if (category === "sandwiches" && product.type === "sandwich") return true;
-    if (category === "fries" && product.type === "fries") return true;
-    if (category === "drinks" && product.type === "beverage") return true;
-    return false;
-  });
 
   const navItems: BottomNavItem[] = [
     { href: "#menu", label: "Menú", icon: UtensilsCrossed },
@@ -273,7 +275,9 @@ export function Storefront({
       }
       bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
     >
-      {revalidationNotice || notice ? <div className="toast" role="status">{revalidationNotice || notice}</div> : null}
+      {revalidationNotice || notice || linkNotice ? (
+        <div className="toast" role="status">{revalidationNotice || notice || linkNotice}</div>
+      ) : null}
 
       <section className="menu-section" id="menu" aria-labelledby="menu-title">
         <div className="menu-intro">
@@ -281,40 +285,13 @@ export function Storefront({
           <h1 id="menu-title">LA CARTA DEL BÚNKER</h1>
         </div>
 
-        <div className="category-tabs" aria-label="Categorías">
-          {categories.map((key) => (
-            <button
-              className={category === key ? "category-tab active" : "category-tab"}
-              key={key}
-              onClick={() => setCategory(key)}
-              onFocus={revealInScroller}
-              type="button"
-            >
-              {categoryLabels[key]}
-            </button>
-          ))}
-        </div>
-
-        <div className="section-heading">
-          <div>
-            <span>{category === "burgers" ? "LAS MÁS PEDIDAS" : "ELEGÍ TU FAVORITO"}</span>
-            <h2>{categoryLabels[category]}</h2>
-          </div>
-          <span>{visibleProducts.length} opciones</span>
-        </div>
-
-        <div className="product-grid">
-          {visibleProducts.map((product, index) => (
-            <ProductCard
-              promotion={cardContext ? promotionalPrice(product, promotions, cardContext) : null}
-              featured={category === "burgers" && index === 0}
-              key={product.id}
-              onAdd={() => addDirect(product)}
-              onOpen={() => openProduct(product)}
-              product={product}
-            />
-          ))}
-        </div>
+        <Menu
+          categories={categories}
+          onAdd={addDirect}
+          onOpen={openProduct}
+          products={products}
+          promotionFor={(product) => (cardContext ? promotionalPrice(product, promotions, cardContext) : null)}
+        />
       </section>
 
       <CartSection
@@ -350,6 +327,8 @@ export function Storefront({
 
       {activeProduct ? (
         <ProductDrawer
+          // A different product (Back/Forward between two) is a new dialog with its own defaults.
+          key={`${activeProduct.id}:${editingLine?.id ?? "new"}`}
           initialLine={editingLine}
           onClose={closeProduct}
           onSubmit={(submittedLine) => {
@@ -377,43 +356,6 @@ export function Storefront({
   );
 }
 
-function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
-  product: Product;
-  promotion: PromotionalPrice | null;
-  featured: boolean;
-  onOpen: () => void;
-  onAdd: () => void;
-}) {
-  return (
-    <article className={`product-card${featured ? " featured" : ""}${!product.inStock ? " sold-out" : ""}`}>
-      <button className="product-main" onClick={onOpen} type="button" aria-label={`Ver ${product.name}`}>
-        <div className="product-image-wrap">
-          {/* Remote mock photography is intentionally kept as reference content until supplied assets arrive. */}
-          {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-          {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="product-image" src={product.imageUrl} /> : null}
-          {product.featured ? <span className="featured-dot" aria-label="Destacado"><Check size={16} /></span> : null}
-          {!product.inStock ? <span className="sold-out-badge">Agotado</span> : null}
-        </div>
-        <div className="product-copy">
-          <div className="product-title-row">
-            <h3>{product.name}</h3>
-            <span className="product-price">
-              {promotion ? <s className="compare-at"><span className="sr-only">Antes </span>{formatArs(promotion.compareAtPriceCents)}</s> : null}
-              <strong>{formatArs(promotion?.priceCents ?? product.priceCents)}</strong>
-            </span>
-          </div>
-          {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
-          <p>{product.description}</p>
-          <span className="product-meta">{product.type === "burger" ? "SMASH • 200G" : (categoryLabels[product.categoryId as StoreCategory] ?? (product.type === "sandwich" ? "Sándwiches" : product.type === "fries" ? "Papas" : "Bebidas"))}</span>
-        </div>
-      </button>
-      <button className="add-button" disabled={!product.inStock} onClick={onAdd} type="button" aria-label={`Agregar ${product.name}`}>
-        {product.inStock ? <>Agregar <Plus size={16} /></> : "Sin stock"}
-      </button>
-    </article>
-  );
-}
-
 export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   product: Product;
   initialLine?: CartLine | null;
@@ -424,26 +366,40 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
   const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const summaryId = useId();
+  const slug = product.slug;
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
 
   // Focus moves to the close button once, on open: a parent re-render (status, promotions or
-  // checkout answers) must not pull focus out of the field being typed in.
+  // checkout answers) must not pull focus out of the field being typed in. Closing (button,
+  // Escape, Back or adding) returns focus to whatever opened the drawer and the page to where it
+  // was; a drawer opened from a shared link returns to its product's card.
   useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    const scrollY = window.scrollY;
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCloseRef.current();
+      else if (event.key === "Tab") trapFocus(event, dialogRef.current);
     };
     document.body.classList.add("drawer-open");
     window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.classList.remove("drawer-open");
       window.removeEventListener("keydown", onKeyDown);
+      if (opener?.isConnected) {
+        opener.focus({ preventScroll: true });
+        if (Math.abs(window.scrollY - scrollY) > 1) window.scrollTo({ top: scrollY });
+        return;
+      }
+      document.querySelector<HTMLElement>(`[data-product-trigger="${CSS.escape(slug)}"]`)?.focus();
     };
-  }, []);
+  }, [slug]);
 
   const applicableGroups = getApplicableOptionGroups(product);
   const validation = validateOptionSelection(product, selected);
@@ -452,13 +408,17 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
 
   return (
     <div className="drawer-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div aria-label={`Personalizar ${product.name}`} aria-modal="true" className="product-drawer" role="dialog">
+      <div aria-describedby={summaryId} aria-label={`Personalizar ${product.name}`} aria-modal="true" className="product-drawer" ref={dialogRef} role="dialog">
         <div className="drawer-grabber" />
         <button aria-label="Cerrar personalizador" className="close-button" onClick={onClose} ref={closeRef} type="button"><X /></button>
         {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
         {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} /> : null}
         <div className="drawer-content">
           <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
+          <p className="sr-only" id={summaryId}>
+            {`Precio ${formatArs(product.priceCents)}. ${product.inStock ? "Disponible." : "Agotado, no se puede agregar al carrito."}`}
+          </p>
+          {!product.inStock ? <p className="drawer-sold-out" aria-hidden="true">Agotado · no se puede agregar al carrito</p> : null}
           <p>{product.description}</p>
 
           {applicableGroups.map((group) => {
@@ -529,14 +489,16 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
           </div>
           <button
             className="primary-action"
-            disabled={!isValid}
+            disabled={!isValid || !product.inStock}
             onClick={() => {
-              if (!isValid) return;
+              if (!isValid || !product.inStock) return;
               onSubmit(makeCartLine(product, selected, quantity, notes));
             }}
             type="button"
           >
-            {initialLine ? (
+            {!product.inStock ? (
+              "Producto agotado"
+            ) : initialLine ? (
               <>Guardar cambios <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
             ) : (
               <>Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span></>

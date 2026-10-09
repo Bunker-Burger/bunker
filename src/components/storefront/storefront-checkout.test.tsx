@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
+import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { PublicStoreStatus } from "@/domain/store-status";
-import { serializePublicProducts } from "@/server/catalog/public-products";
+import { serializePublicCatalog } from "@/server/catalog/public-products";
 import { Storefront } from "./storefront";
 import { PRODUCTS_ENDPOINT } from "./use-public-catalog";
 import { PROMOTIONS_ENDPOINT } from "./use-public-promotions";
@@ -80,7 +80,7 @@ function serve(routes: { status: () => Response; products?: () => Response; chec
 function serveOpenStore(checkout: () => Response = () => json(serverCheckout)) {
   serve({
     status: () => json(statuses.open),
-    products: () => json({ products: serializePublicProducts(fallbackProducts) }),
+    products: () => json(serializePublicCatalog({ products: fallbackProducts, categories: fixtureCategories })),
     checkout
   });
 }

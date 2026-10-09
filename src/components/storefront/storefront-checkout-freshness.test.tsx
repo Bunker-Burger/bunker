@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
+import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { PublicStoreStatus } from "@/domain/store-status";
 import type { Product } from "@/domain/types";
-import { serializePublicProducts } from "@/server/catalog/public-products";
+import { serializePublicCatalog } from "@/server/catalog/public-products";
 import { Storefront } from "./storefront";
 import { PRODUCTS_ENDPOINT } from "./use-public-catalog";
 import { PROMOTIONS_ENDPOINT } from "./use-public-promotions";
@@ -63,7 +63,7 @@ function serve(initial: Record<string, Handler[]>) {
   );
 }
 
-const catalog = (items: Product[] = fallbackProducts): Handler => () => json({ products: serializePublicProducts(items) });
+const catalog = (items: Product[] = fallbackProducts): Handler => () => json(serializePublicCatalog({ products: items, categories: fixtureCategories }));
 
 /** Records whether a link to `href` is ever in the DOM after `arm()`, even for a single commit. */
 function watchLink(href: string) {
