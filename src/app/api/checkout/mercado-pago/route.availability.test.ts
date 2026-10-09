@@ -161,6 +161,32 @@ describe("POST /api/checkout/mercado-pago availability", () => {
     expect(outbound).toEqual(["https://quota.example/increment"]);
   });
 
+  it("answers 503 and sends 0 calls to Mercado Pago when remote quota returns count 0 (P2-15)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input instanceof Request ? input.url : input);
+        outbound.push(url);
+        if (url.includes("quota.example")) {
+          return new Response(JSON.stringify({ count: 0 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response("{}", { status: 500 });
+      })
+    );
+
+    const response = await post({
+      ...complete,
+      RATE_LIMIT_UPSTREAM_URL: "https://quota.example/increment"
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toBe("service_unavailable");
+    // Only the quota endpoint was called, 0 requests to Mercado Pago
+    expect(outbound).toEqual(["https://quota.example/increment"]);
+  });
+
   it.each([
     ["APP_URL has no scheme", { APP_URL: "sin-esquema" }],
     ["APP_URL is ftp", { APP_URL: "ftp://example.com" }],

@@ -168,8 +168,8 @@ export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
       }
 
       const json = (await response.json()) as RemoteQuotaTransportResponse;
-      if (typeof json?.count !== "number" || !Number.isFinite(json.count)) {
-        throw new Error("Formato de respuesta de cuota inválido: falta count");
+      if (typeof json?.count !== "number" || !Number.isSafeInteger(json.count) || json.count < 1) {
+        throw new Error("Formato de respuesta de cuota inválido: count debe ser un entero positivo seguro (>= 1)");
       }
       return json.count;
     } finally {

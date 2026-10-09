@@ -364,11 +364,18 @@ describe("validateRateLimitUpstream & RemoteTransportQuotaBackend (P2-14)", () =
     expect(result.error).toBe("rate_limit_backend_unavailable");
   });
 
-  it("fails closed when remote quota response has invalid or missing count", async () => {
+  it.each([
+    ["zero (0)", { count: 0 }],
+    ["negative (-1)", { count: -1 }],
+    ["floating point (0.5)", { count: 0.5 }],
+    ["unsafe integer exceeding MAX_SAFE_INTEGER", { count: 9007199254740992 }],
+    ["null count", { count: null }],
+    ["missing count property", { status: "ok" }]
+  ])("rejects impossible count %s and fails closed with rate_limit_backend_unavailable (P2-15)", async (_desc, responsePayload) => {
     const { RemoteTransportQuotaBackend } = await import("./rate-limit");
 
-    const malformedFetcher: typeof fetch = async () => {
-      return new Response(JSON.stringify({ status: "ok" }), {
+    const simulatedFetcher: typeof fetch = async () => {
+      return new Response(JSON.stringify(responsePayload), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
@@ -376,8 +383,15 @@ describe("validateRateLimitUpstream & RemoteTransportQuotaBackend (P2-14)", () =
 
     const backend = new RemoteTransportQuotaBackend({
       endpointUrl: "https://quota.example/inc",
-      fetcher: malformedFetcher
+      fetcher: simulatedFetcher
     });
+
+    // 1. Verificar que el backend lance directamente error descriptivo
+    await expect(backend.atomicIncrement("ip:test-key", 1000, 2000)).rejects.toThrow(
+      /Formato de respuesta de cuota inválido/
+    );
+
+    // 2. Verificar que createFixedWindowRateLimiter falle cerrado, bloqueando la petición con rate_limit_backend_unavailable
     const store = new DistributedRateLimitStore(backend);
     const limiter = createFixedWindowRateLimiter({
       store,
@@ -386,8 +400,48 @@ describe("validateRateLimitUpstream & RemoteTransportQuotaBackend (P2-14)", () =
       now: () => Date.now()
     });
 
-    const result = await limiter.check("ip:malformed-test");
+    const result = await limiter.check("ip:test-key");
     expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.retryAfterMs).toBe(60_000);
     expect(result.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("permits valid counts 1 through 10 and rejects 11th with rate limited 429 (P2-15)", async () => {
+    const { RemoteTransportQuotaBackend } = await import("./rate-limit");
+
+    let counter = 0;
+    const incrementingFetcher: typeof fetch = async () => {
+      counter += 1;
+      return new Response(JSON.stringify({ count: counter }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.example/inc",
+      fetcher: incrementingFetcher
+    });
+    const store = new DistributedRateLimitStore(backend);
+    const limiter = createFixedWindowRateLimiter({
+      store,
+      limit: 10,
+      windowMs: 60_000,
+      now: () => 1_000_000
+    });
+
+    // Peticiones 1..10 permitidas
+    for (let i = 1; i <= 10; i++) {
+      const res = await limiter.check("ip:test-valid");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(10 - i);
+    }
+
+    // Petición 11 rechazada con allowed=false (cuota superada)
+    const res11 = await limiter.check("ip:test-valid");
+    expect(res11.allowed).toBe(false);
+    expect(res11.remaining).toBe(0);
+    expect(res11.retryAfterMs).toBeGreaterThan(0);
   });
 });
