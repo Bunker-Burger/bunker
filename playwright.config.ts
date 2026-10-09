@@ -34,8 +34,8 @@ export default defineConfig({
     }))
   ],
   webServer: {
-    // E2E runs against the production build (`npm run build` first) so hydration matches what users get.
-    command: `npm run start -- --hostname 127.0.0.1 --port ${port}`,
+    // E2E runs against the production build (`pnpm run build` first) so hydration matches what users get.
+    command: `pnpm run start --hostname 127.0.0.1 --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000

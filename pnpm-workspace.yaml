@@ -1,0 +1,4 @@
+# Not a monorepo: pnpm settings only.
+# unrs-resolver ships its native bindings as optional dependencies; its postinstall is only a fallback.
+ignoredBuiltDependencies:
+  - unrs-resolver

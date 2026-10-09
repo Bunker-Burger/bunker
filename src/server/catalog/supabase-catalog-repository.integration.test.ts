@@ -10,7 +10,7 @@ import { createSupabaseCatalogRepository } from "./supabase-catalog-repository";
 
 /*
  * Reads the seeded catalog (supabase/seed.sql) from the cloud DEVELOPMENT project through
- * the real repositories, auth and RLS. Runs with `npm run test:integration` when `.env.local`
+ * the real repositories, auth and RLS. Runs with `pnpm run test:integration` when `.env.local`
  * holds development credentials; readSupabaseConfig refuses production credentials here.
  *
  * Admin reads go through the production entry point `getAdminCatalog()`; only the request
