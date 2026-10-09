@@ -117,36 +117,72 @@ export async function createCheckoutProPreference(
     let finalAttemptId = attemptId;
     let finalExternalReference = initialExternalReference;
 
-    // P2-09: Deduplicación durable en payment_attempts
+    // P1-10 & P2-09: Deduplicación durable en payment_attempts
     if (dependencies.attempts.findByIdempotencyKey) {
       const existing = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
       if (existing) {
-        if (existing.providerPreferenceId) {
-          // Respuesta previa existente completa: retornar sin invocar MP nuevamente
+        const isMatchingQuote =
+          existing.quoteId === input.quote.id || existing.expectedAmountCents === input.quote.totalCents;
+        const isPending = existing.status === "pending";
+        const isUnexpired = input.quote.expiresAt.getTime() > dependencies.now().getTime();
+
+        if (existing.providerPreferenceId && isMatchingQuote && isPending && isUnexpired) {
+          // Respuesta previa existente completa y vigente: retornar sin invocar MP nuevamente
           return {
             preferenceId: existing.providerPreferenceId,
             checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${existing.providerPreferenceId}`,
             externalReference: existing.externalReference
           };
         }
-        // Intento persistido previamente sin preference_id (ej. reintento tras timeout o error de red):
-        // Reusar la identidad existente para mantener el mismo external_reference y clave
-        finalAttemptId = existing.id;
-        finalExternalReference = existing.externalReference;
+
+        if (isPending && isMatchingQuote && isUnexpired) {
+          // Intento persistido previamente sin preference_id (ej. reintento tras timeout o error de red):
+          // Reusar la identidad existente para mantener el mismo external_reference y clave
+          finalAttemptId = existing.id;
+          finalExternalReference = existing.externalReference;
+        }
       }
     }
 
-    // P2-08: Persistir intento e idempotency key durable ANTES de crear preferencia remota
-    // Si la base de datos falla al guardar el attempt, NUNCA se invoca Mercado Pago.
-    await dependencies.attempts.save({
-      id: finalAttemptId,
-      quoteId: input.quote.id,
-      idempotencyKey,
-      externalReference: finalExternalReference,
-      expectedAmountCents: input.quote.totalCents,
-      status: "pending",
-      createdAt: dependencies.now()
-    });
+    // P2-08 & P1-10: Persistir intento e idempotency key durable ANTES de crear preferencia remota
+    // Gestionar conflicto de idempotency_key ante carreras concurrentes entre procesos independientes
+    try {
+      await dependencies.attempts.save({
+        id: finalAttemptId,
+        quoteId: input.quote.id,
+        idempotencyKey,
+        externalReference: finalExternalReference,
+        expectedAmountCents: input.quote.totalCents,
+        status: "pending",
+        createdAt: dependencies.now()
+      });
+    } catch (saveError) {
+      const isUniqueConflict =
+        saveError instanceof Error &&
+        (saveError.message.includes("unique") ||
+          saveError.message.includes("idempotency_key") ||
+          saveError.message.includes("duplicate key") ||
+          (saveError as { code?: string }).code === "23505");
+
+      if (isUniqueConflict && dependencies.attempts.findByIdempotencyKey) {
+        const winning = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
+        if (winning) {
+          if (winning.providerPreferenceId) {
+            return {
+              preferenceId: winning.providerPreferenceId,
+              checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${winning.providerPreferenceId}`,
+              externalReference: winning.externalReference
+            };
+          }
+          finalAttemptId = winning.id;
+          finalExternalReference = winning.externalReference;
+        } else {
+          throw saveError;
+        }
+      } else {
+        throw saveError;
+      }
+    }
 
     const [firstName, ...surnameParts] = input.customer.name.trim().split(/\s+/);
     const response = await dependencies.fetcher("https://api.mercadopago.com/checkout/preferences", {

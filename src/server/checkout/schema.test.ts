@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseUntrustedCheckout } from "./schema";
+import {
+  deriveLogicalCheckoutIdempotencyKey,
+  deriveLogicalCheckoutPayloadDigest,
+  parseUntrustedCheckout
+} from "./schema";
 
 const baseCheckout = {
   items: [{ productId: "burger-1", quantity: 2, optionSelections: { size: ["double"] }, notes: "Sin cebolla" }],
@@ -29,5 +33,55 @@ describe("parseUntrustedCheckout", () => {
       paymentMethod: "mercado_pago",
       customer: { name: "Ana", phone: "+54 9 11 5555 1234" }
     }).customer).toEqual({ name: "Ana", phone: "+54 9 11 5555 1234" });
+  });
+
+  it("accepts optional intentNonce in payload", () => {
+    const parsed = parseUntrustedCheckout({
+      ...baseCheckout,
+      intentNonce: "custom-nonce-1234"
+    });
+    expect(parsed.intentNonce).toBe("custom-nonce-1234");
+  });
+});
+
+describe("deriveLogicalCheckoutPayloadDigest and deriveLogicalCheckoutIdempotencyKey (P1-10)", () => {
+  const mpCheckout = {
+    items: [
+      { productId: "p-2", quantity: 1, optionSelections: { cheese: ["cheddar"] }, notes: "Poco hielo" },
+      { productId: "p-1", quantity: 2, optionSelections: { size: ["double"] }, notes: "" }
+    ],
+    fulfilment: "delivery" as const,
+    paymentMethod: "mercado_pago" as const,
+    customer: { name: " Carlos Gómez ", phone: "+54 9 381 555-1111" }
+  };
+
+  it("produces deterministic canonical key invariant to item ordering", () => {
+    const digest = deriveLogicalCheckoutPayloadDigest(mpCheckout);
+    expect(digest).toBeTypeOf("string");
+    expect(digest.length).toBe(64);
+
+    const permutedCheckout = {
+      ...mpCheckout,
+      items: [
+        { productId: "p-1", quantity: 2, optionSelections: { size: ["double"] }, notes: "" },
+        { productId: "p-2", quantity: 1, optionSelections: { cheese: ["cheddar"] }, notes: "Poco hielo" }
+      ]
+    };
+
+    const key1 = deriveLogicalCheckoutIdempotencyKey(mpCheckout);
+    const key2 = deriveLogicalCheckoutIdempotencyKey(permutedCheckout);
+
+    expect(key1).toBe(key2);
+    expect(key1.startsWith("checkout-")).toBe(true);
+    expect(key1.length).toBe(41); // checkout- (9) + 32 hex = 41 chars, satisfies check between 16 and 128
+  });
+
+  it("separates purchase intent nonce: different nonces produce distinct keys", () => {
+    const keyA = deriveLogicalCheckoutIdempotencyKey(mpCheckout, "intent-nonce-1");
+    const keyB = deriveLogicalCheckoutIdempotencyKey(mpCheckout, "intent-nonce-2");
+
+    expect(keyA).not.toBe(keyB);
+    expect(keyA.length).toBe(41);
+    expect(keyB.length).toBe(41);
   });
 });

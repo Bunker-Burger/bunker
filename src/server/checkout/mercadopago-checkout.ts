@@ -106,34 +106,15 @@ export async function prepareMercadoPagoCheckout(
   }
 
   const customer = checkout.customer;
-  const idempotencyKey = deriveLogicalCheckoutIdempotencyKey(checkout);
+  const initialIdempotencyKey = deriveLogicalCheckoutIdempotencyKey(checkout, checkout.intentNonce);
 
   // P2-09: Deduplicación atómica en memoria para carreras concurrentes (síncrona antes de cualquier await)
-  const inFlight = inFlightCheckouts.get(idempotencyKey);
+  const inFlight = inFlightCheckouts.get(initialIdempotencyKey);
   if (inFlight) {
     return inFlight;
   }
 
   const executionPromise: Promise<Result<MercadoPagoCheckoutSuccess, MercadoPagoCheckoutError>> = (async () => {
-    // P2-09: Reusar identidad e intento existente para el mismo checkout lógico
-    if (dependencies.attempts.findByIdempotencyKey) {
-      const existingAttempt = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
-      if (existingAttempt && existingAttempt.status === "pending" && existingAttempt.quoteId) {
-        const existingQuote = await dependencies.quotes.findById(existingAttempt.quoteId);
-        const isUnexpired = existingQuote && existingQuote.expiresAt.getTime() > dependencies.now().getTime();
-        if (isUnexpired && existingAttempt.providerPreferenceId) {
-          // Respuesta previa completa (respuesta perdida o retry del cliente):
-          // Retornar la misma preferencia existente sin invocar a MP ni generar registros duplicados!
-          return ok({
-            preferenceId: existingAttempt.providerPreferenceId,
-            checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${existingAttempt.providerPreferenceId}`,
-            externalReference: existingAttempt.externalReference,
-            quote: existingQuote
-          });
-        }
-      }
-    }
-
     let quote: PaymentQuote;
     try {
       quote = await createAuthoritativeQuote(checkout, {
@@ -153,13 +134,55 @@ export async function prepareMercadoPagoCheckout(
       return failure("unavailable", "No pudimos guardar la cotización del pedido.");
     }
 
+    let effectiveIdempotencyKey = initialIdempotencyKey;
+
+    // P1-10 & P2-09: Reusar identidad e intento existente SOLO si es un reintento legítimo del mismo intento activo
+    if (dependencies.attempts.findByIdempotencyKey) {
+      const existingAttempt = await dependencies.attempts.findByIdempotencyKey(initialIdempotencyKey);
+      if (existingAttempt) {
+        const isPending = existingAttempt.status === "pending";
+        const hasPreference = Boolean(existingAttempt.providerPreferenceId);
+        const matchesAmount = existingAttempt.expectedAmountCents === quote.totalCents;
+        let isUnexpired = false;
+        let existingQuote: PaymentQuote | null = null;
+        if (existingAttempt.quoteId) {
+          existingQuote = await dependencies.quotes.findById(existingAttempt.quoteId);
+          isUnexpired = Boolean(existingQuote && existingQuote.expiresAt.getTime() > dependencies.now().getTime());
+        }
+
+        if (isPending && matchesAmount && isUnexpired && existingQuote) {
+          if (hasPreference) {
+            // Reintento idéntico vigente (1 min reintento, pérdida de respuesta o reintento de cliente):
+            // Reutilizar la misma preferencia y cotización autoritativa sin invocar MP nuevamente
+            return ok({
+              preferenceId: existingAttempt.providerPreferenceId!,
+              checkoutUrl: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${existingAttempt.providerPreferenceId}`,
+              externalReference: existingAttempt.externalReference,
+              quote: existingQuote
+            });
+          }
+          // Intento en curso o reintento tras timeout sin preference_id:
+          // Mantener la MISMA clave de idempotencia para que MP procese el reintento idempotentemente!
+          effectiveIdempotencyKey = initialIdempotencyKey;
+        } else {
+          // P1-10: Si el intento previo terminó (status === 'approved' | 'rejected' | 'expired')
+          // o su cotización venció (>15 min) o cambió el precio/tarifa:
+          // Esta es una NUEVA COMPRA IDÉNTICA.
+          // NUNCA devolver URL vieja ni reutilizar una clave de idempotencia colisionante.
+          // Se genera una clave fresca para el nuevo pedido/intento:
+          const nonce = dependencies.createId();
+          effectiveIdempotencyKey = deriveLogicalCheckoutIdempotencyKey(checkout, nonce);
+        }
+      }
+    }
+
     let preference: { preferenceId: string; checkoutUrl: string; externalReference: string };
     try {
       preference = await createCheckoutProPreference(
         {
           quote: { id: quote.id, totalCents: quote.totalCents, expiresAt: quote.expiresAt },
           customer: { name: customer.name, phone: customer.phone },
-          idempotencyKey
+          idempotencyKey: effectiveIdempotencyKey
         },
         {
           config: mpDetection.config,
@@ -182,11 +205,11 @@ export async function prepareMercadoPagoCheckout(
     });
   })();
 
-  inFlightCheckouts.set(idempotencyKey, executionPromise);
+  inFlightCheckouts.set(initialIdempotencyKey, executionPromise);
   try {
     return await executionPromise;
   } finally {
-    inFlightCheckouts.delete(idempotencyKey);
+    inFlightCheckouts.delete(initialIdempotencyKey);
   }
 }
 

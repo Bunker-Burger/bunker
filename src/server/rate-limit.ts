@@ -85,6 +85,163 @@ export interface DistributedQuotaBackend {
   size?(): number;
 }
 
+export interface RemoteQuotaTransportPayload {
+  key: string;
+  windowStartMs: number;
+  expiresAtMs: number;
+  nowMs: number;
+}
+
+export interface RemoteQuotaTransportResponse {
+  count: number;
+}
+
+/**
+ * P2-05: Backend de cuota distribuida a través de transporte de red HTTP.
+ * Desacopla runtimes serverless (Lambdas/Edge) comunicando con un servicio centralizado de cuota.
+ */
+export class RemoteTransportQuotaBackend implements DistributedQuotaBackend {
+  constructor(
+    private options: {
+      endpointUrl: string;
+      fetcher?: typeof fetch;
+      apiKey?: string;
+      timeoutMs?: number;
+    }
+  ) {}
+
+  async atomicIncrement(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
+    const fetchFn = this.options.fetcher ?? fetch;
+    const body: RemoteQuotaTransportPayload = {
+      key,
+      windowStartMs,
+      expiresAtMs,
+      nowMs: nowMs ?? Date.now()
+    };
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (this.options.apiKey) {
+      headers["Authorization"] = `Bearer ${this.options.apiKey}`;
+    }
+
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId =
+      controller && this.options.timeoutMs
+        ? setTimeout(() => controller.abort(), this.options.timeoutMs)
+        : null;
+
+    const init: RequestInit = {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body)
+    };
+    if (controller) {
+      init.signal = controller.signal;
+    }
+
+    try {
+      const response = await fetchFn(this.options.endpointUrl, init);
+
+      if (!response.ok) {
+        throw new Error(`Transporte de cuota devolvió HTTP ${response.status}`);
+      }
+
+      const json = (await response.json()) as RemoteQuotaTransportResponse;
+      if (typeof json?.count !== "number") {
+        throw new Error("Formato de respuesta de cuota inválido: falta count");
+      }
+      return json.count;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+}
+
+/**
+ * P2-05: Implementación de cuota distribuida basada en Supabase RPC.
+ *
+ * Decisión técnica y diseño de migración (para aplicar tras autorización):
+ *
+ * ```sql
+ * create table if not exists private.rate_limit_quotas (
+ *   key text primary key,
+ *   count integer not null check (count > 0),
+ *   window_start timestamptz not null,
+ *   expires_at timestamptz not null,
+ *   updated_at timestamptz not null default now()
+ * );
+ *
+ * create or replace function private.atomic_increment_rate_limit(
+ *   p_key text,
+ *   p_window_start timestamptz,
+ *   p_expires_at timestamptz,
+ *   p_now timestamptz default now()
+ * )
+ * returns integer
+ * language plpgsql
+ * security definer
+ * as $$
+ * declare
+ *   v_count integer;
+ * begin
+ *   insert into private.rate_limit_quotas (key, count, window_start, expires_at, updated_at)
+ *   values (p_key, 1, p_window_start, p_expires_at, p_now)
+ *   on conflict (key) do update
+ *     set count = case
+ *                   when private.rate_limit_quotas.expires_at <= p_now then 1
+ *                   else private.rate_limit_quotas.count + 1
+ *                 end,
+ *         window_start = case
+ *                          when private.rate_limit_quotas.expires_at <= p_now then p_window_start
+ *                          else private.rate_limit_quotas.window_start
+ *                        end,
+ *         expires_at = case
+ *                        when private.rate_limit_quotas.expires_at <= p_now then p_expires_at
+ *                        else private.rate_limit_quotas.expires_at
+ *                      end,
+ *         updated_at = p_now
+ *   returning count into v_count;
+ *   return v_count;
+ * end;
+ * $$;
+ * ```
+ */
+export class SupabaseRpcQuotaBackend implements DistributedQuotaBackend {
+  constructor(
+    private client: {
+      rpc: (
+        name: string,
+        params: Record<string, unknown>
+      ) => Promise<{ data: unknown; error: unknown }>;
+    }
+  ) {}
+
+  async atomicIncrement(key: string, windowStartMs: number, expiresAtMs: number, nowMs?: number): Promise<number> {
+    const { data, error } = await this.client.rpc("atomic_increment_rate_limit", {
+      p_key: key,
+      p_window_start: new Date(windowStartMs).toISOString(),
+      p_expires_at: new Date(expiresAtMs).toISOString(),
+      p_now: new Date(nowMs ?? Date.now()).toISOString()
+    });
+
+    if (error) {
+      throw new Error(
+        `Error en Supabase RPC atomic_increment_rate_limit: ${String(
+          (error as { message?: string }).message || error
+        )}`
+      );
+    }
+
+    if (typeof data !== "number") {
+      throw new Error("RPC atomic_increment_rate_limit devolvió resultado no numérico");
+    }
+
+    return data;
+  }
+}
+
 /**
  * Atomic in-memory implementation of DistributedQuotaBackend.
  * Serializes access per key to guarantee atomic updates without race conditions,
@@ -201,7 +358,22 @@ export function getSharedRateLimitStore(options?: {
   backend?: DistributedQuotaBackend;
   maxEntries?: number;
 }): RateLimitStore {
-  return new DistributedRateLimitStore(options?.backend ?? getGlobalDistributedBackend(options));
+  if (options?.backend) {
+    return new DistributedRateLimitStore(options.backend);
+  }
+
+  const upstreamUrl = process.env.RATE_LIMIT_UPSTREAM_URL?.trim();
+  if (upstreamUrl) {
+    const apiKey = process.env.RATE_LIMIT_API_KEY?.trim();
+    return new DistributedRateLimitStore(
+      new RemoteTransportQuotaBackend({
+        endpointUrl: upstreamUrl,
+        ...(apiKey ? { apiKey } : {})
+      })
+    );
+  }
+
+  return new DistributedRateLimitStore(getGlobalDistributedBackend(options));
 }
 
 export function createFixedWindowRateLimiter(options: RateLimiterOptions) {

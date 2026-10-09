@@ -19,7 +19,8 @@ export const untrustedCheckoutSchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(50),
   fulfilment: z.enum(["pickup", "delivery"]),
   paymentMethod: z.enum(["cash_exact", "transfer", "mercado_pago"]),
-  customer: customerSchema.optional()
+  customer: customerSchema.optional(),
+  intentNonce: z.string().trim().min(4).max(128).optional()
 }).strict().superRefine((checkout, context) => {
   if (checkout.paymentMethod === "mercado_pago" && !checkout.customer) {
     context.addIssue({
@@ -37,10 +38,10 @@ export function parseUntrustedCheckout(input: unknown): CheckoutRequest {
 }
 
 /**
- * P2-09: Deriva una identidad de idempotencia determinista y canónica para el checkout lógico.
- * Garantiza longitud entre 16 y 128 caracteres para compatibilidad con la restricción de BD.
+ * P1-10: Canonicaliza el payload del carrito y contacto del cliente.
+ * Produce un digest SHA-256 determinista del contenido ordenado canónicamente.
  */
-export function deriveLogicalCheckoutIdempotencyKey(checkout: CheckoutRequest): string {
+export function deriveLogicalCheckoutPayloadDigest(checkout: CheckoutRequest): string {
   const canonical = {
     customer: {
       name: checkout.customer?.name.trim().toLowerCase(),
@@ -60,9 +61,27 @@ export function deriveLogicalCheckoutIdempotencyKey(checkout: CheckoutRequest): 
       .sort((a, b) => a.productId.localeCompare(b.productId))
   };
 
-  // Usar hash SHA-256 para una clave compacta y determinista (41 caracteres: checkout- + 32 hex)
   const jsonStr = JSON.stringify(canonical);
-  const digest = createHash("sha256").update(jsonStr).digest("hex");
-  return `checkout-${digest.slice(0, 32)}`;
+  return createHash("sha256").update(jsonStr).digest("hex");
+}
+
+/**
+ * P1-10: Deriva una clave de idempotencia combinando el hash canónico del payload
+ * con el nonce de intención de compra del intento (intentNonce).
+ * Garantiza longitud fija de 41 caracteres (checkout- + 32 hex), satisfaciendo la restricción DB de 16..128.
+ */
+export function deriveLogicalCheckoutIdempotencyKey(
+  checkout: CheckoutRequest,
+  intentNonce?: string
+): string {
+  const payloadDigest = deriveLogicalCheckoutPayloadDigest(checkout);
+  const nonce = intentNonce?.trim() || checkout.intentNonce?.trim();
+  if (nonce) {
+    const combinedDigest = createHash("sha256")
+      .update(`${payloadDigest}:${nonce}`)
+      .digest("hex");
+    return `checkout-${combinedDigest.slice(0, 32)}`;
+  }
+  return `checkout-${payloadDigest.slice(0, 32)}`;
 }
 

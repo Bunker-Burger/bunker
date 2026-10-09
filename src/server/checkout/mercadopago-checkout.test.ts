@@ -541,4 +541,276 @@ describe("prepareMercadoPagoCheckout", () => {
     // Exactamente 1 llamada a Mercado Pago gracias a la deduplicación concurrente
     expect(mpCalls).toBe(1);
   });
+
+  it("P1-10: nueva compra idéntica después de 16 min (quote expirada) genera nueva quote, reference y preferencia sin devolver URL vieja", async () => {
+    const repo = createInMemoryPaymentRepository();
+    let mpCalls = 0;
+
+    const fetcher: typeof fetch = async () => {
+      mpCalls += 1;
+      return new Response(
+        JSON.stringify({ id: `pref_mp_call_${mpCalls}`, init_point: `https://mp.test/init_${mpCalls}` }),
+        { status: 200 }
+      );
+    };
+
+    const payload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Tomás Blanco", phone: "+54 9 381 555-9999" }
+    };
+
+    // Primera compra a las 01:00:00 (vence 01:15:00)
+    const firstOrder = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-first",
+      now: () => new Date("2026-10-09T01:00:00Z"),
+      fetcher
+    });
+
+    expect(firstOrder.ok).toBe(true);
+    if (!firstOrder.ok) return;
+    expect(firstOrder.value.preferenceId).toBe("pref_mp_call_1");
+    expect(mpCalls).toBe(1);
+
+    // 16 minutos después (01:16:00), la cotización previa ya expiró
+    // El cliente inicia una nueva compra con el mismo carrito y datos:
+    const secondOrder = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-second",
+      now: () => new Date("2026-10-09T01:16:00Z"),
+      fetcher
+    });
+
+    expect(secondOrder.ok).toBe(true);
+    if (!secondOrder.ok) return;
+
+    // P1-10: NUNCA devuelve la preferencia vieja ni la URL vieja!
+    expect(secondOrder.value.preferenceId).toBe("pref_mp_call_2");
+    expect(secondOrder.value.preferenceId).not.toBe(firstOrder.value.preferenceId);
+    expect(secondOrder.value.externalReference).not.toBe(firstOrder.value.externalReference);
+    expect(secondOrder.value.quote.id).not.toBe(firstOrder.value.quote.id);
+    expect(mpCalls).toBe(2);
+  });
+
+  it("P1-10: nuevo pedido idéntico tras un pago aprobado genera nueva quote, reference y preferencia", async () => {
+    const repo = createInMemoryPaymentRepository();
+    let mpCalls = 0;
+
+    const fetcher: typeof fetch = async () => {
+      mpCalls += 1;
+      return new Response(
+        JSON.stringify({ id: `pref_approved_flow_${mpCalls}`, init_point: `https://mp.test/init_${mpCalls}` }),
+        { status: 200 }
+      );
+    };
+
+    const payload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Sofía Morán", phone: "+54 9 381 555-1122" }
+    };
+
+    // Pedido 1
+    const order1 = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-sofia-1",
+      now: () => new Date("2026-10-09T01:00:00Z"),
+      fetcher
+    });
+
+    expect(order1.ok).toBe(true);
+    if (!order1.ok) return;
+    expect(order1.value.preferenceId).toBe("pref_approved_flow_1");
+
+    // El pago del Pedido 1 se completa y se aprueba
+    await repo.attempts.markApproved(order1.value.externalReference, "pay-sofia-real-1");
+
+    // 5 minutos después, Sofía hace un segundo pedido idéntico:
+    const order2 = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-sofia-2",
+      now: () => new Date("2026-10-09T01:05:00Z"),
+      fetcher
+    });
+
+    expect(order2.ok).toBe(true);
+    if (!order2.ok) return;
+
+    // P1-10: Produce nueva referencia y preferencia, nunca la anterior ya aprobada
+    expect(order2.value.preferenceId).toBe("pref_approved_flow_2");
+    expect(order2.value.externalReference).not.toBe(order1.value.externalReference);
+    expect(mpCalls).toBe(2);
+  });
+
+  it("P1-10: cambio de tarifa o precio genera nueva cotización y preferencia con monto vigente", async () => {
+    const repo = createInMemoryPaymentRepository();
+    let mpCalls = 0;
+
+    const fetcher: typeof fetch = async () => {
+      mpCalls += 1;
+      return new Response(
+        JSON.stringify({ id: `pref_tariff_${mpCalls}`, init_point: `https://mp.test/init_${mpCalls}` }),
+        { status: 200 }
+      );
+    };
+
+    const payload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "delivery",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Camila Paez", phone: "+54 9 381 555-3344" }
+    };
+
+    // Pedido inicial con delivery a $1500 (total: $8000 + $1500 = $9500)
+    const initialOrder = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: async () =>
+        ok(
+          evaluateStoreStatus(
+            { timezone: "America/Argentina/Tucuman", statusOverride: "open", deliveryFeeCents: 150000n, businessHours: [] },
+            new Date("2026-10-09T01:00:00Z")
+          )
+        ),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-camila-1",
+      now: () => new Date("2026-10-09T01:00:00Z"),
+      fetcher
+    });
+
+    expect(initialOrder.ok).toBe(true);
+    if (!initialOrder.ok) return;
+    expect(initialOrder.value.quote.totalCents).toBe(950000n);
+
+    // El local actualiza la tarifa de delivery a $2500 (nuevo total: $10500)
+    const updatedOrder = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: async () =>
+        ok(
+          evaluateStoreStatus(
+            { timezone: "America/Argentina/Tucuman", statusOverride: "open", deliveryFeeCents: 250000n, businessHours: [] },
+            new Date("2026-10-09T01:02:00Z")
+          )
+        ),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-camila-2",
+      now: () => new Date("2026-10-09T01:02:00Z"),
+      fetcher
+    });
+
+    expect(updatedOrder.ok).toBe(true);
+    if (!updatedOrder.ok) return;
+
+    // P1-10: La cotización refleja el nuevo monto vigente ($10500) y genera nueva preferencia
+    expect(updatedOrder.value.quote.totalCents).toBe(1050000n);
+    expect(updatedOrder.value.preferenceId).toBe("pref_tariff_2");
+    expect(mpCalls).toBe(2);
+  });
+
+  it("P1-10: carrera concurrente con conflicto unique en payment_attempts gestiona read/retry seguro sin HTTP 503 espurio", async () => {
+    let saveCount = 0;
+    const repo = createInMemoryPaymentRepository();
+    const originalSave = repo.attempts.save.bind(repo.attempts);
+
+    // Simular que el segundo intento en carrera dispara error de clave duplicada en DB (23505)
+    repo.attempts.save = async (attempt) => {
+      saveCount += 1;
+      if (saveCount === 2) {
+        // Lanzar violación de unicidad idéntica a PostgreSQL
+        const pgErr = new Error('duplicate key value violates unique constraint "payment_attempts_idempotency_key_key"');
+        (pgErr as { code?: string }).code = "23505";
+        throw pgErr;
+      }
+      return originalSave(attempt);
+    };
+
+    const fetcher: typeof fetch = async () =>
+      new Response(JSON.stringify({ id: "pref_race_safe", init_point: "https://mp.test/init" }), { status: 200 });
+
+    const payload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Martín Rivas", phone: "+54 9 381 555-6677" },
+      intentNonce: "race-safe-nonce"
+    };
+
+    // Ejecución simultánea simulando dos Lambdas concurrentes
+    const [res1, res2] = await Promise.all([
+      prepareMercadoPagoCheckout(payload, {
+        detectConfig: () => ({
+          enabled: true,
+          config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+        }),
+        loadCatalog: async () => ok(mockCatalog()),
+        loadStoreStatus: mockStoreStatus("open"),
+        quotes: repo.quotes,
+        attempts: repo.attempts,
+        createId: () => "att-race-1",
+        now: () => new Date("2026-10-09T01:00:00Z"),
+        fetcher
+      }),
+      prepareMercadoPagoCheckout(payload, {
+        detectConfig: () => ({
+          enabled: true,
+          config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+        }),
+        loadCatalog: async () => ok(mockCatalog()),
+        loadStoreStatus: mockStoreStatus("open"),
+        quotes: repo.quotes,
+        attempts: repo.attempts,
+        createId: () => "att-race-2",
+        now: () => new Date("2026-10-09T01:00:00Z"),
+        fetcher
+      })
+    ]);
+
+    // Ninguno falla con 503 espurio: ambos resuelven ok!
+    expect(res1.ok).toBe(true);
+    expect(res2.ok).toBe(true);
+    if (!res1.ok || !res2.ok) return;
+
+    expect(res1.value.preferenceId).toBe("pref_race_safe");
+    expect(res2.value.preferenceId).toBe("pref_race_safe");
+  });
 });

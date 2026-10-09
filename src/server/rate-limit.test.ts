@@ -4,10 +4,10 @@ import type { RateLimitStore } from "./rate-limit";
 import {
   AtomicRateLimitStore,
   createFixedWindowRateLimiter,
-  DistributedMemoryQuotaBackend,
   DistributedRateLimitStore,
   extractClientIp,
-  MemoryRateLimitStore
+  MemoryRateLimitStore,
+  RemoteTransportQuotaBackend
 } from "./rate-limit";
 
 describe("createFixedWindowRateLimiter (P2-05)", () => {
@@ -41,60 +41,99 @@ describe("createFixedWindowRateLimiter (P2-05)", () => {
     expect(res.error).toBe("rate_limit_backend_unavailable");
   });
 
-  it("shares atomic quota across 2 separate serverless instances / cold starts (P2-05)", async () => {
-    const sharedBackend = new DistributedMemoryQuotaBackend();
-    const fixedNow = 1_000_000;
+  it("shares atomic quota across 2 isolated runtimes via shared network transport (P2-05)", async () => {
+    // Servidor centralizado independiente (ej. KV / Upstash / microservicio de cuota)
+    const centralStore = new Map<string, { count: number; expiresAt: number }>();
+    let networkCallsA = 0;
+    let networkCallsB = 0;
 
-    // Instance A (Lambda 1): has its own store instance
-    const storeA = new DistributedRateLimitStore(sharedBackend);
-    const instanceA = createFixedWindowRateLimiter({
+    const handleTransportRequest = async (bodyJson: string): Promise<Response> => {
+      const { key, expiresAtMs, nowMs } = JSON.parse(bodyJson);
+      const existing = centralStore.get(key);
+      if (!existing || existing.expiresAt <= nowMs) {
+        centralStore.set(key, { count: 1, expiresAt: expiresAtMs });
+        return new Response(JSON.stringify({ count: 1 }), { status: 200 });
+      }
+      existing.count += 1;
+      return new Response(JSON.stringify({ count: existing.count }), { status: 200 });
+    };
+
+    // Runtime A (Lambda 1): entorno aislado con su propio fetcher de red
+    const fetcherA: typeof fetch = async (_url, init) => {
+      networkCallsA += 1;
+      return handleTransportRequest(String(init?.body));
+    };
+    const backendA = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: fetcherA
+    });
+    const storeA = new DistributedRateLimitStore(backendA);
+    const runtimeA = createFixedWindowRateLimiter({
       store: storeA,
       limit: 10,
       windowMs: 60_000,
-      now: () => fixedNow
+      now: () => 1_000_000
     });
 
-    // 6 requests through Instance A
-    for (let i = 0; i < 6; i++) {
-      const res = await instanceA.check("ip:shared-client");
-      expect(res.allowed).toBe(true);
-    }
-
-    // Instance B (Lambda 2 / cold start): newly spawned, separate store instance (not same Map reference!)
-    const storeB = new DistributedRateLimitStore(sharedBackend);
-    expect(storeA).not.toBe(storeB);
-
-    const instanceB = createFixedWindowRateLimiter({
+    // Runtime B (Lambda 2): entorno aislado con su propio fetcher de red (sin memoria compartida con A)
+    const fetcherB: typeof fetch = async (_url, init) => {
+      networkCallsB += 1;
+      return handleTransportRequest(String(init?.body));
+    };
+    const backendB = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: fetcherB
+    });
+    const storeB = new DistributedRateLimitStore(backendB);
+    const runtimeB = createFixedWindowRateLimiter({
       store: storeB,
       limit: 10,
       windowMs: 60_000,
-      now: () => fixedNow
+      now: () => 1_000_000
     });
 
-    // 4 requests through Instance B
-    for (let i = 0; i < 4; i++) {
-      const res = await instanceB.check("ip:shared-client");
-      expect(res.allowed).toBe(true);
-    }
+    // Verificar aislamiento estricto: no comparten referencias en memoria
+    expect(backendA).not.toBe(backendB);
+    expect(storeA).not.toBe(storeB);
 
-    // 11th request across either instance MUST be rate limited (429 / allowed: false)
-    const rejectedB = await instanceB.check("ip:shared-client");
+    // 6 peticiones a través de Runtime A
+    for (let i = 0; i < 6; i++) {
+      const res = await runtimeA.check("ip:shared-client");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(10 - (i + 1));
+    }
+    expect(networkCallsA).toBe(6);
+
+    // 4 peticiones a través de Runtime B
+    for (let i = 0; i < 4; i++) {
+      const res = await runtimeB.check("ip:shared-client");
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(4 - (i + 1));
+    }
+    expect(networkCallsB).toBe(4);
+
+    // 11ª petición enviada a Runtime B: se bloquea con 429 (allowed: false, remaining: 0, retryAfterMs > 0)
+    const rejectedB = await runtimeB.check("ip:shared-client");
     expect(rejectedB.allowed).toBe(false);
     expect(rejectedB.remaining).toBe(0);
     expect(rejectedB.retryAfterMs).toBeGreaterThan(0);
+    expect(Math.ceil(rejectedB.retryAfterMs / 1000)).toBeGreaterThanOrEqual(1);
 
-    const rejectedA = await instanceA.check("ip:shared-client");
+    // 12ª petición enviada a Runtime A: se bloquea igualmente
+    const rejectedA = await runtimeA.check("ip:shared-client");
     expect(rejectedA.allowed).toBe(false);
     expect(rejectedA.remaining).toBe(0);
   });
 
   it("fails closed when distributed backend is down or unreachable (P2-05)", async () => {
-    const failingBackend = {
-      async atomicIncrement() {
-        throw new Error("Distributed backend connection timed out");
-      }
+    const failingFetcher: typeof fetch = async () => {
+      throw new Error("Distributed backend connection timed out / network drop");
     };
-    const store = new DistributedRateLimitStore(failingBackend);
+    const backend = new RemoteTransportQuotaBackend({
+      endpointUrl: "https://quota.bunker.internal/increment",
+      fetcher: failingFetcher
+    });
+    const store = new DistributedRateLimitStore(backend);
     const limiter = createFixedWindowRateLimiter({
       store,
       limit: 10,

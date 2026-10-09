@@ -735,6 +735,11 @@ function CheckoutSection({
   const [customerPhone, setCustomerPhone] = useState("");
   const [isSubmittingMp, setIsSubmittingMp] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
+  const checkoutNonceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    checkoutNonceRef.current = null;
+  }, [cart, fulfilment]);
 
   const isCustomerValid = customerName.trim().length >= 2 && customerPhone.trim().length >= 6;
   const nowMs = now?.getTime() ?? null;
@@ -765,6 +770,11 @@ function CheckoutSection({
     if (!canSubmitMp) return;
     setIsSubmittingMp(true);
     setMpError(null);
+    if (!checkoutNonceRef.current) {
+      checkoutNonceRef.current = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `nonce-${Date.now()}`;
+    }
     try {
       const payload = {
         items: cart.map((line) => ({
@@ -778,7 +788,8 @@ function CheckoutSection({
         customer: {
           name: customerName.trim(),
           phone: customerPhone.trim()
-        }
+        },
+        intentNonce: checkoutNonceRef.current
       };
 
       const res = await fetch("/api/checkout/mercado-pago", {
@@ -807,6 +818,7 @@ function CheckoutSection({
       }
 
       if (data?.checkoutUrl) {
+        checkoutNonceRef.current = null;
         if (onCheckoutRedirect) {
           onCheckoutRedirect(data.checkoutUrl);
         } else if (typeof window.location.assign === "function") {

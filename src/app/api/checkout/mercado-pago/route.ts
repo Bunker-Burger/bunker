@@ -60,6 +60,11 @@ export async function POST(request: Request) {
     body = null;
   }
 
+  const idempotencyHeader = request.headers.get("x-idempotency-key") || request.headers.get("idempotency-key");
+  if (idempotencyHeader && body && typeof body === "object" && !("intentNonce" in body)) {
+    (body as Record<string, unknown>).intentNonce = idempotencyHeader.trim();
+  }
+
   const now = new Date();
   const ports = getPaymentPersistencePorts();
   if (!ports) {

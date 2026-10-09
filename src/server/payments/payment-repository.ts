@@ -205,6 +205,21 @@ export function createInMemoryPaymentRepository(): {
 
   const attempts: PaymentAttemptsPort = {
     async save(attempt: PaymentAttempt): Promise<void> {
+      // P1-10: Simular la restricción UNIQUE de PostgreSQL sobre idempotency_key
+      if (attempt.idempotencyKey) {
+        for (const existing of attemptsMap.values()) {
+          if (
+            existing.id !== attempt.id &&
+            existing.idempotencyKey === attempt.idempotencyKey
+          ) {
+            const err = new Error(
+              'duplicate key value violates unique constraint "payment_attempts_idempotency_key_key"'
+            );
+            (err as { code?: string }).code = "23505";
+            throw err;
+          }
+        }
+      }
       attemptsMap.set(attempt.externalReference, { ...attempt });
     },
     async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
