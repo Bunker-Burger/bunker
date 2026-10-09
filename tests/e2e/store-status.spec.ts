@@ -63,7 +63,8 @@ test.describe("with the status answered per state", () => {
       await expectNoSendAction(page);
 
       // Browsing and the persisted cart are unaffected, across a reload too.
-      await page.getByRole("button", { name: "Papas" }).click();
+      // Exact: with every section listed, "Ver Papas Búnker" and "Agregar Papas Búnker" match too.
+      await page.getByRole("button", { name: "Papas", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Papas Búnker" })).toBeVisible();
       await page.reload();
       await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();

@@ -32,6 +32,7 @@ export default async function Home({ searchParams }: HomeProps) {
           : undefined
       }
       initialProducts={initialProducts}
+      categories={initialProducts && catalogResult.ok ? catalogResult.value.categories : undefined}
     />
   );
 }
