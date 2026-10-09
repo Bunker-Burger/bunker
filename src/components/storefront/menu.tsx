@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, Search, X } from "lucide-react";
+import { Check, Plus, Search, UtensilsCrossed, X } from "lucide-react";
 import { useId, useMemo, useRef, useState, type FocusEvent } from "react";
 import type { Category, Product } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
@@ -16,7 +16,8 @@ const plural = (count: number) => (count === 1 ? "1 producto" : `${count} produc
 
 interface MenuProps {
   products: readonly Product[];
-  categories?: readonly Category[] | undefined;
+  /** Categories of the same snapshot as `products`. */
+  categories: readonly Category[];
   promotionFor: (product: Product) => PromotionalPrice | null;
   onOpen: (product: Product) => void;
   onAdd: (product: Product) => void;
@@ -43,7 +44,19 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd }: Menu
   const activeFilter = filters.some((option) => option.id === filter) ? filter : "all";
   const sections = buildMenuSections(products, sectionCategories, activeFilter, query);
   const shown = sections.reduce((total, section) => total + section.products.length, 0);
+  const published = products.some((product) => product.published);
   const narrowed = activeFilter !== "all" || query.trim() !== "";
+
+  // Nothing published is a real state of the store, not a failed search: no tools, no cards.
+  if (!published) {
+    return (
+      <div className="empty-state menu-empty menu-unpublished" role="status">
+        <UtensilsCrossed aria-hidden="true" />
+        <h2>La carta está vacía por ahora</h2>
+        <p>El local todavía no publicó productos. Volvé a mirar en un rato.</p>
+      </div>
+    );
+  }
 
   return (
     <>

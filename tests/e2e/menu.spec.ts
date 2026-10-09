@@ -1,4 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { categories as fixtureCategories, products as fixtureProducts } from "../../src/data/catalog";
+import type { Category, Product, PublicCatalogSnapshot } from "../../src/domain/types";
+import { serializePublicCatalog } from "../../src/server/catalog/public-products";
 
 /*
  * BB-07: public menu and product drawer in a real browser (production build, static fallback
@@ -22,13 +25,6 @@ test("a shared link opens the product, survives a reload, and closing returns to
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("button", { name: "Ver Oklahoma Onion" })).toBeFocused();
-});
-
-test("an unknown product link cleans the URL and says so", async ({ page }) => {
-  await page.goto("/?producto=no-existe");
-  await expect(page.getByRole("status").filter({ hasText: "Ese producto ya no está disponible." })).toBeVisible();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("opening from a card and going Back closes it and restores scroll and focus", async ({ page }) => {
@@ -102,4 +98,94 @@ test("the section chips stay pinned while scrolling and jump back to the results
   await chips.getByRole("button", { name: "Papas", exact: true }).click();
   await expect(page.locator("#menu").getByRole("heading", { level: 2, name: "Papas" })).toBeInViewport();
   await expect(page.getByRole("button", { name: "Ver Papas Búnker" })).toBeInViewport();
+});
+
+/*
+ * Review 1: the menu follows /api/store/products (products + categories of one read). Without
+ * Supabase (CI), the page is server-rendered with no snapshot and shows the demo copy until this
+ * answer arrives, so these cover "fallback, then the real answer".
+ */
+test.describe("with the catalog answered by the test", () => {
+  // page.route() does not see requests made by the service worker.
+  test.use({ serviceWorkers: "block" });
+
+  const answer = (page: Page, reply: () => { status: number; json: unknown }) =>
+    page.route("**/api/store/products", (route) => {
+      const { status, json } = reply();
+      return route.fulfill({ status, json, headers: { "cache-control": "no-store" } });
+    });
+  const snapshot = (catalog: PublicCatalogSnapshot) => () => ({ status: 200, json: serializePublicCatalog(catalog) });
+  const fresh: Product = { ...fixtureProducts[0]!, id: "nueva-del-dia", slug: "nueva-del-dia", name: "Nueva del Día", featured: false };
+
+  test("a verified empty menu (200 with empty lists) replaces the demo copy with an empty state", async ({ page }) => {
+    await answer(page, snapshot({ products: [], categories: [] }));
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: "La carta está vacía por ahora" })).toBeVisible();
+    await expect(page.locator("#menu").getByRole("article")).toHaveCount(0);
+    await expect(page.locator("#menu").getByRole("button")).toHaveCount(0);
+    await expect(page.getByRole("searchbox")).toHaveCount(0);
+  });
+
+  test("a 503 keeps the menu as it was and marks it pending, never empty", async ({ page }) => {
+    await answer(page, () => ({ status: 503, json: { error: "unavailable" } }));
+    await page.goto("/");
+
+    await expect(page.getByTestId("verification-status-note")).toContainText("Pendiente de verificar");
+    await expect(page.getByRole("button", { name: "Ver Smash Búnker Doble" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "La carta está vacía por ahora" })).toHaveCount(0);
+  });
+
+  test("a shared link to a product only the fresh catalog has opens it and keeps the URL", async ({ page }) => {
+    await answer(page, snapshot({ products: [...fixtureProducts, fresh], categories: fixtureCategories }));
+    await page.goto("/?producto=nueva-del-dia");
+
+    await expect(page.getByRole("dialog", { name: "Personalizar Nueva del Día" })).toBeVisible();
+    await expect(page).toHaveURL(/\?producto=nueva-del-dia$/);
+  });
+
+  test("while the catalog cannot be verified (503) a shared link keeps its URL and is not declared missing", async ({ page }) => {
+    await answer(page, () => ({ status: 503, json: { error: "unavailable" } }));
+    await page.goto("/?producto=nueva-del-dia");
+
+    await expect(page.getByRole("status").filter({ hasText: "No pudimos confirmar ese producto" })).toBeVisible();
+    await expect(page).toHaveURL(/\?producto=nueva-del-dia$/);
+    await expect(page.getByText("Ese producto ya no está disponible.")).toHaveCount(0);
+  });
+
+  test("an unknown product link is cleaned and announced once the catalog answers without it", async ({ page }) => {
+    await answer(page, snapshot({ products: fixtureProducts, categories: fixtureCategories }));
+    await page.goto("/?producto=no-existe");
+
+    await expect(page.getByRole("status").filter({ hasText: "Ese producto ya no está disponible." })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("a demo product the store no longer publishes closes, cleans the URL and says so", async ({ page }) => {
+    const withoutOklahoma = fixtureProducts.filter((product) => product.slug !== "oklahoma-onion");
+    await answer(page, snapshot({ products: withoutOklahoma, categories: fixtureCategories }));
+    await page.goto("/?producto=oklahoma-onion");
+
+    await expect(page.getByRole("status").filter({ hasText: "Ese producto ya no está disponible." })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("button", { name: "Ver Oklahoma Onion" })).toHaveCount(0);
+  });
+
+  test("sections follow the live categories: names, order and a hidden one", async ({ page }) => {
+    const live: Category[] = [
+      { ...fixtureCategories[3]!, name: "Para tomar", sortOrder: 1 },
+      { ...fixtureCategories[0]!, name: "Clásicas", sortOrder: 2 },
+      { ...fixtureCategories[2]!, sortOrder: 3 }
+    ];
+    // The server stops publishing a hidden category's products along with it.
+    const products = fixtureProducts.filter((product) => product.categoryId !== "sandwiches");
+    await answer(page, snapshot({ products, categories: live }));
+    await page.goto("/");
+
+    const chips = page.getByRole("group", { name: "Secciones de la carta" }).getByRole("button");
+    await expect(chips).toHaveText(["Todo", "Destacadas", "Para tomar", "Clásicas", "Papas"]);
+    await expect(page.locator("#menu").getByRole("heading", { level: 2 })).toHaveText(["Las más pedidas", "Para tomar", "Papas"]);
+  });
 });

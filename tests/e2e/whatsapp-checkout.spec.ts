@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { products } from "../../src/data/catalog";
-import { serializePublicProducts } from "../../src/server/catalog/public-products";
+import { categories as fixtureCategories, products } from "../../src/data/catalog";
+import { serializePublicCatalog } from "../../src/server/catalog/public-products";
 
 /*
  * BB-10: with the store open and the catalog verified, the checkout asks for no personal data,
@@ -25,7 +25,7 @@ async function serveOpenStore(page: Page, checkout: (body: unknown) => { status:
   await page.route("**/api/store/status", (route) => route.fulfill({ json: openStore, headers: { "cache-control": "no-store" } }));
   await page.route("**/api/store/promotions", (route) => route.fulfill({ json: { promotions: [] }, headers: { "cache-control": "no-store" } }));
   await page.route("**/api/store/products", (route) =>
-    route.fulfill({ json: { products: serializePublicProducts(products) }, headers: { "cache-control": "no-store" } })
+    route.fulfill({ json: serializePublicCatalog({ products, categories: fixtureCategories }), headers: { "cache-control": "no-store" } })
   );
   await page.route("**/api/checkout/whatsapp", (route) => {
     const body: unknown = route.request().postDataJSON();

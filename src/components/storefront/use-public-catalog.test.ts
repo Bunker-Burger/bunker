@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
-import { serializePublicProducts } from "@/server/catalog/public-products";
+import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
+import { serializePublicCategories, serializePublicProducts } from "@/server/catalog/public-products";
 import { usePublicCatalog } from "./use-public-catalog";
 
 describe("usePublicCatalog hook (P1 B concurrency & lifecycle)", () => {
@@ -50,7 +50,7 @@ describe("usePublicCatalog hook (P1 B concurrency & lifecycle)", () => {
           return {
             ok: true,
             status: 200,
-            json: async () => ({ products: catalogB })
+            json: async () => ({ products: catalogB, categories: serializePublicCategories(fixtureCategories) })
           } as unknown as Response;
         }
       })
@@ -74,7 +74,7 @@ describe("usePublicCatalog hook (P1 B concurrency & lifecycle)", () => {
 
     // Now Request A's json() finally finishes with stale catalog A
     await act(async () => {
-      resolveJsonA!({ products: catalogA });
+      resolveJsonA!({ products: catalogA, categories: serializePublicCategories(fixtureCategories) });
     });
 
     // CRITICAL: Stale Request A MUST NOT overwrite Request B!
@@ -90,7 +90,7 @@ describe("usePublicCatalog hook (P1 B concurrency & lifecycle)", () => {
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => ({ products: catalogValid })
+        json: async () => ({ products: catalogValid, categories: serializePublicCategories(fixtureCategories) })
       }))
     );
 

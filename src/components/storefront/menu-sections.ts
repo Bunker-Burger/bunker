@@ -1,4 +1,3 @@
-import { categoryLabels, type StoreCategory } from "@/data/catalog";
 import type { Category, Product, ProductType } from "@/domain/types";
 
 /** A section of the public menu, in the order the store configured. */
@@ -23,13 +22,6 @@ export type MenuFilter = "all" | typeof FEATURED_SECTION_ID | string;
 export const FEATURED_SECTION_ID = "destacadas";
 const OTHER_SECTION_ID = "otros";
 
-const fallbackTypes: Record<StoreCategory, ProductType> = {
-  burgers: "burger",
-  sandwiches: "sandwich",
-  fries: "fries",
-  drinks: "beverage"
-};
-
 const eyebrows: Partial<Record<ProductType, string>> = {
   burger: "Smash al fuego",
   sandwich: "Para los que van por otra cosa",
@@ -37,15 +29,13 @@ const eyebrows: Partial<Record<ProductType, string>> = {
   beverage: "Bien frías"
 };
 
-/**
- * Visible categories as the server ordered them (`sort_order`); without a server catalog, the
- * static fallback categories in their declared order.
- */
-export function menuCategories(categories: readonly Category[] | undefined): MenuCategory[] {
-  if (categories && categories.length > 0) {
-    return categories.filter((category) => category.visible).map(({ id, name, type }) => ({ id, name, type }));
-  }
-  return (Object.keys(categoryLabels) as StoreCategory[]).map((id) => ({ id, name: categoryLabels[id], type: fallbackTypes[id] }));
+/** Visible categories of the snapshot, by the store's `sortOrder` (ties keep the server's order). */
+export function menuCategories(categories: readonly Category[]): MenuCategory[] {
+  return categories
+    .filter((category) => category.visible)
+    .map((category, index) => ({ category, index }))
+    .sort((a, b) => a.category.sortOrder - b.category.sortOrder || a.index - b.index)
+    .map(({ category: { id, name, type } }) => ({ id, name, type }));
 }
 
 /** Lower case, without accents or extra spaces: "Sándwich" matches "sandwich". */
@@ -63,13 +53,13 @@ function matches(product: Product, query: string) {
   return normalizeSearch(`${product.name} ${product.description}`).includes(query);
 }
 
-/** The category a product is listed under: its own, else the first one of the same type. */
+/**
+ * The category a product is listed under: exactly its own. A product whose category is not in the
+ * snapshot is never moved to another category that happens to share its type; it is listed under
+ * "Más opciones" so it is neither misfiled nor silently dropped.
+ */
 function categoryOf(product: Product, categories: readonly MenuCategory[]) {
-  return (
-    categories.find((category) => category.id === product.categoryId) ??
-    categories.find((category) => category.type === product.type) ??
-    null
-  );
+  return categories.find((category) => category.id === product.categoryId) ?? null;
 }
 
 /**

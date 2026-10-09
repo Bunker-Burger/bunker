@@ -1,4 +1,4 @@
-import type { Product } from "@/domain/types";
+import type { Category, Product } from "@/domain/types";
 
 const images = {
   double: "https://lh3.googleusercontent.com/aida-public/AB6AXuCbAIlwAQyd01V9jkDGFyhimsk-mXpvbHL61YlyY-xESy0XpygcZu6sXrinKe7FVs08NLT8EM5WhBt8XGt63HA9hjD7tfZnHNl-s4dPdTfn2q7fMA9RSpPzaYm2rGoLBNb1kf9bAwMqvQuAt3rX4MkVVaE_tcT8R28HdK9Gw4UDBLM8-r5Ya4BYoUT1B0v_jwZAo1GXxtBo7ozi5-mQOrQPkaAlx0cUxRio4bcjpRWz6RWDxwYDjF-o_vjxkzE0cq1W",
@@ -116,3 +116,11 @@ export const categoryLabels = {
 } as const;
 
 export type StoreCategory = keyof typeof categoryLabels;
+
+/** Categories of the static fallback products (their `categoryId`s), in menu order. */
+export const categories: Category[] = [
+  { id: "burgers", slug: "hamburguesas", name: categoryLabels.burgers, type: "burger", sortOrder: 10, visible: true },
+  { id: "sandwiches", slug: "sandwiches", name: categoryLabels.sandwiches, type: "sandwich", sortOrder: 20, visible: true },
+  { id: "fries", slug: "papas", name: categoryLabels.fries, type: "fries", sortOrder: 30, visible: true },
+  { id: "drinks", slug: "bebidas", name: categoryLabels.drinks, type: "beverage", sortOrder: 40, visible: true }
+];

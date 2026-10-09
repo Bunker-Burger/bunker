@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
+import { categories as fixtureCategories, products as fallbackProducts } from "@/data/catalog";
 import type { Category, Product } from "@/domain/types";
 import { buildMenuSections, FEATURED_SECTION_ID, menuCategories, menuFilters, normalizeSearch } from "./menu-sections";
 
@@ -16,7 +16,7 @@ const category = (id: string, name: string, type: Category["type"], sortOrder: n
 });
 
 describe("menu sections", () => {
-  const fallback = menuCategories(undefined);
+  const fallback = menuCategories(fixtureCategories);
 
   it("stacks the featured section first and then each category in order, each product once", () => {
     const sections = buildMenuSections(fallbackProducts, fallback, "all", "");
@@ -41,23 +41,24 @@ describe("menu sections", () => {
     ]);
   });
 
-  it("follows the store's category order and names, hiding hidden categories", () => {
+  it("follows the store's sortOrder and names, and never refiles a product of a hidden category", () => {
     const products: Product[] = fallbackProducts.map((product) => ({
       ...product,
       featured: false,
       categoryId: { burger: "c-burger", sandwich: "c-sandwich", fries: "c-side", beverage: "c-drink", other: "c-other" }[product.type]
     }));
+    // Listed out of order on purpose: sortOrder decides.
     const categories = menuCategories([
+      category("c-side", "Acompañamientos", "fries", 30),
       category("c-drink", "Bebidas frías", "beverage", 10),
       category("c-burger", "Clásicas", "burger", 20),
-      category("c-side", "Acompañamientos", "fries", 30),
       category("c-sandwich", "Sándwiches", "sandwich", 40, false)
     ]);
 
     const sections = buildMenuSections(products, categories, "all", "");
 
     expect(sections.map((section) => section.title)).toEqual(["Bebidas frías", "Clásicas", "Acompañamientos", "Más opciones"]);
-    // A product whose category is hidden still has a home, never vanishes silently.
+    // A product whose category is not in the snapshot is listed apart, never dropped silently.
     expect(sections.at(-1)?.products.map((product) => product.type)).toEqual(["sandwich", "sandwich"]);
     expect(menuFilters(products, categories).map((option) => option.label)).toEqual([
       "Todo",
@@ -65,6 +66,31 @@ describe("menu sections", () => {
       "Clásicas",
       "Acompañamientos"
     ]);
+  });
+
+  it("with two categories of the same type, each product stays in its own; unknown ids are not moved by type", () => {
+    const burger = fallbackProducts.find((product) => product.id === "smash-doble")!;
+    const products: Product[] = [
+      { ...burger, id: "p-clasica", slug: "clasica", name: "Clásica", featured: false, categoryId: "c-clasicas" },
+      { ...burger, id: "p-especial", slug: "especial", name: "Especial", featured: false, categoryId: "c-especiales" },
+      { ...burger, id: "p-huerfana", slug: "huerfana", name: "Huérfana", featured: false, categoryId: "c-borrada" }
+    ];
+    const categories = menuCategories([
+      category("c-clasicas", "Clásicas", "burger", 10),
+      category("c-especiales", "Especiales", "burger", 20)
+    ]);
+
+    expect(names(buildMenuSections(products, categories, "all", ""))).toEqual([
+      ["Clásicas", ["Clásica"]],
+      ["Especiales", ["Especial"]],
+      ["Más opciones", ["Huérfana"]]
+    ]);
+    expect(names(buildMenuSections(products, categories, "c-especiales", ""))).toEqual([["Especiales", ["Especial"]]]);
+  });
+
+  it("an empty verified snapshot has no sections and no section filters", () => {
+    expect(buildMenuSections([], menuCategories([]), "all", "")).toEqual([]);
+    expect(menuFilters([], menuCategories([])).map((option) => option.label)).toEqual(["Todo"]);
   });
 
   it("searches name and description ignoring case and accents, across sections", () => {

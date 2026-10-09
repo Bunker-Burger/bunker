@@ -13,7 +13,7 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   addCartLine,
   clearCart,
@@ -32,10 +32,10 @@ import {
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule } from "@/domain/public-promotions";
-import type { CartLine, Category, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, SelectedOptions } from "@/domain/types";
+import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
-import { products as fallbackProducts, STORE_TIMEZONE } from "@/data/catalog";
+import { STORE_TIMEZONE } from "@/data/catalog";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -56,6 +56,8 @@ import "./storefront.css";
 
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
+const PENDING_PRODUCT_NOTICE = "Buscando el producto en la carta…";
+const UNVERIFIED_PRODUCT_NOTICE = "No pudimos confirmar ese producto con el local todavía. Reintentamos en un momento.";
 const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer"];
 
 function removeProductParam() {
@@ -71,9 +73,11 @@ interface StorefrontProps {
   paymentMethods?: readonly PaymentMethodKind[] | undefined;
   showAdminNav?: boolean;
   onInvalidProduct?: () => void;
-  initialProducts?: Product[] | undefined;
-  /** Visible categories in the store's configured order; the static fallback ones when absent. */
-  categories?: readonly Category[] | undefined;
+  /**
+   * Snapshot the page was rendered with (empty when nothing is published), or null when the
+   * server could not read the catalog; the client then re-reads it and that answer is the truth.
+   */
+  initialCatalog?: PublicCatalogSnapshot | null | undefined;
 }
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -115,17 +119,13 @@ export function Storefront({
   paymentMethods = DEFAULT_PAYMENT_METHODS,
   showAdminNav = false,
   onInvalidProduct,
-  initialProducts,
-  categories
+  initialCatalog = null
 }: StorefrontProps) {
   const now = useNow();
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
-  const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
-  const { products, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({
-    initialProducts: resolvedInitialProducts
-  });
+  const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog });
   const storageDegraded = useStorageDegraded();
 
   /** Promotion items name products by slug; the cart uses the storefront's product ids. */
@@ -156,19 +156,12 @@ export function Storefront({
     : null;
   const [editingLine, setEditingLine] = useState<CartLine | null>(null);
 
-  const isKnownSlug = useCallback(
-    (slug: string) => products.some((product) => product.slug === slug),
-    [products]
-  );
-
-  const [initialSlugInvalid] = useState(
-    () => initialProductSlug !== null && !resolvedInitialProducts.some((p) => p.slug === initialProductSlug)
-  );
-  const [activeSlug, setActiveSlug] = useState(initialSlugInvalid ? null : initialProductSlug);
-  const [notice, setNotice] = useState(initialSlugInvalid ? INVALID_PRODUCT_NOTICE : "");
+  // The product in the URL (or being edited). It is only judged against a verified catalog: a
+  // server-rendered or fallback copy may be stale, so an unknown slug waits for the fresh read.
+  const [activeSlug, setActiveSlug] = useState(initialProductSlug);
+  const [notice, setNotice] = useState("");
   const [revalidationNotice, setRevalidationNotice] = useRevalidationNotice();
   const onInvalidProductRef = useRef(onInvalidProduct);
-  const invalidSlugHandled = useRef(false);
 
   // Only revalidate the persisted cart when the catalog has been verified against the server.
   // Never wipe or alter cart lines while verification is pending or if it failed (503 / network).
@@ -190,33 +183,35 @@ export function Storefront({
     onInvalidProductRef.current = onInvalidProduct;
   }, [onInvalidProduct]);
 
-  const rejectInvalidSlug = useCallback(() => {
-    removeProductParam();
-    onInvalidProductRef.current?.();
-  }, []);
-
   useEffect(() => {
-    if (!initialSlugInvalid || invalidSlugHandled.current) return;
-    invalidSlugHandled.current = true;
-    rejectInvalidSlug();
-  }, [initialSlugInvalid, rejectInvalidSlug]);
-
-  useEffect(() => {
-    const syncRoute = () => {
-      const slug = new URL(window.location.href).searchParams.get("producto");
-      if (slug !== null && !isKnownSlug(slug)) {
-        setNotice(INVALID_PRODUCT_NOTICE);
-        setActiveSlug(null);
-        rejectInvalidSlug();
-        return;
-      }
-      setActiveSlug(slug);
-    };
+    const syncRoute = () => setActiveSlug(new URL(window.location.href).searchParams.get("producto"));
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
-  }, [isKnownSlug, rejectInvalidSlug]);
+  }, []);
 
-  const activeProduct = activeSlug ? products.find((product) => product.slug === activeSlug) : undefined;
+  const activeProduct = activeSlug
+    ? products.find((product) => product.published && product.slug === activeSlug)
+    : undefined;
+  const slugUnresolved = activeSlug !== null && activeProduct === undefined;
+  const slugRejected = slugUnresolved && verificationStatus === "verified";
+
+  // A verified catalog without the product (never existed, or retired since the page or the
+  // fallback was rendered): close it, clean the URL and say so. Pending/unverified keeps the URL.
+  const [rejection, setRejection] = useState<{ slug: string; id: number } | null>(null);
+  if (slugRejected) {
+    setRejection((previous) => ({ slug: activeSlug, id: (previous?.id ?? 0) + 1 }));
+    setActiveSlug(null);
+    setEditingLine(null);
+    setNotice(INVALID_PRODUCT_NOTICE);
+  }
+  useEffect(() => {
+    if (!rejection) return;
+    if (new URL(window.location.href).searchParams.get("producto") === rejection.slug) removeProductParam();
+    onInvalidProductRef.current?.();
+  }, [rejection]);
+  const linkNotice = slugUnresolved && !slugRejected
+    ? verificationStatus === "pending" ? PENDING_PRODUCT_NOTICE : UNVERIFIED_PRODUCT_NOTICE
+    : "";
 
   const openProduct = (product: Product) => {
     const url = new URL(window.location.href);
@@ -280,7 +275,9 @@ export function Storefront({
       }
       bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
     >
-      {revalidationNotice || notice ? <div className="toast" role="status">{revalidationNotice || notice}</div> : null}
+      {revalidationNotice || notice || linkNotice ? (
+        <div className="toast" role="status">{revalidationNotice || notice || linkNotice}</div>
+      ) : null}
 
       <section className="menu-section" id="menu" aria-labelledby="menu-title">
         <div className="menu-intro">

@@ -1,11 +1,11 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
+import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import { revalidateCart, serializeCart } from "@/domain/cart";
 import type { CartLine, Product } from "@/domain/types";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
-import { serializePublicProducts } from "@/server/catalog/public-products";
+import { serializePublicCatalog, serializePublicCategories, serializePublicProducts } from "@/server/catalog/public-products";
 import { ProductDrawer, Storefront } from "./storefront";
 
 describe("Storefront", () => {
@@ -18,7 +18,7 @@ describe("Storefront", () => {
         const url = String(input instanceof Request ? input.url : input);
         if (url.includes("/api/store/products")) {
           return new Response(
-            JSON.stringify({ products: serializePublicProducts(fallbackProducts) }),
+            JSON.stringify(serializePublicCatalog({ products: fallbackProducts, categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           );
         }
@@ -68,7 +68,7 @@ describe("Storefront", () => {
     expect(persisted).toContain("Sin cebolla");
   });
 
-  it("announces an invalid slug and requests URL cleanup", () => {
+  it("announces an invalid slug and requests URL cleanup once the catalog is verified", async () => {
     const onInvalidProduct = vi.fn();
     render(
       <Storefront
@@ -78,7 +78,9 @@ describe("Storefront", () => {
       />
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent("Ese producto ya no está disponible");
+    // The fallback copy cannot rule a product out; the server's answer can.
+    expect(onInvalidProduct).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Ese producto ya no está disponible"));
     expect(onInvalidProduct).toHaveBeenCalledOnce();
   });
 
@@ -320,7 +322,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         const url = String(input instanceof Request ? input.url : input);
         if (url.includes("/api/store/products")) {
           return new Response(
-            JSON.stringify({ products: serializePublicProducts(fallbackProducts) }),
+            JSON.stringify(serializePublicCatalog({ products: fallbackProducts, categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           );
         }
@@ -527,6 +529,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         vi.fn(async () =>
           new Response(
             JSON.stringify({
+              categories: serializePublicCategories(fixtureCategories),
               products: [
                 {
                   id: "special-edition-burger",
@@ -565,6 +568,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         vi.fn(async () =>
           new Response(
             JSON.stringify({
+              categories: serializePublicCategories(fixtureCategories),
               products: [
                 {
                   id: "special-edition-burger",
@@ -628,7 +632,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         "fetch",
         vi.fn(async () =>
           new Response(
-            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, updatedProduct]) }),
+            JSON.stringify(serializePublicCatalog({ products: [...fallbackProducts, updatedProduct], categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           )
         )
@@ -699,7 +703,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       // Clean up the hanging promise
       resolveDelayedFetch!(
         new Response(
-          JSON.stringify({ products: serializePublicProducts([...fallbackProducts, specialMissingProduct]) }),
+          JSON.stringify(serializePublicCatalog({ products: [...fallbackProducts, specialMissingProduct], categories: fixtureCategories })),
           { status: 200, headers: { "content-type": "application/json" } }
         )
       );
@@ -741,7 +745,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         "fetch",
         vi.fn(async () =>
           new Response(
-            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, updatedSpecialProduct]) }),
+            JSON.stringify(serializePublicCatalog({ products: [...fallbackProducts, updatedSpecialProduct], categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           )
         )
@@ -771,7 +775,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         vi.fn(async () => {
           await firstFetchGate;
           return new Response(
-            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, specialMissingProduct]) }),
+            JSON.stringify(serializePublicCatalog({ products: [...fallbackProducts, specialMissingProduct], categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           );
         })
@@ -840,7 +844,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
             return {
               ok: true,
               status: 200,
-              json: async () => ({ products: catalogB })
+              json: async () => ({ products: catalogB, categories: serializePublicCategories(fixtureCategories) })
             } as unknown as Response;
           }
         })
@@ -863,7 +867,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       // Now Request A finishes with old price $ 7.500
       await act(async () => {
-        resolveJsonA!({ products: catalogA });
+        resolveJsonA!({ products: catalogA, categories: serializePublicCategories(fixtureCategories) });
       });
 
       // Request B ($ 9.900) remains active, NOT overwritten by Request A!
@@ -876,7 +880,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
         "fetch",
         vi.fn(async () =>
           new Response(
-            JSON.stringify({ products: serializePublicProducts([...fallbackProducts, specialMissingProduct]) }),
+            JSON.stringify(serializePublicCatalog({ products: [...fallbackProducts, specialMissingProduct], categories: fixtureCategories })),
             { status: 200, headers: { "content-type": "application/json" } }
           )
         )
@@ -928,7 +932,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       localStorage.setItem("bunker-cart", serializeCart([specialMissingLine]));
 
       // Render Storefront with fallback products (where specialMissingProduct is absent)
-      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialProducts={fallbackProducts} />);
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialCatalog={{ products: fallbackProducts, categories: fixtureCategories }} />);
 
       // After client mount and verification, the recovered line must remain intact
       const cartSection = screen.getByRole("region", { name: "Carrito" });
@@ -944,7 +948,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       // Mock fetch in pending state
       vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
 
-      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialProducts={fallbackProducts} />);
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialCatalog={{ products: fallbackProducts, categories: fixtureCategories }} />);
 
       // Line is preserved in DOM and in storage:
       const cartSection = screen.getByRole("region", { name: "Carrito" });

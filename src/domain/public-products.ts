@@ -1,4 +1,4 @@
-import type { OptionGroup, OptionSelectionMode, Product, ProductOption, ProductType } from "./types";
+import type { Category, OptionGroup, OptionSelectionMode, Product, ProductOption, ProductType, PublicCatalogSnapshot } from "./types";
 
 const VALID_PRODUCT_TYPES = new Set<ProductType>(["burger", "sandwich", "fries", "beverage", "other"]);
 const VALID_SELECTION_MODES = new Set<OptionSelectionMode>(["single", "multiple"]);
@@ -134,4 +134,43 @@ export function parsePublicProducts(payload: unknown): Product[] | null {
   }
 
   return products;
+}
+
+function isInteger(val: unknown): val is number {
+  return typeof val === "number" && Number.isInteger(val);
+}
+
+function parseCategory(raw: unknown): Category | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>;
+  if (!isNonEmptyString(c.id)) return null;
+  if (!isNonEmptyString(c.slug)) return null;
+  if (!isNonEmptyString(c.name)) return null;
+  if (typeof c.type !== "string" || !VALID_PRODUCT_TYPES.has(c.type as ProductType)) return null;
+  if (!isInteger(c.sortOrder)) return null;
+  if (typeof c.visible !== "boolean") return null;
+  return { id: c.id, slug: c.slug, name: c.name, type: c.type as ProductType, sortOrder: c.sortOrder, visible: c.visible };
+}
+
+/**
+ * Parses GET /api/store/products: products and categories of one server read. Both lists are
+ * required; empty lists are a valid, verified empty menu. Anything malformed rejects the whole
+ * snapshot (null), so a broken answer is never taken for an empty menu.
+ */
+export function parsePublicCatalog(payload: unknown): PublicCatalogSnapshot | null {
+  if (!payload || typeof payload !== "object" || !("categories" in payload)) return null;
+  const products = parsePublicProducts(payload);
+  if (!products) return null;
+  const list = (payload as { categories: unknown }).categories;
+  if (!Array.isArray(list)) return null;
+
+  const categories: Category[] = [];
+  const ids = new Set<string>();
+  for (const rawItem of list) {
+    const category = parseCategory(rawItem);
+    if (!category || ids.has(category.id)) return null;
+    ids.add(category.id);
+    categories.push(category);
+  }
+  return { products, categories };
 }

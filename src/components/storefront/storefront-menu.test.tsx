@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { products as fallbackProducts } from "@/data/catalog";
+import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { Category } from "@/domain/types";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
-import { serializePublicProducts } from "@/server/catalog/public-products";
+import { serializePublicCatalog } from "@/server/catalog/public-products";
 import { Storefront } from "./storefront";
 
 /* BB-07: public menu (sections, search, filters) and the product drawer's accessibility. */
@@ -23,7 +23,7 @@ beforeEach(() => {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input instanceof Request ? input.url : input);
       if (url.includes("/api/store/products")) {
-        return Response.json({ products: serializePublicProducts(fallbackProducts) });
+        return Response.json(serializePublicCatalog({ products: fallbackProducts, categories: fixtureCategories }));
       }
       throw new Error(`Unexpected fetch call: ${url}`);
     })
@@ -52,7 +52,7 @@ describe("carta pública", () => {
       { id: "burgers", slug: "hamburguesas", name: "Clásicas", type: "burger", sortOrder: 3, visible: true },
       { id: "sandwiches", slug: "sandwiches", name: "Sándwiches", type: "sandwich", sortOrder: 4, visible: true }
     ];
-    renderStorefront({ categories });
+    renderStorefront({ initialCatalog: { products: fallbackProducts, categories } });
 
     expect(sectionTitles()).toEqual(["Las más pedidas", "Bebidas", "Acompañamientos", "Sándwiches"]);
     const chips = within(screen.getByRole("group", { name: "Secciones de la carta" })).getAllByRole("button");
