@@ -201,13 +201,15 @@ test.describe("responsive shell", () => {
     await expect(nav).toBeVisible();
     await expect(tray).toBeVisible();
 
-    const name = page.getByPlaceholder("¿A nombre de quién?");
-    await name.focus();
+    // The checkout asks for no personal data (BB-10): the kitchen notes are the text field left.
+    await page.getByRole("button", { name: "Ver Smash Búnker Doble" }).click();
+    const notes = page.getByRole("textbox", { name: "Aclaraciones para la cocina" });
+    await notes.focus();
     await expect(nav).toBeHidden();
     await expect(tray).toBeHidden();
-    await expect(name).toBeInViewport();
+    await expect(notes).toBeInViewport();
 
-    await name.blur();
+    await notes.blur();
     await expect(nav).toBeVisible();
     await expect(tray).toBeVisible();
   });

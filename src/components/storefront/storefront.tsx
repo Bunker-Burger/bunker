@@ -21,7 +21,8 @@ import {
   editCartLine,
   formatRevalidationNotice,
   removeCartLine,
-  revalidateCart
+  revalidateCart,
+  serializeCart
 } from "@/domain/cart";
 import {
   calculateConfiguredUnitPrice,
@@ -32,7 +33,7 @@ import {
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule } from "@/domain/public-promotions";
-import type { CartLine, FulfilmentMethod, Product, PromotionRule, SelectedOptions } from "@/domain/types";
+import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
 import { categoryLabels, products as fallbackProducts, STORE_TIMEZONE, type StoreCategory } from "@/data/catalog";
@@ -49,12 +50,14 @@ import {
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
-import { describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
+import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
+import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
 import "./storefront.css";
 
 const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const categories = Object.keys(categoryLabels) as StoreCategory[];
+const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer"];
 
 // Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
 function revealInScroller(event: FocusEvent<HTMLElement>) {
@@ -70,6 +73,8 @@ function removeProductParam() {
 interface StorefrontProps {
   initialProductSlug: string | null;
   mercadoPagoEnabled: boolean;
+  /** Methods the store has enabled (`store_payment_methods`); the server enforces them again. */
+  paymentMethods?: readonly PaymentMethodKind[] | undefined;
   showAdminNav?: boolean;
   onInvalidProduct?: () => void;
   initialProducts?: Product[] | undefined;
@@ -91,6 +96,7 @@ function makeCartLine(product: Product, selectedOptions: SelectedOptions, quanti
 export function Storefront({
   initialProductSlug,
   mercadoPagoEnabled,
+  paymentMethods = DEFAULT_PAYMENT_METHODS,
   showAdminNav = false,
   onInvalidProduct,
   initialProducts
@@ -100,7 +106,7 @@ export function Storefront({
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
   const resolvedInitialProducts = initialProducts && initialProducts.length > 0 ? initialProducts : fallbackProducts;
-  const { products, verificationStatus } = usePublicCatalog({
+  const { products, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({
     initialProducts: resolvedInitialProducts
   });
   const storageDegraded = useStorageDegraded();
@@ -117,6 +123,13 @@ export function Storefront({
     () => publicPromotions.map((promotion) => toPromotionRule(promotion, productIdBySlug)),
     [publicPromotions, productIdBySlug]
   );
+  // Versions of everything a server quote depends on beyond the request itself: a new catalog
+  // verification, store status or promotion set discards any quote shown so far.
+  const quoteFreshness = JSON.stringify([
+    verifiedGeneration,
+    storeStatus.kind === "ready" ? storeStatus.status : storeStatus.kind,
+    publicPromotions
+  ]);
   const deliveryFeeCents =
     storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
   const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
@@ -317,7 +330,10 @@ export function Storefront({
         fulfilment={fulfilment}
         mercadoPagoEnabled={mercadoPagoEnabled}
         now={now}
+        onCartRejected={recheckProducts}
         onFulfilmentChange={setFulfilment}
+        paymentMethods={paymentMethods}
+        quoteFreshness={quoteFreshness}
         products={products}
         promotions={promotions}
         storeStatus={storeStatus}
@@ -408,11 +424,18 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
   const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
 
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Focus moves to the close button once, on open: a parent re-render (status, promotions or
+  // checkout answers) must not pull focus out of the field being typed in.
   useEffect(() => {
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
     document.body.classList.add("drawer-open");
     window.addEventListener("keydown", onKeyDown);
@@ -420,7 +443,7 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
       document.body.classList.remove("drawer-open");
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   const applicableGroups = getApplicableOptionGroups(product);
   const validation = validateOptionSelection(product, selected);
@@ -626,15 +649,35 @@ function toPromotionLines(cart: CartLine[], catalogProducts: readonly Product[])
   });
 }
 
+/** Same choices, same JSON: empty groups dropped and groups in a stable order. */
+function canonicalSelections(selections: SelectedOptions): SelectedOptions {
+  return Object.fromEntries(
+    Object.entries(selections)
+      .filter(([, optionIds]) => optionIds.length > 0)
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
+/** Why the server refused to give a WhatsApp link for this cart. */
+const CHECKOUT_ERRORS: Record<string, string> = {
+  store_closed: "El local no está tomando pedidos ahora.",
+  invalid_cart: "Algo de tu carrito cambió o ya no está disponible. Revisá el carrito antes de enviarlo.",
+  payment_method_unavailable: "Ese método de pago no está disponible ahora. Elegí otro.",
+  invalid_request: "No pudimos procesar el pedido. Revisá las cantidades (hasta 20 por producto)."
+};
+
 function CheckoutSection({
   cart,
   products,
   verificationStatus,
   mercadoPagoEnabled,
+  paymentMethods,
   now,
   promotions,
   fulfilment,
   onFulfilmentChange: setFulfilment,
+  onCartRejected,
+  quoteFreshness,
   storeStatus,
   deliveryFeeCents,
   timezone
@@ -643,20 +686,27 @@ function CheckoutSection({
   products: readonly Product[];
   verificationStatus: CatalogVerificationStatus;
   mercadoPagoEnabled: boolean;
+  paymentMethods: readonly PaymentMethodKind[];
   now: Date | null;
   promotions: readonly PromotionRule[];
   fulfilment: FulfilmentMethod;
   onFulfilmentChange: (fulfilment: FulfilmentMethod) => void;
+  onCartRejected: () => void;
+  quoteFreshness: string;
   storeStatus: StoreStatusView;
   deliveryFeeCents: bigint | null;
   timezone: string;
 }) {
-  const [selectedPayment, setPayment] = useState<PaymentMethod>(mercadoPagoEnabled ? "mercado-pago" : "transfer");
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const offered: PaymentMethod[] = [
+    ...(mercadoPagoEnabled ? ["mercado-pago" as const] : []),
+    ...(paymentMethods.includes("bank_transfer") ? ["transfer" as const] : []),
+    ...(paymentMethods.includes("cash") ? ["cash" as const] : [])
+  ];
+  const [selectedPayment, setPayment] = useState<PaymentMethod | null>(null);
+  const payment = selectedPayment !== null && offered.includes(selectedPayment) ? selectedPayment : offered[0] ?? null;
   const nowMs = now?.getTime() ?? null;
   // Display-only estimate with the same engine the server quote uses; the server recomputes it.
-  const quote = useMemo(
+  const estimate = useMemo(
     () =>
       quoteCart(toPromotionLines(cart, products), nowMs === null ? [] : promotions, fulfilment, deliveryFeeCents ?? 0n, {
         now: new Date(nowMs ?? 0),
@@ -664,11 +714,55 @@ function CheckoutSection({
       }),
     [cart, products, fulfilment, deliveryFeeCents, promotions, nowMs, timezone]
   );
-  const payment = !mercadoPagoEnabled && selectedPayment === "mercado-pago" ? "transfer" : selectedPayment;
-  const acceptingOrders = storeStatus.kind === "ready" && storeStatus.status.acceptingOrders;
+  // A status being re-read authorizes nothing until the server answers again (fail closed).
+  const acceptingOrders = acceptsOrdersNow(storeStatus);
   const deliveryPending = fulfilment === "delivery" && deliveryFeeCents === null;
   const hasValidLines = cart.length > 0;
   const isVerified = verificationStatus === "verified";
+
+  // Only ids, quantities, notes and choices go to the server, which prices them and builds the
+  // WhatsApp message; nothing is requested while the order could not be sent anyway.
+  const request = useMemo<WhatsAppCheckoutRequest | null>(
+    () =>
+      acceptingOrders && isVerified && hasValidLines && (payment === "cash" || payment === "transfer")
+        ? {
+            items: cart.map((line) => ({
+              productId: line.productId,
+              quantity: line.quantity,
+              optionSelections: canonicalSelections(line.selectedOptions),
+              notes: line.notes
+            })),
+            fulfilment,
+            paymentMethod: payment === "cash" ? "cash_exact" : "transfer"
+          }
+        : null,
+    [acceptingOrders, isVerified, hasValidLines, cart, fulfilment, payment]
+  );
+  const serverCheckout = useWhatsAppCheckout(request, quoteFreshness);
+  const confirmed = serverCheckout.kind === "ready" ? serverCheckout.checkout : null;
+  const cartRejected = serverCheckout.kind === "error" && serverCheckout.code === "invalid_cart";
+
+  // A cart the server refuses is re-checked against the catalog (once per cart content), which
+  // fixes or flags its lines.
+  const cartKey = useMemo(() => serializeCart(cart), [cart]);
+  const recheckedCart = useRef<string | null>(null);
+  useEffect(() => {
+    if (!cartRejected || recheckedCart.current === cartKey) return;
+    recheckedCart.current = cartKey;
+    onCartRejected();
+  }, [cartRejected, cartKey, onCartRejected]);
+
+  const totals = confirmed ?? estimate;
+  const promotion = confirmed ? confirmed.promotion : estimate.promotion;
+  const blockedLabel = storeStatus.kind === "ready" && storeStatus.checking
+    ? "Verificando el local…"
+    : !acceptingOrders
+      ? "No se pueden enviar pedidos ahora"
+      : payment === "mercado-pago"
+        ? "Mercado Pago próximamente"
+        : serverCheckout.kind === "loading"
+          ? "Calculando el total…"
+          : "Enviar pedido por WhatsApp";
 
   return (
     <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
@@ -683,32 +777,30 @@ function CheckoutSection({
             </div>
           </fieldset>
 
-          <div className="customer-fields">
-            <label><span>Tu nombre</span><input autoComplete="name" onChange={(event) => setName(event.target.value)} placeholder="¿A nombre de quién?" value={name} /></label>
-            {fulfilment === "delivery" ? <label><span>Dirección</span><input autoComplete="street-address" onChange={(event) => setAddress(event.target.value)} placeholder="Calle, número y referencia" value={address} /></label> : null}
-          </div>
-
           <fieldset className="choice-group payment-group">
             <legend>Método de pago</legend>
-            {mercadoPagoEnabled ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note="Pagá online de forma segura" onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
-            <PaymentChoice checked={payment === "transfer"} label="Transferencia" note="CBU / CVU / Alias de Búnker" onChange={() => setPayment("transfer")} value="transfer" />
-            <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note="Prepará el monto justo al recibir o retirar" onChange={() => setPayment("cash")} value="cash" />
+            {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note="Pagá online de forma segura" onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
+            {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia" note="Pedí el alias por WhatsApp y enviá el comprobante por ese chat" onChange={() => setPayment("transfer")} value="transfer" /> : null}
+            {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note="Tené el importe justo al recibir o retirar" onChange={() => setPayment("cash")} value="cash" /> : null}
           </fieldset>
+          <p className="checkout-whatsapp-note">
+            No te pedimos datos acá: tu nombre{fulfilment === "delivery" ? ", la dirección" : ""} y el pago se coordinan en el chat de WhatsApp del local.
+          </p>
         </div>
 
         <div className="summary-card">
           <h3>Resumen de la orden</h3>
           {cart.map((line) => <div className="summary-line" key={line.id}><span>{line.quantity}× {line.productName}</span><strong>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong></div>)}
           <div className="summary-rule" />
-          <div className="summary-line muted"><span>Subtotal</span><strong>{formatArs(quote.subtotalCents)}</strong></div>
-          <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending ? "A confirmar" : quote.deliveryCents === 0n ? "$0" : formatArs(quote.deliveryCents)}</strong></div>
-          {quote.promotion ? (
+          <div className="summary-line muted"><span>Subtotal</span><strong>{formatArs(totals.subtotalCents)}</strong></div>
+          <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending && !confirmed ? "A confirmar" : totals.deliveryCents === 0n ? "$0" : formatArs(totals.deliveryCents)}</strong></div>
+          {promotion ? (
             <div className="summary-promotion" data-testid="applied-promotion">
-              <div className="summary-line"><span>Promoción: {quote.promotion.name}</span><strong>-{formatArs(quote.discountCents)}</strong></div>
-              <small>{quote.promotion.explanation}. No se acumula con otras promociones.</small>
+              <div className="summary-line"><span>Promoción: {promotion.name}</span><strong>-{formatArs(totals.discountCents)}</strong></div>
+              <small>{promotion.explanation}. No se acumula con otras promociones.</small>
             </div>
           ) : null}
-          <div className="summary-total"><span>Total estimado</span><strong>{formatArs(quote.totalCents)}</strong></div>
+          <div className="summary-total" data-testid="checkout-total"><span>{confirmed ? "Total" : "Total estimado"}</span><strong>{formatArs(totals.totalCents)}</strong></div>
           <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
           {!hasValidLines ? (
             <p aria-live="polite" className="store-status-note text-muted">
@@ -722,15 +814,26 @@ function CheckoutSection({
                 : "Pendiente de verificar: no pudimos confirmar la disponibilidad de los productos con el servidor. Revisá tu conexión."}
             </p>
           ) : null}
-          {/* No send action until a server-validated quote can authorize it (BB-10): a total computed in the browser never confirms an order. */}
-          <button
-            className="whatsapp-button"
-            disabled
-            type="button"
-          >
-            {acceptingOrders ? "Confirmación por WhatsApp próximamente" : "No se pueden enviar pedidos ahora"}
-          </button>
-          <small>Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo.</small>
+          {serverCheckout.kind === "error" ? (
+            <p className="store-status-note text-warning" data-testid="checkout-error" role="alert">
+              {CHECKOUT_ERRORS[serverCheckout.code] ?? "No pudimos calcular el total con el local. Probá de nuevo en un momento."}
+            </p>
+          ) : null}
+          {/* Only a total recomputed by the server yields a link; a browser estimate never confirms an order. */}
+          {confirmed ? (
+            <a className="whatsapp-button" href={confirmed.url} rel="noopener noreferrer" target="_blank">
+              Enviar pedido por WhatsApp
+            </a>
+          ) : (
+            <button className="whatsapp-button" disabled type="button">
+              {blockedLabel}
+            </button>
+          )}
+          <small>
+            {confirmed
+              ? "Se abre WhatsApp con tu pedido para que el local lo confirme. El carrito queda guardado en este dispositivo."
+              : "Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo."}
+          </small>
         </div>
       </div>
     </section>

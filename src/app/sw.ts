@@ -18,11 +18,15 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Store status (BB-08), promotions (BB-09) and fresh catalog (BB-06) must always come from the server: never
-    // answer them from a cache.
+    // Store status (BB-08), promotions (BB-09), fresh catalog (BB-06) and the WhatsApp checkout (BB-10) must always
+    // come from the server: never answer them from a cache.
     {
       matcher: ({ sameOrigin, url: { pathname } }) =>
-        sameOrigin && (pathname === "/api/store/status" || pathname === "/api/store/promotions" || pathname === "/api/store/products"),
+        sameOrigin &&
+        (pathname === "/api/store/status" ||
+          pathname === "/api/store/promotions" ||
+          pathname === "/api/store/products" ||
+          pathname.startsWith("/api/checkout/")),
       handler: new NetworkOnly()
     },
     ...defaultCache
