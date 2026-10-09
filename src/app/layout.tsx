@@ -1,22 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Oswald, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import "@fontsource-variable/oswald/wght.css";
+import "@fontsource-variable/space-grotesk/wght.css";
 import "./globals.css";
-
-const oswald = Oswald({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-oswald",
-  display: "swap"
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-space-grotesk",
-  display: "swap"
-});
 
 export const metadata: Metadata = {
   title: "Búnker Burger | Carta online",
@@ -36,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es" className={`${oswald.variable} ${spaceGrotesk.variable}`}>
+    <html lang="es">
       <body>
         {children}
         <Toaster />

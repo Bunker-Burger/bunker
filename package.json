@@ -23,6 +23,8 @@
     "db:types:check": "node --env-file-if-exists=.env.local scripts/generate-db-types.mjs --check"
   },
   "dependencies": {
+    "@fontsource-variable/oswald": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-label": "2.1.8",
     "@radix-ui/react-select": "2.2.6",
