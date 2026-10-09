@@ -1,3 +1,4 @@
+import Link from "next/link";
 import styles from "../admin.module.css";
 
 export default function AdminHomePage() {
@@ -6,7 +7,7 @@ export default function AdminHomePage() {
       <p className={styles.eyebrow}>BÚNKER BURGER</p>
       <h1 id="admin-title">Panel administrativo</h1>
       <p>El acceso está protegido. La gestión del catálogo y las promociones se incorpora en las próximas etapas.</p>
-      <a className={styles.primaryLink} href="/">Ver menú público</a>
+      <Link className={styles.primaryLink} href="/">Ver menú público</Link>
     </section>
   );
 }

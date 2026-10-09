@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
@@ -15,10 +16,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <main className={styles.adminViewport}>
       <header className={styles.adminHeader}>
-        <a className={styles.brand} href="/" aria-label="Búnker Burger, volver al menú">
+        <Link className={styles.brand} href="/" aria-label="Búnker Burger, volver al menú">
           <span aria-hidden="true">BB</span>
           <strong>BÚNKER BURGER</strong>
-        </a>
+        </Link>
         <div className={styles.adminActions}>
           <span className={styles.role}>{role}</span>
           <form action={logout}>

@@ -1,7 +1,9 @@
 # BB-11 — Autenticación y protección administrativa
 
-**Fecha:** 2026-10-09  
-**Issue:** [#11](https://github.com/Bunker-Burger/bunker/issues/11)  
+**Fecha:** 2026-10-09
+
+**Issue:** [#11](https://github.com/Bunker-Burger/bunker/issues/11)
+
 **Estado:** diseño listo para revisión
 
 ## Objetivo

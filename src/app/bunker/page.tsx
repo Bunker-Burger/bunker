@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
@@ -13,10 +14,10 @@ export default async function BunkerLoginPage() {
   return (
     <main className={styles.viewport}>
       <section aria-labelledby="admin-login-title" className={styles.card}>
-        <a aria-label="Búnker Burger, volver al menú" className={styles.brand} href="/">
+        <Link aria-label="Búnker Burger, volver al menú" className={styles.brand} href="/">
           <span aria-hidden="true">BB</span>
           <strong>BÚNKER BURGER</strong>
-        </a>
+        </Link>
         <div className={styles.heading}>
           <p>ACCESO PRIVADO</p>
           <h1 id="admin-login-title">Administración</h1>
