@@ -110,19 +110,19 @@ try {
 
   // Pathname debe ser estrictamente vacío o "/"
   if (parsed.pathname !== "" && parsed.pathname !== "/") {
-    report(`Pathname "${parsed.pathname}" is forbidden in NEXT_PUBLIC_SUPABASE_URL.`);
+    report("Pathname is forbidden in NEXT_PUBLIC_SUPABASE_URL.");
     finish(false);
   }
 
   // Query parameters prohibidos
   if (parsed.search !== "") {
-    report(`Query parameters "${parsed.search}" are forbidden in NEXT_PUBLIC_SUPABASE_URL.`);
+    report("Query parameters are forbidden in NEXT_PUBLIC_SUPABASE_URL.");
     finish(false);
   }
 
   // Hash fragment prohibido
   if (parsed.hash !== "") {
-    report(`Hash fragment "${parsed.hash}" is forbidden in NEXT_PUBLIC_SUPABASE_URL.`);
+    report("Hash fragment is forbidden in NEXT_PUBLIC_SUPABASE_URL.");
     finish(false);
   }
 
@@ -135,7 +135,7 @@ try {
 
   canonicalOrigin = `https://${expectedHost}`;
 } catch (err) {
-  report(`Invalid URL format: ${err.message}`);
+  report("Invalid URL format.");
   finish(false);
 }
 
