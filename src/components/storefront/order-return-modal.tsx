@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Clock, AlertCircle, MessageCircle, RefreshCw, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatArs } from "@/lib/money";
 
 export interface OrderReturnModalProps {
@@ -32,6 +32,18 @@ export function OrderReturnModal({
     status: "checking",
     attempt: 1
   });
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     let attemptCount = 0;
@@ -120,6 +132,7 @@ export function OrderReturnModal({
     >
       <div className="return-modal-card">
         <button
+          ref={closeButtonRef}
           onClick={onClose}
           type="button"
           aria-label="Cerrar ventana de estado"

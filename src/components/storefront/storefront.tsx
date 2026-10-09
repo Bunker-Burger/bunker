@@ -59,7 +59,7 @@ const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const PENDING_PRODUCT_NOTICE = "Buscando el producto en la carta…";
 const UNVERIFIED_PRODUCT_NOTICE = "No pudimos confirmar ese producto con el local todavía. Reintentamos en un momento.";
-const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer"];
+const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer", "mercado_pago"];
 
 function removeProductParam() {
   const url = new URL(window.location.href);
@@ -724,7 +724,7 @@ function CheckoutSection({
   onCheckoutRedirect?: ((url: string) => void) | undefined;
 }) {
   const offered: PaymentMethod[] = [
-    ...(mercadoPagoEnabled ? ["mercado-pago" as const] : []),
+    ...(mercadoPagoEnabled && paymentMethods.includes("mercado_pago") ? ["mercado-pago" as const] : []),
     ...(paymentMethods.includes("bank_transfer") ? ["transfer" as const] : []),
     ...(paymentMethods.includes("cash") ? ["cash" as const] : [])
   ];
@@ -774,6 +774,7 @@ function CheckoutSection({
           notes: line.notes
         })),
         fulfilment,
+        paymentMethod: "mercado_pago" as const,
         customer: {
           name: customerName.trim(),
           phone: customerPhone.trim()

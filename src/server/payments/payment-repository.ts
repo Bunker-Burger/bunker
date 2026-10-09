@@ -44,10 +44,9 @@ function deserializeLines(json: unknown): QuoteLine[] {
 
 export function createSupabasePaymentRepository(
   client: SupabaseClient<Database>,
-  options?: { storeId?: string; channel?: FulfilmentMethod }
+  options?: { storeId?: string }
 ): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } {
   const storeId = options?.storeId ?? DEFAULT_STORE_ID;
-  const channel = options?.channel ?? "pickup";
 
   const quotes: PaymentQuotesPort = {
     async save(quote: PaymentQuote): Promise<void> {
@@ -60,7 +59,7 @@ export function createSupabasePaymentRepository(
         delivery_cents: Number(quote.deliveryCents),
         total_cents: Number(quote.totalCents),
         currency: "ARS",
-        fulfillment_channel: channel,
+        fulfillment_channel: quote.fulfillmentChannel,
         expires_at: quote.expiresAt.toISOString()
       });
       if (error) {
@@ -84,6 +83,7 @@ export function createSupabasePaymentRepository(
         deliveryCents: BigInt(data.delivery_cents),
         totalCents: BigInt(data.total_cents),
         promotion: null,
+        fulfillmentChannel: (data.fulfillment_channel as FulfilmentMethod) ?? "pickup",
         expiresAt: new Date(data.expires_at)
       };
     }
@@ -191,8 +191,7 @@ export function createInMemoryPaymentRepository(): {
 
 export function getPaymentPersistencePorts(options?: {
   storeId?: string;
-  channel?: FulfilmentMethod;
-}): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } {
+}): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } | null {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const configResult = readSupabaseConfig();
 
@@ -203,5 +202,5 @@ export function getPaymentPersistencePorts(options?: {
     return createSupabasePaymentRepository(serviceClient, options);
   }
 
-  return createInMemoryPaymentRepository();
+  return null;
 }

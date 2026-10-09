@@ -5,7 +5,11 @@ import {
   detectMercadoPagoConfig,
   type MercadoPagoConfigDetection
 } from "@/server/payments/mercado-pago";
-import type { PaymentAttemptsPort, PaymentQuotesPort } from "@/server/payments/ports";
+import type {
+  PaymentAttemptsPort,
+  PaymentQuote,
+  PaymentQuotesPort
+} from "@/server/payments/ports";
 import { buildApprovedMercadoPagoWhatsAppUrl } from "./whatsapp";
 
 export type PaymentVerificationStatus =
@@ -43,6 +47,26 @@ export interface CheckPaymentStatusDependencies {
   now?: () => Date;
 }
 
+async function getWhatsAppUrlForApprovedQuote(
+  quote: PaymentQuote,
+  paymentReference: string,
+  loadCatalog?: () => Promise<Result<Catalog, CatalogError>>
+): Promise<string | null> {
+  if (!loadCatalog) return null;
+  const catalogResult = await loadCatalog();
+  if (!catalogResult.ok) return null;
+  try {
+    return buildApprovedMercadoPagoWhatsAppUrl({
+      businessPhone: catalogResult.value.store.whatsappE164,
+      fulfilment: quote.fulfillmentChannel,
+      pricing: quote,
+      paymentReference
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function checkMercadoPagoPaymentStatus(
   params: { ref: string | null; paymentId?: string | null },
   dependencies: CheckPaymentStatusDependencies
@@ -64,23 +88,13 @@ export async function checkMercadoPagoPaymentStatus(
   // 1. Si ya está aprobado autoritativamente en la base de datos
   if (attempt.status === "approved") {
     const quote = await dependencies.quotes.findById(attempt.quoteId);
-    let whatsappUrl: string | null = null;
-
-    if (quote && dependencies.loadCatalog) {
-      const catalogResult = await dependencies.loadCatalog();
-      if (catalogResult.ok) {
-        try {
-          whatsappUrl = buildApprovedMercadoPagoWhatsAppUrl({
-            businessPhone: catalogResult.value.store.whatsappE164,
-            fulfilment: "pickup",
-            pricing: quote,
-            paymentReference: attempt.providerPaymentId ?? attempt.externalReference
-          });
-        } catch {
-          whatsappUrl = null;
-        }
-      }
-    }
+    const whatsappUrl = quote
+      ? await getWhatsAppUrlForApprovedQuote(
+          quote,
+          attempt.providerPaymentId ?? attempt.externalReference,
+          dependencies.loadCatalog
+        )
+      : null;
 
     return {
       status: "approved",
@@ -91,63 +105,71 @@ export async function checkMercadoPagoPaymentStatus(
     };
   }
 
-  // 2. Reconciliación server-to-server si el navegador presenta payment_id y sigue pendiente
-  if (attempt.status === "pending" && paymentId && /^\d+$/.test(paymentId.trim())) {
+  // 2. Reconciliación server-to-server ante retorno o recuperación de retorno abandonado
+  if (attempt.status === "pending") {
     const detectConfig = dependencies.detectConfig ?? detectMercadoPagoConfig;
     const configDetection = detectConfig();
 
     if (configDetection.enabled) {
       const fetcher = dependencies.fetcher ?? fetch;
       try {
-        const mpRes = await fetcher(
-          `https://api.mercadopago.com/v1/payments/${paymentId.trim()}`,
-          {
-            headers: { Authorization: `Bearer ${configDetection.config.accessToken}` },
-            cache: "no-store"
-          }
-        );
+        let mpPayment: Record<string, unknown> | null = null;
 
-        if (mpRes.ok) {
-          const mpData = await mpRes.json();
-          const amountCents = BigInt(Math.round(Number(mpData.transaction_amount) * 100));
+        // Caso A: El cliente o retorno proveyó payment_id
+        if (paymentId && /^\d+$/.test(paymentId.trim())) {
+          const mpRes = await fetcher(
+            `https://api.mercadopago.com/v1/payments/${paymentId.trim()}`,
+            {
+              headers: { Authorization: `Bearer ${configDetection.config.accessToken}` },
+              cache: "no-store"
+            }
+          );
+          if (mpRes.ok) {
+            mpPayment = await mpRes.json();
+          }
+        } else {
+          // Caso B: Retorno abandonado — búsqueda server-to-server por external_reference
+          const searchRes = await fetcher(
+            `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(attempt.externalReference)}`,
+            {
+              headers: { Authorization: `Bearer ${configDetection.config.accessToken}` },
+              cache: "no-store"
+            }
+          );
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (Array.isArray(searchData?.results) && searchData.results.length > 0) {
+              mpPayment = searchData.results[0];
+            }
+          }
+        }
+
+        if (mpPayment) {
+          const amountCents = BigInt(Math.round(Number(mpPayment.transaction_amount) * 100));
 
           // Verificación estricta de referencia externa, moneda y monto esperado
           if (
-            mpData.external_reference === attempt.externalReference &&
-            mpData.currency_id === "ARS" &&
+            mpPayment.external_reference === attempt.externalReference &&
+            mpPayment.currency_id === "ARS" &&
             amountCents === attempt.expectedAmountCents
           ) {
-            if (mpData.status === "approved") {
-              await dependencies.attempts.markApproved(attempt.externalReference, String(mpData.id));
+            if (mpPayment.status === "approved") {
+              await dependencies.attempts.markApproved(attempt.externalReference, String(mpPayment.id));
               const quote = await dependencies.quotes.findById(attempt.quoteId);
-              let whatsappUrl: string | null = null;
-
-              if (quote && dependencies.loadCatalog) {
-                const catalogResult = await dependencies.loadCatalog();
-                if (catalogResult.ok) {
-                  try {
-                    whatsappUrl = buildApprovedMercadoPagoWhatsAppUrl({
-                      businessPhone: catalogResult.value.store.whatsappE164,
-                      fulfilment: "pickup",
-                      pricing: quote,
-                      paymentReference: String(mpData.id)
-                    });
-                  } catch {
-                    whatsappUrl = null;
-                  }
-                }
-              }
+              const whatsappUrl = quote
+                ? await getWhatsAppUrlForApprovedQuote(quote, String(mpPayment.id), dependencies.loadCatalog)
+                : null;
 
               return {
                 status: "approved",
                 externalReference: attempt.externalReference,
-                paymentReference: String(mpData.id),
+                paymentReference: String(mpPayment.id),
                 totalCents: attempt.expectedAmountCents.toString(),
                 whatsappUrl
               };
             }
 
-            if (mpData.status === "rejected" || mpData.status === "cancelled") {
+            if (mpPayment.status === "rejected" || mpPayment.status === "cancelled") {
               return {
                 status: "rejected",
                 message: "El pago fue rechazado por la entidad bancaria o cancelado."

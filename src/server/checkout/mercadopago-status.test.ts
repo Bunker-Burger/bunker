@@ -1,26 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { checkMercadoPagoPaymentStatus } from "./mercadopago-status";
 import { createInMemoryPaymentRepository } from "../payments/payment-repository";
-import type { PaymentQuote } from "../payments/ports";
+import type { Catalog } from "@/domain/types";
 import { ok } from "@/lib/result";
+import type { PaymentQuote } from "../payments/ports";
 
-function mockQuote(id: string, totalCents = 1500000n, expiresAt?: Date): PaymentQuote {
+function mockQuote(
+  id: string,
+  totalCents = 1500000n,
+  expiresAt?: Date,
+  fulfillmentChannel: "pickup" | "delivery" = "pickup",
+  deliveryCents = 0n
+): PaymentQuote {
   return {
     id,
     lines: [{
       productId: "p1",
       productName: "Smash",
       quantity: 1,
-      unitPriceCents: totalCents,
-      basePriceCents: totalCents,
+      unitPriceCents: totalCents - deliveryCents,
+      basePriceCents: totalCents - deliveryCents,
       selectedOptions: [],
       notes: ""
     }],
-    subtotalCents: totalCents,
+    subtotalCents: totalCents - deliveryCents,
     discountCents: 0n,
-    deliveryCents: 0n,
+    deliveryCents,
     totalCents,
     promotion: null,
+    fulfillmentChannel,
     expiresAt: expiresAt ?? new Date(Date.now() + 15 * 60_000)
   };
 }
@@ -256,5 +264,197 @@ describe("checkMercadoPagoPaymentStatus", () => {
     );
 
     expect(res.status).toBe("expired");
+  });
+
+  it("TC-DELIVERY: genera mensaje de WhatsApp con modalidad Delivery, tarifa y solicitud de dirección (P2-03)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    // Delivery quote: subtotal $15.000 + delivery $1.500 = total $16.500
+    await repo.quotes.save(mockQuote("quote-deliv", 1650000n, undefined, "delivery", 150000n));
+    await repo.attempts.save({
+      id: "attempt-deliv",
+      quoteId: "quote-deliv",
+      externalReference: "ext-ref-deliv",
+      expectedAmountCents: 1650000n,
+      status: "approved",
+      providerPaymentId: "mp-pay-delivery-123",
+      createdAt: new Date()
+    });
+
+    const mockCatalog = {
+      store: { whatsappE164: "+5493815550000" }
+    } as unknown as Catalog;
+
+    const res = await checkMercadoPagoPaymentStatus(
+      { ref: "ext-ref-deliv" },
+      {
+        attempts: repo.attempts,
+        quotes: repo.quotes,
+        loadCatalog: async () => ok(mockCatalog)
+      }
+    );
+
+    expect(res.status).toBe("approved");
+    if (res.status !== "approved") return;
+    expect(res.whatsappUrl).toBeDefined();
+    const decodedUrl = decodeURIComponent(res.whatsappUrl!);
+    expect(decodedUrl).toContain("Modalidad: Delivery");
+    expect(decodedUrl).toContain("Envío: $1.500");
+    expect(decodedUrl).toContain("Te paso la dirección de entrega por este chat.");
+    expect(decodedUrl).toContain("Pago: Mercado Pago acreditado por webhook (ref. mp-pay-delivery-123)");
+  });
+
+  it("TC-PICKUP: genera mensaje de WhatsApp con modalidad Retiro en el local sin costo de envío (P2-03)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    await repo.quotes.save(mockQuote("quote-pickup", 1500000n, undefined, "pickup", 0n));
+    await repo.attempts.save({
+      id: "attempt-pickup",
+      quoteId: "quote-pickup",
+      externalReference: "ext-ref-pickup",
+      expectedAmountCents: 1500000n,
+      status: "approved",
+      providerPaymentId: "mp-pay-pickup-123",
+      createdAt: new Date()
+    });
+
+    const mockCatalog = {
+      store: { whatsappE164: "+5493815550000" }
+    } as unknown as Catalog;
+
+    const res = await checkMercadoPagoPaymentStatus(
+      { ref: "ext-ref-pickup" },
+      {
+        attempts: repo.attempts,
+        quotes: repo.quotes,
+        loadCatalog: async () => ok(mockCatalog)
+      }
+    );
+
+    expect(res.status).toBe("approved");
+    if (res.status !== "approved") return;
+    expect(res.whatsappUrl).toBeDefined();
+    const decodedUrl = decodeURIComponent(res.whatsappUrl!);
+    expect(decodedUrl).toContain("Modalidad: Retiro en el local");
+    expect(decodedUrl).not.toContain("Envío:");
+    expect(decodedUrl).not.toContain("Te paso la dirección de entrega");
+  });
+
+  it("TC-ABANDONED: reconcilia retorno abandonado sin payment_id mediante búsqueda MP server-to-server (P2-06)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    await repo.quotes.save(mockQuote("quote-abandoned", 1500000n));
+    await repo.attempts.save({
+      id: "attempt-abandoned",
+      quoteId: "quote-abandoned",
+      externalReference: "ext-ref-abandoned",
+      expectedAmountCents: 1500000n,
+      status: "pending",
+      createdAt: new Date()
+    });
+
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/v1/payments/search?external_reference=ext-ref-abandoned")) {
+        return new Response(JSON.stringify({
+          paging: { total: 1 },
+          results: [{
+            id: 888777666,
+            external_reference: "ext-ref-abandoned",
+            currency_id: "ARS",
+            transaction_amount: 15000,
+            status: "approved"
+          }]
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
+    };
+
+    // Client returns WITHOUT payment_id parameter (abandoned flow or polled by ref)
+    const res = await checkMercadoPagoPaymentStatus(
+      { ref: "ext-ref-abandoned" },
+      {
+        attempts: repo.attempts,
+        quotes: repo.quotes,
+        detectConfig: () => ({
+          enabled: true,
+          config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+        }),
+        fetcher
+      }
+    );
+
+    expect(res.status).toBe("approved");
+    if (res.status !== "approved") return;
+    expect(res.paymentReference).toBe("888777666");
+
+    const saved = await repo.attempts.findByExternalReference("ext-ref-abandoned");
+    expect(saved?.status).toBe("approved");
+    expect(saved?.providerPaymentId).toBe("888777666");
+  });
+
+  it("TC-ABANDONED-EXPIRED: retorno abandonado sin pago en MP transcurrido el tiempo marca expired (P2-06)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    const expiredDate = new Date("2026-10-09T00:50:00Z");
+    await repo.quotes.save(mockQuote("quote-abandoned-exp", 1500000n, expiredDate));
+    await repo.attempts.save({
+      id: "attempt-abandoned-exp",
+      quoteId: "quote-abandoned-exp",
+      externalReference: "ext-ref-abandoned-exp",
+      expectedAmountCents: 1500000n,
+      status: "pending",
+      createdAt: new Date("2026-10-09T00:40:00Z")
+    });
+
+    const fetcher: typeof fetch = async () =>
+      new Response(JSON.stringify({ paging: { total: 0 }, results: [] }), { status: 200 });
+
+    const res = await checkMercadoPagoPaymentStatus(
+      { ref: "ext-ref-abandoned-exp" },
+      {
+        attempts: repo.attempts,
+        quotes: repo.quotes,
+        detectConfig: () => ({
+          enabled: true,
+          config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+        }),
+        fetcher,
+        now: () => new Date("2026-10-09T01:00:00Z")
+      }
+    );
+
+    expect(res.status).toBe("expired");
+  });
+
+  it("TC-ZERO-TRUST: nunca acredita por parámetros de URL arbitrarios sin validación con MP (P2-06)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    await repo.quotes.save(mockQuote("quote-tamper-url"));
+    await repo.attempts.save({
+      id: "attempt-tamper-url",
+      quoteId: "quote-tamper-url",
+      externalReference: "ext-ref-tamper-url",
+      expectedAmountCents: 1500000n,
+      status: "pending",
+      createdAt: new Date()
+    });
+
+    // Adversary provides a fake payment_id and claims it was approved in URL query
+    const fetcher: typeof fetch = async () =>
+      new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
+
+    const res = await checkMercadoPagoPaymentStatus(
+      { ref: "ext-ref-tamper-url", paymentId: "fake-id-999" },
+      {
+        attempts: repo.attempts,
+        quotes: repo.quotes,
+        detectConfig: () => ({
+          enabled: true,
+          config: { accessToken: "token", webhookSecret: "secret", appUrl: "https://bunker.test" }
+        }),
+        fetcher
+      }
+    );
+
+    // Stays pending (never credited by untrusted URL params)
+    expect(res.status).toBe("pending");
+    const attempt = await repo.attempts.findByExternalReference("ext-ref-tamper-url");
+    expect(attempt?.status).toBe("pending");
   });
 });

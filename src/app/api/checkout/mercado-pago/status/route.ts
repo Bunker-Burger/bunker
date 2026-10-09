@@ -8,6 +8,13 @@ export async function GET(request: Request) {
   const paymentId = searchParams.get("payment_id");
 
   const ports = getPaymentPersistencePorts();
+  if (!ports) {
+    return Response.json(
+      { error: "unavailable", message: "El servicio de pagos no está disponible en este momento." },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
   const statusResult = await checkMercadoPagoPaymentStatus(
     { ref, paymentId },
     {

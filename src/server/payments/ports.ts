@@ -3,6 +3,7 @@ import type {
   ConfigurableOption,
   ConfigurableOptionGroup,
   ConfigurableProduct,
+  FulfilmentMethod,
   OptionSelectionMode,
   ProductType,
   PromotionRule
@@ -50,6 +51,7 @@ export interface PaymentQuote {
   totalCents: bigint;
   /** The single promotion applied, as computed by the server; null when none applies. */
   promotion: AppliedPromotion | null;
+  fulfillmentChannel: FulfilmentMethod;
   expiresAt: Date;
 }
 

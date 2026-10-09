@@ -116,23 +116,28 @@ export async function prepareMercadoPagoCheckout(
     if (error instanceof InvalidCheckoutError) {
       return failure("invalid_cart", error.message);
     }
-    throw error;
+    return failure("unavailable", "No pudimos guardar la cotización del pedido.");
   }
 
-  const preference = await createCheckoutProPreference(
-    {
-      quote: { id: quote.id, totalCents: quote.totalCents, expiresAt: quote.expiresAt },
-      customer: { name: checkout.customer.name, phone: checkout.customer.phone }
-    },
-    {
-      config: mpDetection.config,
-      fetcher: dependencies.fetcher ?? fetch,
-      attempts: dependencies.attempts,
-      storeStatus: async () => status.value,
-      createId: dependencies.createId,
-      now: dependencies.now
-    }
-  );
+  let preference: { preferenceId: string; checkoutUrl: string; externalReference: string };
+  try {
+    preference = await createCheckoutProPreference(
+      {
+        quote: { id: quote.id, totalCents: quote.totalCents, expiresAt: quote.expiresAt },
+        customer: { name: checkout.customer.name, phone: checkout.customer.phone }
+      },
+      {
+        config: mpDetection.config,
+        fetcher: dependencies.fetcher ?? fetch,
+        attempts: dependencies.attempts,
+        storeStatus: async () => status.value,
+        createId: dependencies.createId,
+        now: dependencies.now
+      }
+    );
+  } catch {
+    return failure("unavailable", "No pudimos generar el pago con Mercado Pago.");
+  }
 
   return ok({
     preferenceId: preference.preferenceId,

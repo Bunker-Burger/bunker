@@ -132,4 +132,11 @@ describe("OrderReturnModal (BB-14)", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("closes modal on Escape key press", async () => {
+    const onClose = vi.fn();
+    render(<OrderReturnModal externalReference="ext_ref_123" onClose={onClose} />);
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

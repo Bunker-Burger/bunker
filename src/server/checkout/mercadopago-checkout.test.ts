@@ -250,4 +250,111 @@ describe("prepareMercadoPagoCheckout", () => {
     if (result.ok) return;
     expect(result.error.code).toBe("payment_method_unavailable");
   });
+
+  it("falla cerrado con 503 cuando la base de datos falla al guardar la quote (P1-02)", async () => {
+    const errorQuotes = {
+      save: async () => {
+        throw new Error("DB write failed");
+      },
+      findById: async () => null
+    };
+    const repo = createInMemoryPaymentRepository();
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: errorQuotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z")
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("unavailable");
+    const response = mercadoPagoCheckoutResponse(result);
+    expect(response.status).toBe(503);
+  });
+
+  it("falla cerrado con 503 cuando falla la persistencia del attempt (P1-02)", async () => {
+    const repo = createInMemoryPaymentRepository();
+    const errorAttempts = {
+      save: async () => {
+        throw new Error("Attempts DB failure");
+      },
+      findByExternalReference: async () => null,
+      markApproved: async () => {}
+    };
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "pickup",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: errorAttempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z"),
+      fetcher: async () =>
+        new Response(JSON.stringify({ id: "pref_123", init_point: "https://mp.test/init" }), { status: 200 })
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("unavailable");
+    const response = mercadoPagoCheckoutResponse(result);
+    expect(response.status).toBe(503);
+  });
+
+  it("calcula y congela delivery con fulfillmentChannel='delivery' y tarifa oficial (P2-03)", async () => {
+    const repo = createInMemoryPaymentRepository();
+
+    const validPayload = {
+      items: [{ productId: PRODUCT_ID, quantity: 1, optionSelections: {}, notes: "" }],
+      fulfilment: "delivery",
+      paymentMethod: "mercado_pago",
+      customer: { name: "Juan Pérez", phone: "+54 9 381 555-1234" }
+    };
+
+    const result = await prepareMercadoPagoCheckout(validPayload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", webhookSecret: "test-secret", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "uuid-1",
+      now: () => new Date("2026-10-09T01:00:00Z"),
+      fetcher: async () =>
+        new Response(JSON.stringify({ id: "pref_123", init_point: "https://mp.test/init" }), { status: 200 })
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.quote.fulfillmentChannel).toBe("delivery");
+    expect(result.value.quote.deliveryCents).toBe(150000n);
+    expect(result.value.quote.totalCents).toBe(950000n); // 800000 + 150000
+  });
 });

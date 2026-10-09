@@ -37,7 +37,8 @@ const pricing: CheckoutPricing = {
   discountCents: 0n,
   deliveryCents: 120_000n,
   totalCents: 2_480_000n,
-  promotion: null
+  promotion: null,
+  fulfillmentChannel: "delivery"
 };
 
 const order: WhatsAppOrder = { businessPhone: "+54 9 3865 20-7458", fulfilment: "delivery", pricing };

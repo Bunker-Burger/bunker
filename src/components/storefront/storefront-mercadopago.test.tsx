@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { PublicStoreStatus } from "@/domain/store-status";
 import { serializePublicCatalog } from "@/server/catalog/public-products";
+import { untrustedCheckoutSchema } from "@/server/checkout/schema";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
 import { Storefront } from "./storefront";
 import { PRODUCTS_ENDPOINT } from "./use-public-catalog";
@@ -71,9 +72,13 @@ function setupFetch(options?: {
           promotion: null
         });
       }
-      if (url.includes("/api/checkout/mercado-pago")) {
+      if (url.includes("/api/checkout/mercado-pago") && !url.includes("/status")) {
         if (options?.mpCreateResponse) {
           return json(options.mpCreateResponse.body, options.mpCreateResponse.status);
+        }
+        const parsed = untrustedCheckoutSchema.safeParse(init.body ? JSON.parse(String(init.body)) : null);
+        if (!parsed.success) {
+          return json({ error: "invalid_request", message: "El pedido no tiene un formato válido." }, 400);
         }
         return json({
           preferenceId: "pref_test_123",
@@ -219,6 +224,8 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
       const body = mpReq?.body as Record<string, unknown>;
       expect(body.customer).toEqual({ name: "Martín Fierro", phone: "3815551234" });
       expect(body.fulfilment).toBe("pickup");
+      expect(body.paymentMethod).toBe("mercado_pago");
+      expect(untrustedCheckoutSchema.safeParse(body).success).toBe(true);
       // Check that client didn't send unitPriceCents or totalCents
       const items = body.items as Array<Record<string, unknown>>;
       expect(items[0]).not.toHaveProperty("unitPriceCents");
@@ -227,6 +234,49 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
         "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123"
       );
     });
+  });
+
+  it("hides Mercado Pago when store paymentMethods excludes mercado_pago even if mercadoPagoEnabled is true (P2-04)", async () => {
+    setupFetch();
+    render(
+      <Storefront
+        initialProductSlug={null}
+        mercadoPagoEnabled={true}
+        paymentMethods={["cash", "bank_transfer"]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Finalizar pedido")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("radio", { name: /Mercado Pago/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mp-submit-button")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Nombre y apellido/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Transferencia/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Efectivo/i)).toBeInTheDocument();
+  });
+
+  it("rejects payload without paymentMethod via untrustedCheckoutSchema with invalid_request (P1-01)", () => {
+    const invalidPayload = {
+      items: [
+        {
+          productId: "p1",
+          quantity: 1,
+          optionSelections: {},
+          notes: ""
+        }
+      ],
+      fulfilment: "pickup",
+      // paymentMethod omitted
+      customer: {
+        name: "Test User",
+        phone: "1123456789"
+      }
+    };
+
+    const result = untrustedCheckoutSchema.safeParse(invalidPayload);
+    expect(result.success).toBe(false);
   });
 
   it("disables submit button when store is closed or paused", async () => {
