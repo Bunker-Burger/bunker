@@ -6,6 +6,7 @@ import {
   createFixedWindowRateLimiter,
   DistributedRateLimitStore,
   extractClientIp,
+  getSharedRateLimitStore,
   MemoryRateLimitStore,
   RemoteTransportQuotaBackend
 } from "./rate-limit";
@@ -145,6 +146,30 @@ describe("createFixedWindowRateLimiter (P2-05)", () => {
     expect(res.allowed).toBe(false);
     expect(res.remaining).toBe(0);
     expect(res.error).toBe("rate_limit_backend_unavailable");
+  });
+
+  it("fails closed when distributed backend configuration is missing in production or requireDistributed is true (P2-05)", async () => {
+    const savedUrl = process.env.RATE_LIMIT_UPSTREAM_URL;
+    delete process.env.RATE_LIMIT_UPSTREAM_URL;
+
+    try {
+      const store = getSharedRateLimitStore({ requireDistributed: true });
+      const limiter = createFixedWindowRateLimiter({
+        store,
+        limit: 10,
+        windowMs: 60_000,
+        now: () => Date.now()
+      });
+
+      const res = await limiter.check("ip:test-prod-no-config");
+      expect(res.allowed).toBe(false);
+      expect(res.remaining).toBe(0);
+      expect(res.error).toBe("rate_limit_backend_unavailable");
+    } finally {
+      if (savedUrl !== undefined) {
+        process.env.RATE_LIMIT_UPSTREAM_URL = savedUrl;
+      }
+    }
   });
 
   it("enforces atomic quota under concurrency (15 simultaneous requests, exactly 10 pass, 5 reject) (P2-05)", async () => {

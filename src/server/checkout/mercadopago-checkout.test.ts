@@ -606,6 +606,29 @@ describe("prepareMercadoPagoCheckout", () => {
     expect(secondOrder.value.externalReference).not.toBe(firstOrder.value.externalReference);
     expect(secondOrder.value.quote.id).not.toBe(firstOrder.value.quote.id);
     expect(mpCalls).toBe(2);
+
+    // Reintento de la SEGUNDA compra con el mismo nonce/payload a las 01:17:00 (ej. pérdida de respuesta / retry):
+    const secondOrderRetry = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-second-retry",
+      now: () => new Date("2026-10-09T01:17:00Z"),
+      fetcher
+    });
+
+    expect(secondOrderRetry.ok).toBe(true);
+    if (!secondOrderRetry.ok) return;
+    // P1-10: El reintento de la nueva compra conserva su PROPIA preferencia (pref_mp_call_2) y NO genera una 3ra!
+    expect(secondOrderRetry.value.preferenceId).toBe("pref_mp_call_2");
+    expect(secondOrderRetry.value.externalReference).toBe(secondOrder.value.externalReference);
+    expect(secondOrderRetry.value.quote.id).toBe(secondOrder.value.quote.id);
+    expect(mpCalls).toBe(2); // Exactamente 2 llamadas a MP, cero duplicados en retry!
   });
 
   it("P1-10: nuevo pedido idéntico tras un pago aprobado genera nueva quote, reference y preferencia", async () => {
@@ -670,6 +693,28 @@ describe("prepareMercadoPagoCheckout", () => {
     // P1-10: Produce nueva referencia y preferencia, nunca la anterior ya aprobada
     expect(order2.value.preferenceId).toBe("pref_approved_flow_2");
     expect(order2.value.externalReference).not.toBe(order1.value.externalReference);
+    expect(mpCalls).toBe(2);
+
+    // Reintento del Pedido 2 (ej. pérdida transitoria de conexión o reintento de cliente):
+    const order2Retry = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: mockStoreStatus("open"),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-sofia-2-retry",
+      now: () => new Date("2026-10-09T01:06:00Z"),
+      fetcher
+    });
+
+    expect(order2Retry.ok).toBe(true);
+    if (!order2Retry.ok) return;
+    // P1-10: El reintento conserva la preferencia de la nueva compra (pref_approved_flow_2) sin crear una 3ra
+    expect(order2Retry.value.preferenceId).toBe("pref_approved_flow_2");
+    expect(order2Retry.value.externalReference).toBe(order2.value.externalReference);
     expect(mpCalls).toBe(2);
   });
 
@@ -744,6 +789,34 @@ describe("prepareMercadoPagoCheckout", () => {
     // P1-10: La cotización refleja el nuevo monto vigente ($10500) y genera nueva preferencia
     expect(updatedOrder.value.quote.totalCents).toBe(1050000n);
     expect(updatedOrder.value.preferenceId).toBe("pref_tariff_2");
+    expect(mpCalls).toBe(2);
+
+    // Reintento del pedido actualizado (misma tarifa, retry del cliente):
+    const updatedOrderRetry = await prepareMercadoPagoCheckout(payload, {
+      detectConfig: () => ({
+        enabled: true,
+        config: { accessToken: "test-token", appUrl: "https://bunker.test" }
+      }),
+      loadCatalog: async () => ok(mockCatalog()),
+      loadStoreStatus: async () =>
+        ok(
+          evaluateStoreStatus(
+            { timezone: "America/Argentina/Tucuman", statusOverride: "open", deliveryFeeCents: 250000n, businessHours: [] },
+            new Date("2026-10-09T01:03:00Z")
+          )
+        ),
+      quotes: repo.quotes,
+      attempts: repo.attempts,
+      createId: () => "att-camila-2-retry",
+      now: () => new Date("2026-10-09T01:03:00Z"),
+      fetcher
+    });
+
+    expect(updatedOrderRetry.ok).toBe(true);
+    if (!updatedOrderRetry.ok) return;
+    // P1-10: El reintento conserva la preferencia de la nueva tarifa (pref_tariff_2) sin crear una 3ra
+    expect(updatedOrderRetry.value.preferenceId).toBe("pref_tariff_2");
+    expect(updatedOrderRetry.value.quote.totalCents).toBe(1050000n);
     expect(mpCalls).toBe(2);
   });
 

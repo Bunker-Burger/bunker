@@ -808,6 +808,7 @@ function CheckoutSection({
         } else if (res.status === 503) {
           setMpError("Mercado Pago no está disponible en este momento.");
         } else if (data?.error === "invalid_cart") {
+          checkoutNonceRef.current = null;
           onCartRejected();
           setMpError("El carrito cambió de precio o disponibilidad. Revisá el pedido.");
         } else {

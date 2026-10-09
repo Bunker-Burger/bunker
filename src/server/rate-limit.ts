@@ -354,9 +354,23 @@ export function getGlobalDistributedBackend(options?: { maxEntries?: number }): 
   return globalObj[GLOBAL_DISTRIBUTED_BACKEND_KEY];
 }
 
+export class UnavailableRateLimitStore implements RateLimitStore {
+  constructor(private message = "Servicio de cuota distribuida no disponible") {}
+
+  async increment(): Promise<number> {
+    throw new Error(`rate_limit_backend_unavailable: ${this.message}`);
+  }
+
+  clear(): void {}
+  size(): number {
+    return 0;
+  }
+}
+
 export function getSharedRateLimitStore(options?: {
   backend?: DistributedQuotaBackend;
   maxEntries?: number;
+  requireDistributed?: boolean;
 }): RateLimitStore {
   if (options?.backend) {
     return new DistributedRateLimitStore(options.backend);
@@ -370,6 +384,17 @@ export function getSharedRateLimitStore(options?: {
         endpointUrl: upstreamUrl,
         ...(apiKey ? { apiKey } : {})
       })
+    );
+  }
+
+  // P2-05: En producción o cuando se exige cuota distribuida,
+  // si no hay backend distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente),
+  // NUNCA caer silenciosamente en memoria local por proceso.
+  // Falla cerrado (503) garantizando que no haya bypass entre réplicas / cold starts.
+  const isProduction = process.env.NODE_ENV === "production";
+  if (options?.requireDistributed || isProduction) {
+    return new UnavailableRateLimitStore(
+      "No hay servicio de cuota distribuido configurado (RATE_LIMIT_UPSTREAM_URL ausente en producción)"
     );
   }
 

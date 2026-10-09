@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluateStoreStatus, StoreNotAcceptingOrdersError, type StoreOperatingSettings } from "@/domain/store-status";
-import type { PaymentAttemptsPort } from "./ports";
+import type { PaymentAttempt, PaymentAttemptsPort } from "./ports";
 import { createCheckoutProPreference, detectMercadoPagoConfig } from "./mercado-pago";
 
 describe("detectMercadoPagoConfig", () => {
-  it("enables Mercado Pago only with complete server configuration", () => {
+  it("enables Mercado Pago with required BB-14 server configuration (token + appUrl, webhookSecret optional)", () => {
     expect(detectMercadoPagoConfig({ MERCADO_PAGO_ACCESS_TOKEN: "token" })).toEqual({
       enabled: false,
-      missing: ["MERCADO_PAGO_WEBHOOK_SECRET", "APP_URL"]
+      missing: ["APP_URL"]
     });
+    expect(detectMercadoPagoConfig({
+      MERCADO_PAGO_ACCESS_TOKEN: " token ",
+      APP_URL: "https://bunker.example/"
+    })).toEqual({ enabled: true, config: {
+      accessToken: "token", appUrl: "https://bunker.example"
+    } });
     expect(detectMercadoPagoConfig({
       MERCADO_PAGO_ACCESS_TOKEN: " token ",
       MERCADO_PAGO_WEBHOOK_SECRET: " secret ",
@@ -360,6 +366,154 @@ describe("createCheckoutProPreference", () => {
       expect(res2.preferenceId).toBe("pref-concurrent");
       expect(res1.externalReference).toBe(res2.externalReference);
       expect(fetchCalls).toBe(1); // Exactamente 1 llamada remota!
+    });
+
+    it("P1-11: dos runtimes aislados sin memoria compartida ejecutan conflicto UNIQUE 23505 y coordinan atómicamente a 1 sola llamada a MP", async () => {
+      let fetchCalls = 0;
+      let resolveWinnerFetcher!: (value: Response) => void;
+      const winnerFetcherPromise = new Promise<Response>((resolve) => {
+        resolveWinnerFetcher = resolve;
+      });
+
+      const fetcherWinner: typeof fetch = async () => {
+        fetchCalls += 1;
+        return winnerFetcherPromise;
+      };
+
+      const fetcherLoser: typeof fetch = async () => {
+        fetchCalls += 1;
+        return new Response(JSON.stringify({ id: "pref-loser-should-never-be-called", init_point: "https://mp.example/loser" }), { status: 201 });
+      };
+
+      let conflictTriggered = false;
+      const sharedDbAttempts = new Map<string, PaymentAttempt>();
+      const sharedDbIdempotency = new Map<string, PaymentAttempt>();
+
+      const createIsolatedPort = (): PaymentAttemptsPort => ({
+        async save(att) {
+          if (att.idempotencyKey) {
+            const existing = sharedDbIdempotency.get(att.idempotencyKey);
+            if (existing && existing.id !== att.id) {
+              conflictTriggered = true;
+              const err = Object.assign(
+                new Error('duplicate key value violates unique constraint "payment_attempts_idempotency_key_key"'),
+                { code: "23505" }
+              );
+              throw err;
+            }
+            sharedDbIdempotency.set(att.idempotencyKey, att);
+          }
+          sharedDbAttempts.set(att.externalReference, att);
+        },
+        async updatePreferenceId(ref, prefId) {
+          const found = sharedDbAttempts.get(ref);
+          if (found) {
+            found.providerPreferenceId = prefId;
+            found.status = "pending";
+          }
+        },
+        async findByExternalReference(ref) {
+          return sharedDbAttempts.get(ref) ?? null;
+        },
+        async findByIdempotencyKey(key) {
+          return sharedDbIdempotency.get(key) ?? null;
+        },
+        async markApproved() {}
+      });
+
+      // Runtime A y Runtime B tienen instancias separadas de port y mapas aislados de in-flight (simulan 2 Lambdas independientes)
+      const portA = createIsolatedPort();
+      const portB = createIsolatedPort();
+      const inFlightA = new Map();
+      const inFlightB = new Map();
+
+      const baseInput = {
+        quote: { id: "quote-p1-11", totalCents: 2_000_000n, expiresAt: new Date(Date.now() + 15 * 60_000) },
+        customer: { name: "Carlos Gardel", phone: "+5491155554321" },
+        idempotencyKey: "checkout-unique-race-p1-11"
+      };
+
+      // Runtime A y Runtime B ejecutan concurrentemente con mapas in-flight aislados (2 Lambdas)
+      // Ambos inician cuando DB aún no tiene el intento, provocando la carrera real sobre save() y el conflicto 23505
+      setTimeout(() => {
+        resolveWinnerFetcher(new Response(JSON.stringify({ id: "pref-winner-mp", init_point: "https://mp.example/winner" }), { status: 201 }));
+      }, 50);
+
+      const [resA, resB] = await Promise.all([
+        createCheckoutProPreference(baseInput, {
+          config: { accessToken: "secret-token", appUrl: "https://bunker.example" },
+          fetcher: fetcherWinner,
+          attempts: portA,
+          storeStatus: storeStatus("open"),
+          createId: () => "winner-attempt-id",
+          now: () => new Date(),
+          inFlightMap: inFlightA
+        }),
+        createCheckoutProPreference(baseInput, {
+          config: { accessToken: "secret-token", appUrl: "https://bunker.example" },
+          fetcher: fetcherLoser,
+          attempts: portB,
+          storeStatus: storeStatus("open"),
+          createId: () => "loser-attempt-id",
+          now: () => new Date(),
+          inFlightMap: inFlightB
+        })
+      ]);
+
+      // Aserciones estrictas de P1-11:
+      expect(conflictTriggered).toBe(true); // Se ejecutó el conflicto 23505 real!
+      expect(fetchCalls).toBe(1); // Runtime B NUNCA llamó a Mercado Pago!
+      expect(resA.preferenceId).toBe("pref-winner-mp");
+      expect(resB.preferenceId).toBe("pref-winner-mp");
+      expect(resA.checkoutUrl).toBe("https://mp.example/winner");
+      expect(resB.checkoutUrl).toBe("https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-winner-mp");
+      expect(resA.externalReference).toBe("winner-attempt-id");
+      expect(resB.externalReference).toBe("winner-attempt-id");
+    });
+
+    it("P1-11: falla de manera segura si el intento ganador en DB corresponde a otra cotización o expiró", async () => {
+      const sharedDbIdempotency = new Map<string, PaymentAttempt>();
+      sharedDbIdempotency.set("conflict-key-different-quote", {
+        id: "existing-winner",
+        quoteId: "different-quote-id",
+        expectedAmountCents: 999_999n,
+        status: "pending",
+        idempotencyKey: "conflict-key-different-quote",
+        externalReference: "ext-different",
+        createdAt: new Date()
+      });
+
+      const port: PaymentAttemptsPort = {
+        async save() {
+          const err = Object.assign(
+            new Error('duplicate key value violates unique constraint "payment_attempts_idempotency_key_key"'),
+            { code: "23505" }
+          );
+          throw err;
+        },
+        async findByExternalReference() { return null; },
+        async findByIdempotencyKey(key) { return sharedDbIdempotency.get(key) ?? null; },
+        async markApproved() {}
+      };
+
+      await expect(
+        createCheckoutProPreference(
+          {
+            quote: { id: "my-quote-id", totalCents: 1_500_000n, expiresAt: new Date(Date.now() + 15 * 60_000) },
+            customer: { name: "Ana Pérez", phone: "+5491155551234" },
+            idempotencyKey: "conflict-key-different-quote"
+          },
+          {
+            config: { accessToken: "secret-token", appUrl: "https://bunker.example" },
+            fetcher: async () => new Response("{}", { status: 200 }),
+            attempts: port,
+            storeStatus: storeStatus("open"),
+            createId: () => "my-attempt",
+            now: () => new Date(),
+            inFlightMap: new Map()
+          }
+        )
+      ).rejects.toThrow("El intento de pago concurrente en DB no coincide con la cotización o ha expirado.");
     });
   });
 });

@@ -5,7 +5,7 @@ import type { PaymentAttemptsPort } from "./ports";
 
 export interface MercadoPagoConfig {
   accessToken: string;
-  webhookSecret: string;
+  webhookSecret?: string;
   appUrl: string;
   publicKey?: string;
 }
@@ -30,9 +30,6 @@ export function detectMercadoPagoConfig(
   const accessToken = getEnvValue(environment, "MERCADO_PAGO_ACCESS_TOKEN", "MERCADOPAGO_ACCESS_TOKEN");
   if (!accessToken) missing.push("MERCADO_PAGO_ACCESS_TOKEN");
 
-  const webhookSecret = getEnvValue(environment, "MERCADO_PAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET");
-  if (!webhookSecret) missing.push("MERCADO_PAGO_WEBHOOK_SECRET");
-
   let rawAppUrl = getEnvValue(environment, "APP_URL", "NEXT_PUBLIC_APP_URL");
   if (!rawAppUrl && environment.VERCEL_URL?.trim()) {
     rawAppUrl = `https://${environment.VERCEL_URL.trim()}`;
@@ -46,6 +43,8 @@ export function detectMercadoPagoConfig(
     throw new Error("APP_URL debe usar HTTP o HTTPS");
   }
 
+  const webhookSecret = getEnvValue(environment, "MERCADO_PAGO_WEBHOOK_SECRET", "MERCADOPAGO_WEBHOOK_SECRET");
+
   const publicKey = getEnvValue(
     environment,
     "NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY",
@@ -56,8 +55,8 @@ export function detectMercadoPagoConfig(
     enabled: true,
     config: {
       accessToken: accessToken!,
-      webhookSecret: webhookSecret!,
       appUrl: appUrl.href.replace(/\/+$/, ""),
+      ...(webhookSecret ? { webhookSecret } : {}),
       ...(publicKey ? { publicKey } : {})
     }
   };
@@ -90,6 +89,7 @@ interface PreferenceDependencies {
   storeStatus(): Promise<StoreStatus>;
   createId(): string;
   now(): Date;
+  inFlightMap?: Map<string, Promise<{ preferenceId: string; checkoutUrl: string; externalReference: string }>>;
 }
 
 const inFlightPreferenceCreations = new Map<
@@ -105,8 +105,9 @@ export async function createCheckoutProPreference(
   const idempotencyKey = input.idempotencyKey ?? attemptId;
   const initialExternalReference = input.externalReference ?? attemptId;
 
-  // P2-09: Deduplicación atómica en memoria para carreras concurrentes (síncrona antes de cualquier await)
-  const inFlight = inFlightPreferenceCreations.get(idempotencyKey);
+  // P2-09 & P1-11: Deduplicación atómica en memoria para carreras dentro del mismo proceso
+  const inFlightTracker = dependencies.inFlightMap ?? inFlightPreferenceCreations;
+  const inFlight = inFlightTracker.get(idempotencyKey);
   if (inFlight) {
     return inFlight;
   }
@@ -165,8 +166,29 @@ export async function createCheckoutProPreference(
           (saveError as { code?: string }).code === "23505");
 
       if (isUniqueConflict && dependencies.attempts.findByIdempotencyKey) {
-        const winning = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
-        if (winning) {
+        // P1-11: El perdedor de la carrera atómica en DB NUNCA debe continuar a ejecutar un POST concurrente a Mercado Pago!
+        // Espera/lee al ganador con timeout acotado y valida quote, monto, estado y vigencia.
+        const startTime = dependencies.now().getTime();
+        const maxWaitMs = 3000;
+        let pollDelayMs = 40;
+
+        while (dependencies.now().getTime() - startTime < maxWaitMs) {
+          const winning = await dependencies.attempts.findByIdempotencyKey(idempotencyKey);
+          if (!winning) {
+            throw saveError;
+          }
+
+          // Validar quote, status y vigencia
+          const isMatchingQuote =
+            winning.quoteId === input.quote.id ||
+            winning.expectedAmountCents === input.quote.totalCents;
+          const isPending = winning.status === "pending";
+          const isUnexpired = input.quote.expiresAt.getTime() > dependencies.now().getTime();
+
+          if (!isMatchingQuote || !isPending || !isUnexpired) {
+            throw new Error("El intento de pago concurrente en DB no coincide con la cotización o ha expirado.");
+          }
+
           if (winning.providerPreferenceId) {
             return {
               preferenceId: winning.providerPreferenceId,
@@ -174,11 +196,12 @@ export async function createCheckoutProPreference(
               externalReference: winning.externalReference
             };
           }
-          finalAttemptId = winning.id;
-          finalExternalReference = winning.externalReference;
-        } else {
-          throw saveError;
+
+          await new Promise((r) => setTimeout(r, pollDelayMs));
+          pollDelayMs = Math.min(pollDelayMs * 1.5, 200);
         }
+
+        throw new Error("Tiempo de espera agotado aguardando la resolución del intento concurrente.");
       } else {
         throw saveError;
       }
@@ -206,7 +229,6 @@ export async function createCheckoutProPreference(
           surname: surnameParts.join(" "),
           phone: { number: input.customer.phone }
         },
-        notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook`,
         back_urls: {
           success: `${dependencies.config.appUrl}/?payment=success&ref=${finalExternalReference}`,
           pending: `${dependencies.config.appUrl}/?payment=pending&ref=${finalExternalReference}`,
@@ -239,10 +261,10 @@ export async function createCheckoutProPreference(
     return { preferenceId: parsed.id, checkoutUrl: parsed.init_point, externalReference: finalExternalReference };
   })();
 
-  inFlightPreferenceCreations.set(idempotencyKey, creationPromise);
+  inFlightTracker.set(idempotencyKey, creationPromise);
   try {
     return await creationPromise;
   } finally {
-    inFlightPreferenceCreations.delete(idempotencyKey);
+    inFlightTracker.delete(idempotencyKey);
   }
 }

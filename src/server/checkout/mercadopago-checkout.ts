@@ -14,7 +14,11 @@ import type {
   PricingRepository
 } from "@/server/payments/ports";
 import { createAuthoritativeQuote, InvalidCheckoutError } from "./quote";
-import { deriveLogicalCheckoutIdempotencyKey, untrustedCheckoutSchema } from "./schema";
+import {
+  deriveLogicalCheckoutIdempotencyKey,
+  deriveRotatedCheckoutIdempotencyKey,
+  untrustedCheckoutSchema
+} from "./schema";
 
 export type MercadoPagoCheckoutErrorCode =
   | "invalid_request"
@@ -136,10 +140,23 @@ export async function prepareMercadoPagoCheckout(
 
     let effectiveIdempotencyKey = initialIdempotencyKey;
 
-    // P1-10 & P2-09: Reusar identidad e intento existente SOLO si es un reintento legítimo del mismo intento activo
+    // P1-10: Resolver la clave de idempotencia efectiva rotando deterministamente por generaciones.
+    // Si una generación anterior terminó (status === 'approved' | 'rejected' | 'expired'),
+    // su cotización venció (>15 min) o cambió el precio/tarifa:
+    // Se avanza a la siguiente generación (gen + 1).
+    // Un reintento de la nueva compra (mismo intent/nonce) recuperará la MISMA generación activa
+    // y reutilizará su preferencia sin crear llamadas remotas duplicadas.
     if (dependencies.attempts.findByIdempotencyKey) {
-      const existingAttempt = await dependencies.attempts.findByIdempotencyKey(initialIdempotencyKey);
-      if (existingAttempt) {
+      const MAX_ROTATIONS = 20;
+      for (let gen = 1; gen <= MAX_ROTATIONS; gen++) {
+        const candidateKey = deriveRotatedCheckoutIdempotencyKey(initialIdempotencyKey, gen);
+        const existingAttempt = await dependencies.attempts.findByIdempotencyKey(candidateKey);
+        if (!existingAttempt) {
+          // Primera generación sin intento previo: esta es la clave para la nueva compra
+          effectiveIdempotencyKey = candidateKey;
+          break;
+        }
+
         const isPending = existingAttempt.status === "pending";
         const hasPreference = Boolean(existingAttempt.providerPreferenceId);
         const matchesAmount = existingAttempt.expectedAmountCents === quote.totalCents;
@@ -152,7 +169,7 @@ export async function prepareMercadoPagoCheckout(
 
         if (isPending && matchesAmount && isUnexpired && existingQuote) {
           if (hasPreference) {
-            // Reintento idéntico vigente (1 min reintento, pérdida de respuesta o reintento de cliente):
+            // Reintento idéntico vigente (pérdida de respuesta, timeout o reintento de cliente):
             // Reutilizar la misma preferencia y cotización autoritativa sin invocar MP nuevamente
             return ok({
               preferenceId: existingAttempt.providerPreferenceId!,
@@ -162,17 +179,12 @@ export async function prepareMercadoPagoCheckout(
             });
           }
           // Intento en curso o reintento tras timeout sin preference_id:
-          // Mantener la MISMA clave de idempotencia para que MP procese el reintento idempotentemente!
-          effectiveIdempotencyKey = initialIdempotencyKey;
-        } else {
-          // P1-10: Si el intento previo terminó (status === 'approved' | 'rejected' | 'expired')
-          // o su cotización venció (>15 min) o cambió el precio/tarifa:
-          // Esta es una NUEVA COMPRA IDÉNTICA.
-          // NUNCA devolver URL vieja ni reutilizar una clave de idempotencia colisionante.
-          // Se genera una clave fresca para el nuevo pedido/intento:
-          const nonce = dependencies.createId();
-          effectiveIdempotencyKey = deriveLogicalCheckoutIdempotencyKey(checkout, nonce);
+          // Mantener la clave de esta generación para que MP procese el reintento idempotentemente
+          effectiveIdempotencyKey = candidateKey;
+          break;
         }
+
+        // Si el intento previo de esta generación terminó o expiró, continuamos a la siguiente generación
       }
     }
 

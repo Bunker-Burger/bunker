@@ -85,3 +85,18 @@ export function deriveLogicalCheckoutIdempotencyKey(
   return `checkout-${payloadDigest.slice(0, 32)}`;
 }
 
+/**
+ * P1-10: Deriva una clave de idempotencia determinista para rotaciones / nuevas compras del mismo intento.
+ * Genera claves de longitud fija de 41 caracteres (checkout- + 32 hex) indexadas por generación (1, 2, ...).
+ */
+export function deriveRotatedCheckoutIdempotencyKey(
+  baseKey: string,
+  generation: number
+): string {
+  if (generation <= 1) return baseKey;
+  const combinedDigest = createHash("sha256")
+    .update(`${baseKey}:gen:${generation}`)
+    .digest("hex");
+  return `checkout-${combinedDigest.slice(0, 32)}`;
+}
+

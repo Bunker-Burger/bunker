@@ -15,7 +15,7 @@ const checkoutRateLimiter = createFixedWindowRateLimiter({
   limit: 10,
   windowMs: 60_000,
   now: () => Date.now(),
-  store: getSharedRateLimitStore()
+  store: getSharedRateLimitStore({ requireDistributed: process.env.NODE_ENV === "production" })
 });
 
 export async function POST(request: Request) {

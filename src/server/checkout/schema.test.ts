@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveLogicalCheckoutIdempotencyKey,
   deriveLogicalCheckoutPayloadDigest,
+  deriveRotatedCheckoutIdempotencyKey,
   parseUntrustedCheckout
 } from "./schema";
 
@@ -83,5 +84,23 @@ describe("deriveLogicalCheckoutPayloadDigest and deriveLogicalCheckoutIdempotenc
     expect(keyA).not.toBe(keyB);
     expect(keyA.length).toBe(41);
     expect(keyB.length).toBe(41);
+  });
+
+  it("P1-10: deriveRotatedCheckoutIdempotencyKey generates deterministic, distinct 41-char keys across generations", () => {
+    const baseKey = "checkout-12345678901234567890123456789012";
+    expect(deriveRotatedCheckoutIdempotencyKey(baseKey, 1)).toBe(baseKey);
+
+    const gen2 = deriveRotatedCheckoutIdempotencyKey(baseKey, 2);
+    const gen3 = deriveRotatedCheckoutIdempotencyKey(baseKey, 3);
+
+    expect(gen2).not.toBe(baseKey);
+    expect(gen3).not.toBe(gen2);
+    expect(gen2.length).toBe(41);
+    expect(gen3.length).toBe(41);
+    expect(gen2.startsWith("checkout-")).toBe(true);
+    expect(gen3.startsWith("checkout-")).toBe(true);
+
+    // Determinismo: llamar nuevamente con gen=2 devuelve exactamente la misma clave
+    expect(deriveRotatedCheckoutIdempotencyKey(baseKey, 2)).toBe(gen2);
   });
 });
