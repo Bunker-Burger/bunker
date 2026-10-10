@@ -102,6 +102,10 @@ export interface Product extends ConfigurableProduct {
   /** Null when the product has no photo yet. */
   imageUrl: string | null;
   imageAlt?: string;
+  /** Percentages (0–100) of the photo kept in view when it is cropped; centred when absent. */
+  imageFocalPoint?: { x: number; y: number };
+  /** Manual order inside the category (lower first); ties fall back to featured, then name. */
+  sortOrder?: number;
   published: boolean;
   featured: boolean;
   inStock: boolean;

@@ -73,6 +73,15 @@ function parseOptionGroup(raw: unknown): OptionGroup | null {
   };
 }
 
+const isPercent = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 100;
+
+/** A malformed focal point only loses the crop hint (the photo stays centred), never the product. */
+function parseFocalPoint(raw: unknown): { x: number; y: number } | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const { x, y } = raw as Record<string, unknown>;
+  return isPercent(x) && isPercent(y) ? { x, y } : undefined;
+}
+
 function parseProduct(raw: unknown): Product | null {
   if (!raw || typeof raw !== "object") return null;
   const p = raw as Record<string, unknown>;
@@ -91,6 +100,7 @@ function parseProduct(raw: unknown): Product | null {
   if (p.containsAlcohol !== undefined && typeof p.containsAlcohol !== "boolean") return null;
   if (!Array.isArray(p.optionGroups)) return null;
 
+  const focalPoint = parseFocalPoint(p.imageFocalPoint);
   const parsedGroups: OptionGroup[] = [];
   for (const rawGroup of p.optionGroups) {
     const grp = parseOptionGroup(rawGroup);
@@ -108,6 +118,7 @@ function parseProduct(raw: unknown): Product | null {
     priceCents: BigInt(p.priceCents),
     imageUrl: p.imageUrl,
     ...(p.imageAlt !== undefined ? { imageAlt: p.imageAlt } : {}),
+    ...(focalPoint ? { imageFocalPoint: focalPoint } : {}),
     published: p.published,
     featured: p.featured,
     inStock: p.inStock,

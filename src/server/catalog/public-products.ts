@@ -31,6 +31,7 @@ export interface SerializedPublicProduct {
   priceCents: string;
   imageUrl: string | null;
   imageAlt?: string | null | undefined;
+  imageFocalPoint?: { x: number; y: number } | undefined;
   published: boolean;
   featured: boolean;
   inStock: boolean;
@@ -72,6 +73,7 @@ export function serializePublicProducts(products: readonly Product[]): Serialize
     priceCents: product.priceCents.toString(),
     imageUrl: product.imageUrl,
     ...(product.imageAlt !== undefined ? { imageAlt: product.imageAlt } : {}),
+    ...(product.imageFocalPoint !== undefined ? { imageFocalPoint: product.imageFocalPoint } : {}),
     published: product.published,
     featured: product.featured,
     inStock: product.inStock,

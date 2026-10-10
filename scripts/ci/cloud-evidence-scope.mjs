@@ -47,6 +47,8 @@ export const RULES = [
   { pattern: /^src\/server\/catalog\/catalog-service\.ts$/, before: ["authProduct"], reason: "loadAdminCatalog: gate admin y tienda del admin" },
   // getAdminCatalog: único acceso al catálogo admin; arma cliente de sesión (RLS del usuario), scope admin y gate.
   { pattern: /^src\/server\/catalog\/index\.ts$/, before: ["authProduct"], reason: "getAdminCatalog: cliente de sesión, scope admin y gate" },
+  // BB-12: escrituras del catálogo como el admin (gate + cliente de sesión + Storage con RLS).
+  { pattern: /^src\/server\/catalog-admin\//, before: ["authProduct"], reason: "escrituras admin del catálogo: gate, sesión y Storage" },
   { pattern: /^src\/server\/supabase\/(clients|config|update-session)\.ts$/, before: ["authProduct"], reason: "clientes Supabase y cookies SSR" },
   { pattern: /^src\/proxy\.ts$/, before: ["authProduct"], reason: "proxy de sesión" },
   { pattern: /^src\/app\/bunker\//, before: ["authProduct"], reason: "rutas administrativas /bunker" },

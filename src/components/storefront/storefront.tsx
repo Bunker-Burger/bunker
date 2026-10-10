@@ -46,6 +46,7 @@ import {
   toggleOption,
   type PaymentMethod
 } from "./storefront-state";
+import { focalStyle } from "./focal-style";
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
@@ -474,7 +475,7 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
         <div className="drawer-grabber" />
         <button aria-label="Cerrar personalizador" className="close-button" onClick={onClose} ref={closeRef} type="button"><X /></button>
         {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-        {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} /> : null}
+        {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
         <div className="drawer-content">
           <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
           <p className="sr-only" id={summaryId}>

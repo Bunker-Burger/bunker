@@ -9,6 +9,12 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    serverActions: {
+      // Product photos go through a Server Action: 5 MB (the image and bucket limit) plus multipart overhead.
+      bodySizeLimit: "6mb"
+    }
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "lh3.googleusercontent.com" },

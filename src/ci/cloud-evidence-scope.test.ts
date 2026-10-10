@@ -47,6 +47,9 @@ describe("cloud evidence scope (scripts/ci/cloud-evidence-scope.mjs)", () => {
     ["the admin catalog service (loadAdminCatalog)", "src/server/catalog/catalog-service.ts", ["authProduct"]],
     // getAdminCatalog: the only entry point to the admin catalog (session client, admin scope, gate).
     ["the admin catalog entry point (getAdminCatalog)", "src/server/catalog/index.ts", ["authProduct"]],
+    // BB-12: catalog writes authorize through the gate and write with the session client.
+    ["the admin catalog writes", "src/server/catalog-admin/catalog-admin-service.ts", ["authProduct"]],
+    ["the admin catalog Storage/RLS repository", "src/server/catalog-admin/supabase-catalog-admin-repository.ts", ["authProduct"]],
     ["the SSR cookie client", "src/server/supabase/clients.ts", ["authProduct"]],
     ["session refresh", "src/server/supabase/update-session.ts", ["authProduct"]],
     ["Supabase config validation", "src/server/supabase/config.ts", ["authProduct"]],
