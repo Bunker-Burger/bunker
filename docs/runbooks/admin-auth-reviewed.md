@@ -52,8 +52,18 @@ hay que repetirlos con `workflow_dispatch` sobre el SHA final.
    - `Admin Auth — ejecución revisada (main)`;
    - `Admin Auth producto — ejecución revisada (main)`.
 3. El workflow de producto se detiene esperando aprobación del entorno. Aprobar **sólo** después de inspeccionar ese
-   SHA: el job hace checkout de ese commit exacto (no de una rama móvil ni de `pull/*/merge`) y le entrega los secretos
-   del owner en un runner efímero de GitHub, sin caché ni artifacts.
+   SHA. Ya aprobado, y **antes** de traer código de la PR, el job corre desde `main`
+   `scripts/ci/preflight-supabase-dev.mjs` con `EXPECTED_PROJECT_REF=zokkgocmcaqcujltfkjf`, que exige:
+   - `NEXT_PUBLIC_SUPABASE_URL` igual a `https://zokkgocmcaqcujltfkjf.supabase.co` (https, sin usuario, puerto, path
+     ni query);
+   - una clave publishable (`sb_publishable_…` o JWT `anon` con ese `ref`); una `sb_secret_…` o un JWT
+     `service_role` falla;
+   - las credenciales admin presentes.
+
+   `SUPABASE_PROJECT_ENV=development` es sólo una etiqueta y no prueba la identidad del proyecto. Si el preflight
+   falla, no se trae código de la PR y se publica `failure`. Si pasa, el job hace checkout de ese commit exacto (no de
+   una rama móvil ni de `pull/*/merge`) y le entrega los secretos del owner en un runner efímero de GitHub, sin caché ni
+   artifacts.
 4. El job de producto corre `pnpm run test:integration:auth` y `pnpm run test:e2e:admin-auth` con
    `SUPABASE_TEST_REQUIRE_CLOUD=1`. Lo exigido:
    - `admin-session.integration.test.ts` con exactamente 2/2 pasados;
