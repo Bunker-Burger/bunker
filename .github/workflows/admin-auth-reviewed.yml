@@ -1,7 +1,7 @@
 name: Admin Auth — ejecución revisada (main)
 
-# Ejecuta la integración Auth real y el E2E del SHA revisado sólo desde main, con aprobación
-# del Environment main. No genera reportes Playwright ni artefactos que puedan contener cookies.
+# Ejecuta un harness Auth autocontenido y revisado desde main. Nunca checkout ni ejecuta
+# JavaScript del SHA de la PR con secretos; el SHA sólo identifica el commit auditado.
 on:
   workflow_dispatch:
     inputs:
@@ -53,55 +53,37 @@ jobs:
           echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
   admin-auth:
-    name: Auth real y E2E sin artefactos
+    name: Auth cloud harness confiable
     needs: authorize
     runs-on: ubuntu-latest
     environment: main
     steps:
-      - name: Checkout exclusivo del SHA revisado
+      - name: Checkout exclusivo de main
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.authorize.outputs.sha }}
+          ref: main
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Verificar login Auth real, gate negativo y logout
+      - name: Ejecutar únicamente el harness confiable de main
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPECTED_PROJECT_REF: zokkgocmcaqcujltfkjf
           SUPABASE_PROJECT_ENV: development
           SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
           SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
-          SUPABASE_TEST_REQUIRE_CLOUD: "1"
-        run: pnpm run test:integration:auth
-      - name: Build exacto revisado
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_PROJECT_ENV: development
-        run: pnpm run build
-      - name: E2E owner, invalid login, logout y acceso directo
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_PROJECT_ENV: development
-          SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
-          SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
-          SUPABASE_TEST_REQUIRE_CLOUD: "1"
-        run: pnpm run test:e2e:admin-auth
+        run: node scripts/check-admin-auth-cloud.mjs
       - name: Registrar resultado para el SHA exacto
-        if: success()
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
         run: |
           gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$REVIEWED_SHA" \
-            -f state=success \
+            -f state="$STATE" \
             -f context=cloud/admin-auth-reviewed \
-            -f description="Auth integration and E2E real ejecutados sobre SHA revisado" \
+            -f description="Trusted-main cloud Auth harness for reviewed SHA" \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null

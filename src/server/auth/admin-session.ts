@@ -117,7 +117,14 @@ export async function getCurrentStoreAdmin(
 
 export async function signOutCurrentSession(dependencies?: AdminLogoutDependencies): Promise<void> {
   const resolved = dependencies ? { ok: true as const, value: dependencies } : await defaultDependencies();
-  if (!resolved.ok) return;
+  if (!resolved.ok) {
+    // A missing/invalid project configuration means we cannot safely identify the
+    // project's auth cookie. Do not claim logout succeeded; let the action surface
+    // the failure and keep unrelated project sessions untouched.
+    const failure = new Error(`Admin logout unavailable: ${resolved.error.message}`);
+    failure.cause = resolved.error;
+    throw failure;
+  }
 
   let signOutError: unknown;
   try {
