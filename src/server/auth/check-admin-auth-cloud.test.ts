@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // The trusted harness is plain Node ESM so it can run from main without installing app code.
 // @ts-expect-error The JavaScript module carries its own runtime contract and is tested below.
-import { extractActionsRunId, isAuthorizedStatus, isBunkerOwner, isTrustedActionsRun, run, selectLatestStatus } from "../../../scripts/check-admin-auth-cloud.mjs";
+import { isBunkerOwner, run } from "../../../scripts/check-admin-auth-cloud.mjs";
+// Status provenance (the CI gate) is tested by running the real gate script: src/ci/verify-cloud-statuses.test.ts.
 
 const env = {
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
@@ -53,91 +54,5 @@ describe("trusted Auth cloud harness", () => {
     });
 
     await expect(run(fakeFetch, env, false)).resolves.toMatchObject({ passed: false });
-  });
-
-  describe("GitHub status provenance fixtures", () => {
-    const repository = "Bunker-Burger/bunker";
-    const reviewedSha = "a".repeat(40);
-    const workflow = ".github/workflows/admin-auth-reviewed.yml";
-    const runUrl = `https://github.com/${repository}/actions/runs/123456789`;
-    const successRun = {
-      head_sha: reviewedSha,
-      status: "completed",
-      conclusion: "success",
-      path: workflow
-    };
-    const successStatus = {
-      context: "cloud/admin-auth-reviewed",
-      state: "success",
-      creator: { login: "github-actions[bot]" },
-      target_url: runUrl,
-      updated_at: "2026-10-09T12:00:00Z"
-    };
-
-    it("accepts the newest status from the real statuses endpoint shape", () => {
-      const combinedStatus = {
-        state: "success",
-        total_count: 1,
-        statuses: []
-      };
-      const statuses = [
-        successStatus,
-        { ...successStatus, state: "failure", updated_at: "2026-10-09T11:00:00Z" },
-        { ...successStatus, context: "cloud/pgTAP-reviewed" }
-      ];
-      expect(selectLatestStatus(statuses, "cloud/admin-auth-reviewed")).toBe(successStatus);
-      expect(selectLatestStatus(statuses, "cloud/missing")).toBeNull();
-      expect("sha" in combinedStatus).toBe(false);
-      expect("creator" in combinedStatus).toBe(false);
-      expect(successStatus.creator.login).toBe("github-actions[bot]");
-    });
-
-    it.each([
-      ["success", successStatus, successRun, "github-actions[bot]", true],
-      ["missing", null, successRun, "github-actions[bot]", false],
-      ["failure", { ...successStatus, state: "failure" }, successRun, "github-actions[bot]", false],
-      ["stale run SHA", successStatus, { ...successRun, head_sha: "b".repeat(40) }, "github-actions[bot]", false],
-      ["wrong URL", { ...successStatus, target_url: `https://example.test/${reviewedSha}` }, successRun, "github-actions[bot]", false],
-      ["wrong workflow", successStatus, { ...successRun, path: ".github/workflows/other.yml" }, "github-actions[bot]", false],
-      ["incomplete run", successStatus, { ...successRun, status: "in_progress" }, "github-actions[bot]", false],
-      ["untrusted creator", { ...successStatus, creator: { login: "triager" } }, successRun, "triager", false],
-      ["maintainer creator", { ...successStatus, creator: { login: "maintainer" } }, successRun, "maintain", true]
-    ])("rejects or accepts provenance fixture: %s", (_name, status, runData, permission, expected) => {
-      expect(isAuthorizedStatus({
-        status,
-        run: runData,
-        repository,
-        expectedSha: reviewedSha,
-        expectedWorkflow: workflow,
-        creatorPermission: permission
-      })).toBe(expected);
-    });
-
-    it("requires a numeric Actions run URL tied to the repository", () => {
-      expect(extractActionsRunId(runUrl, repository)).toBe("123456789");
-      expect(extractActionsRunId(`${runUrl}/attempts/2`, repository)).toBeNull();
-      expect(extractActionsRunId(`https://github.com/other/repo/actions/runs/123456789`, repository)).toBeNull();
-      expect(extractActionsRunId("https://github.com/Bunker-Burger/bunker/actions/runs/not-a-number", repository)).toBeNull();
-    });
-
-    it("does not treat an older success as current after a newer failure", () => {
-      const statuses = [
-        { ...successStatus, state: "failure", updated_at: "2026-10-09T13:00:00Z" },
-        successStatus
-      ];
-      const newest = selectLatestStatus(statuses, successStatus.context);
-      expect(isAuthorizedStatus({
-        status: newest,
-        run: successRun,
-        repository,
-        expectedSha: reviewedSha,
-        expectedWorkflow: workflow
-      })).toBe(false);
-    });
-
-    it("keeps the run checks sensitive to a wrong SHA", () => {
-      expect(isTrustedActionsRun(successRun, reviewedSha, workflow)).toBe(true);
-      expect(isTrustedActionsRun(successRun, "c".repeat(40), workflow)).toBe(false);
-    });
   });
 });
