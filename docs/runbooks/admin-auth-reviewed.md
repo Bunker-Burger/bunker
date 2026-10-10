@@ -37,11 +37,19 @@ proxy, cookies SSR, layout ni navegación de la aplicación. La evidencia del pr
      -f target_url="https://github.com/Bunker-Burger/bunker/actions/runs/<RUN_ID>"
    ```
 
-   El `target_url` debe ser una ejecución GitHub Actions inmutable del runner efímero aprobado. El CI además verifica
-   que el status esté adjunto al SHA consultado y que su `creator` sea `github-actions[bot]` o un colaborador con
-   permiso `write`, `maintain` o `admin`; un status genérico, URL privada/no verificable, actor no autorizado o SHA
-   distinto no desbloquea el merge. Ante cualquier fallo, skip o duda sobre el aislamiento, publicar `failure` o no
-   publicar status.
+   El `target_url` debe ser una ejecución GitHub Actions inmutable del runner efímero aprobado. El CI consulta
+   `GET /repos/Bunker-Burger/bunker/statuses/<SHA_COMPLETO>` (no el agregado `/commits/<SHA>/status`), toma el
+   status más reciente del contexto y verifica `state=success`, actor, URL canónica con un ID numérico de run y el
+   objeto `GET /actions/runs/<RUN_ID>`: `head_sha` exacto, `status=completed`, `conclusion=success` y el path del
+   workflow confiable esperado. El `creator` debe ser `github-actions[bot]` o un colaborador con permiso `write`,
+   `maintain` o `admin`; un status genérico, URL privada/no verificable, run de otro workflow, actor no autorizado o
+   SHA distinto no desbloquea el merge. Ante cualquier fallo, skip o duda sobre el aislamiento, publicar `failure` o
+   no publicar status.
+
+   El contrato de fixtures se prueba en
+   `src/server/auth/check-admin-auth-cloud.test.ts`: cubre status ausente, failure/stale, creator no autorizado,
+   URL/run/workflow/SHA incorrectos y el caso válido. La mutación temporal de cualquiera de los filtros debe hacer
+   fallar esa suite antes de restaurar el árbol limpio.
 
 El CI de la PR exige este contexto exacto además de `cloud/admin-auth-reviewed` y `cloud/pgTAP-reviewed`. Un status de
 otro SHA, una autodeclaración desde la PR o el probe REST del proveedor no desbloquean el merge.
