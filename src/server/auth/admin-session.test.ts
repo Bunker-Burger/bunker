@@ -1,12 +1,24 @@
 import { AuthApiError, AuthRetryableFetchError } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { catalogError } from "@/server/catalog/errors";
+import { clearSessionCookies } from "@/server/supabase/clients";
 import {
   authenticateStoreAdmin,
   getCurrentStoreAdmin,
   signOutCurrentSession,
   type AdminAuthDependencies
 } from "./admin-session";
+
+const cookieJar = vi.hoisted(() => new Map<string, string>());
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    getAll: () => [...cookieJar].map(([name, value]) => ({ name, value })),
+    set: (name: string, value: string) => {
+      if (value) cookieJar.set(name, value);
+      else cookieJar.delete(name);
+    }
+  })
+}));
 
 const membership = { userId: "user-1", storeId: "store-1", role: "owner" as const };
 const credentials = { email: "owner@example.com", password: "correct horse battery staple" };
@@ -103,8 +115,52 @@ describe("current admin session", () => {
   it("signs out with scope local", async () => {
     const deps = dependencies();
 
-    await signOutCurrentSession({ client: deps.value.client });
+    await signOutCurrentSession({ client: deps.value.client, clearSessionCookies: vi.fn(async () => undefined) });
 
     expect(deps.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it.each([
+    ["returned error", async () => ({ error: new AuthApiError("logout failed", 500, "logout_failed") })],
+    ["thrown exception", async () => { throw new Error("transport failed"); }]
+  ] as const)("clears only the local session cookie when signOut has a %s", async (_case, signOutImplementation) => {
+    const deps = dependencies();
+    deps.signOut.mockImplementation(signOutImplementation);
+    const clearSessionCookies = vi.fn(async () => undefined);
+
+    await expect(signOutCurrentSession({ client: deps.value.client, clearSessionCookies })).resolves.toBeUndefined();
+    expect(clearSessionCookies).toHaveBeenCalledOnce();
+    expect(deps.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("proves the real cookie adapter clears the current session after returned and thrown failures", async () => {
+    const config = {
+      url: "https://abcdefghijklmnopqrst.supabase.co",
+      publishableKey: "sb_publishable_test",
+      projectRef: "abcdefghijklmnopqrst",
+      projectEnv: "development" as const
+    };
+    const deps = dependencies();
+    const clear = () => clearSessionCookies(config);
+
+    for (const failure of [
+      { kind: "returned" as const, value: new AuthApiError("logout failed", 500, "logout_failed") },
+      { kind: "thrown" as const, value: new Error("transport failed") }
+    ]) {
+      cookieJar.clear();
+      cookieJar.set("sb-abcdefghijklmnopqrst-auth-token", "session");
+      cookieJar.set("sb-abcdefghijklmnopqrst-auth-token.0", "chunk");
+      deps.signOut.mockImplementation(
+        failure.kind === "returned"
+          ? async () => ({ error: failure.value })
+          : async () => {
+              throw failure.value;
+            }
+      );
+
+      await expect(signOutCurrentSession({ client: deps.value.client, clearSessionCookies: clear })).resolves.toBeUndefined();
+      expect(cookieJar.has("sb-abcdefghijklmnopqrst-auth-token")).toBe(false);
+      expect(cookieJar.has("sb-abcdefghijklmnopqrst-auth-token.0")).toBe(false);
+    }
   });
 });

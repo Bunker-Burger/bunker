@@ -24,6 +24,10 @@ const credentials = {
 };
 const enabled = config.ok && config.value.projectEnv === "development" && Boolean(credentials.email && credentials.password);
 
+if (process.env.SUPABASE_TEST_REQUIRE_CLOUD === "1" && !enabled) {
+  throw new Error("SUPABASE_TEST_REQUIRE_CLOUD=1 requires development URL, publishable key, project env, and admin credentials");
+}
+
 describe.skipIf(!enabled)("admin session (cloud development project)", () => {
   beforeEach(() => cookieJar.clear());
 

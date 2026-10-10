@@ -36,11 +36,7 @@ export async function login(_previousState: LoginActionState, formData: FormData
 }
 
 export async function logout(): Promise<never> {
-  try {
-    await signOutCurrentSession();
-  } catch {
-    // Logout is idempotent: an absent/revoked session is already the desired state.
-  }
+  await signOutCurrentSession();
   revalidatePath("/", "layout");
   redirect(ADMIN_LOGIN_PATH);
 }

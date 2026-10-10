@@ -102,12 +102,12 @@ describe("logout", () => {
     expect(redirectMock).toHaveBeenCalledWith("/bunker");
   });
 
-  it("remains idempotent when the session is absent or signout fails", async () => {
+  it("does not redirect when local session cleanup fails", async () => {
     signOutMock.mockRejectedValue(new Error("session already absent"));
 
-    await expect(logout()).rejects.toThrow("NEXT_REDIRECT:/bunker");
+    await expect(logout()).rejects.toThrow("session already absent");
 
-    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
-    expect(redirectMock).toHaveBeenCalledWith("/bunker");
+    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });

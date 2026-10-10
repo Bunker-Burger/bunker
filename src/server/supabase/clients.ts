@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createServerClient } from "@supabase/ssr";
+import { clearAuthCookiesAtScopes, createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { SupabaseConfig } from "./config";
@@ -60,5 +60,18 @@ export async function createSessionClient(config: SupabaseConfig): Promise<Supab
       }
     },
     global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) }
+  });
+}
+
+/** Clears only this project's SSR auth cookie chunks at the root path. */
+export async function clearSessionCookies(config: SupabaseConfig): Promise<void> {
+  const cookieStore = await cookies();
+  await clearAuthCookiesAtScopes({
+    getAll: () => cookieStore.getAll(),
+    setAll: async (cookiesToSet) => {
+      for (const { name, value, options } of cookiesToSet) cookieStore.set(name, value, options);
+    },
+    storageKey: `sb-${config.projectRef}-auth-token`,
+    scopes: [{ path: "/" }]
   });
 }

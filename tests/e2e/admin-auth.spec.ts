@@ -10,6 +10,10 @@ const hasDevelopmentAuthConfig = Boolean(
     adminPassword
 );
 
+if (process.env.SUPABASE_TEST_REQUIRE_CLOUD === "1" && !hasDevelopmentAuthConfig) {
+  throw new Error("SUPABASE_TEST_REQUIRE_CLOUD=1 requires complete development Auth configuration");
+}
+
 test("login is private and direct anonymous admin access returns to it", async ({ page }) => {
   await page.goto("/bunker/admin");
 

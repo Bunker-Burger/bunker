@@ -5,7 +5,7 @@ import type { Result } from "@/lib/result";
 import { createSupabaseAdminAccess, type AdminAccessGate, type AdminMembership } from "@/server/catalog/admin-access";
 import { catalogError, type CatalogError } from "@/server/catalog/errors";
 import { STORE_SLUG } from "@/server/catalog";
-import { createSessionClient } from "@/server/supabase/clients";
+import { clearSessionCookies, createSessionClient } from "@/server/supabase/clients";
 import { readSupabaseConfig } from "@/server/supabase/config";
 
 export interface AdminLoginCredentials {
@@ -32,6 +32,7 @@ export interface AdminAuthDependencies {
   client: AdminAuthClient;
   access: AdminAccessGate;
   storeSlug?: string;
+  clearSessionCookies?: () => Promise<void>;
 }
 
 export interface AdminSessionDependencies {
@@ -42,6 +43,7 @@ export interface AdminSessionDependencies {
 
 export interface AdminLogoutDependencies {
   client: AdminAuthClient;
+  clearSessionCookies?: () => Promise<void>;
 }
 
 function loginErrorIsUnavailable(error: AuthError) {
@@ -61,7 +63,14 @@ async function defaultDependencies(): Promise<Result<AdminAuthDependencies, Cata
   if (!config.ok) return config;
   try {
     const client = await createSessionClient(config.value);
-    return { ok: true, value: { client, access: createSupabaseAdminAccess(client) } };
+    return {
+      ok: true,
+      value: {
+        client,
+        access: createSupabaseAdminAccess(client),
+        clearSessionCookies: () => clearSessionCookies(config.value)
+      }
+    };
   } catch (cause) {
     return catalogError("unavailable", "Could not create the admin session client", cause);
   }
@@ -109,5 +118,15 @@ export async function getCurrentStoreAdmin(
 export async function signOutCurrentSession(dependencies?: AdminLogoutDependencies): Promise<void> {
   const resolved = dependencies ? { ok: true as const, value: dependencies } : await defaultDependencies();
   if (!resolved.ok) return;
-  await resolved.value.client.auth.signOut({ scope: "local" });
+
+  let signOutError: unknown;
+  try {
+    const result = await resolved.value.client.auth.signOut({ scope: "local" });
+    signOutError = result.error ?? undefined;
+  } catch (cause) {
+    signOutError = cause;
+  }
+
+  if (signOutError && !resolved.value.clearSessionCookies) throw signOutError;
+  await resolved.value.clearSessionCookies?.();
 }
