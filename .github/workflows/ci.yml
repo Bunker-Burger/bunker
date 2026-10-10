@@ -113,6 +113,29 @@ jobs:
           fi
           echo "Auth cloud del SHA exacto verificado; este job no usa secretos."
 
+  admin-auth-product-reviewed:
+    name: Auth producto revisado (SHA exacto)
+    needs: bootstrap-scope
+    if: github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+    steps:
+      - name: Exigir attestation externa del código Auth del SHA exacto
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed")][0].state // "missing"')"
+          if [[ "$state" != "success" ]]; then
+            echo "::error::Falta la attestation del runner aislado para test:integration:auth + test:e2e:admin-auth sobre este SHA exacto."
+            exit 1
+          fi
+          echo "Attestation del producto Auth del SHA exacto verificada; este job no usa secretos."
+
   e2e:
     runs-on: ubuntu-latest
     steps:
