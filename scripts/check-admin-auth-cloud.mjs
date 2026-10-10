@@ -16,6 +16,46 @@ export function isBunkerOwner(rows) {
   );
 }
 
+/**
+ * GitHub's GET /statuses/:sha response is an array ordered newest-first.
+ * The combined /commits/:sha/status response is a different shape and must
+ * not be used for provenance checks because it does not carry a status SHA or
+ * a creator on each entry.
+ */
+export function selectLatestStatus(statuses, context) {
+  if (!Array.isArray(statuses)) return null;
+  return statuses.find((status) => status?.context === context) ?? null;
+}
+
+export function extractActionsRunId(targetUrl, repository) {
+  if (typeof targetUrl !== "string" || typeof repository !== "string") return null;
+  const escapedRepository = repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = targetUrl.match(new RegExp(`^https://github\\.com/${escapedRepository}/actions/runs/([0-9]+)$`));
+  return match?.[1] ?? null;
+}
+
+export function isTrustedActionsRun(run, expectedSha, expectedWorkflow) {
+  return (
+    run?.head_sha === expectedSha &&
+    run?.status === "completed" &&
+    run?.conclusion === "success" &&
+    run?.path === expectedWorkflow
+  );
+}
+
+export function isAuthorizedStatus({ status, run, repository, expectedSha, expectedWorkflow, creatorPermission = "none" }) {
+  const creator = status?.creator?.login;
+  const runId = extractActionsRunId(status?.target_url, repository);
+  return (
+    status?.state === "success" &&
+    typeof creator === "string" &&
+    creator.length > 0 &&
+    runId !== null &&
+    isTrustedActionsRun(run, expectedSha, expectedWorkflow) &&
+    (creator === "github-actions[bot]" || ["write", "maintain", "admin"].includes(creatorPermission))
+  );
+}
+
 export async function run(fetchImpl, env = process.env, writeSummary = true) {
   const url = (env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
