@@ -83,7 +83,7 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/pgTAP-reviewed" and .sha == $sha)][0] // empty')"
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/pgTAP-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
           [[ -n "$status" ]] || { echo "::error::Falta pgTAP cloud del SHA exacto"; exit 1; }
           state="$(jq -r '.state' <<< "$status")"
           creator="$(jq -r '.creator.login // empty' <<< "$status")"
@@ -112,7 +112,7 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/admin-auth-reviewed" and .sha == $sha)][0] // empty')"
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
           [[ -n "$status" ]] || { echo "::error::Falta Auth cloud del SHA exacto"; exit 1; }
           state="$(jq -r '.state' <<< "$status")"
           creator="$(jq -r '.creator.login // empty' <<< "$status")"
@@ -141,7 +141,7 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed" and .sha == $sha)][0] // empty')"
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
           [[ -n "$status" ]] || { echo "::error::Falta attestation Auth producto del SHA exacto"; exit 1; }
           state="$(jq -r '.state' <<< "$status")"
           creator="$(jq -r '.creator.login // empty' <<< "$status")"
