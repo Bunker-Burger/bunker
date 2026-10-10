@@ -50,6 +50,28 @@ jobs:
           fi
           echo "pgTAP cloud del SHA exacto verificado; este job no usa secretos."
 
+  admin-auth-reviewed:
+    name: Auth cloud revisado (SHA exacto)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+    steps:
+      - name: Exigir harness Auth confiable ejecutado desde main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-reviewed")][0].state // "missing"')"
+          if [[ "$state" != "success" ]]; then
+            echo "::error::No existe Auth cloud aprobado para este SHA. Un mantenedor debe activar el workflow confiable desde main y luego reejecutar este job."
+            exit 1
+          fi
+          echo "Auth cloud del SHA exacto verificado; este job no usa secretos."
+
   e2e:
     runs-on: ubuntu-latest
     steps:
