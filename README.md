@@ -57,6 +57,29 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
 - **Orden y punto focal.** La migración `20261010150000_bb12_catalog_admin.sql` agrega `products.sort_order` (orden manual dentro de la categoría; desempata destacado y nombre) y `product_images.focal_x/focal_y` (0–100, centrado por defecto), que el menú aplica como `object-position`. **El código lee estas columnas: la migración tiene que estar aplicada antes de desplegarlo** (ver `docs/runbooks/cloud-evidence.md` §2.1).
 - **Caché.** Cada escritura exitosa llama `updateTag(CATALOG_CACHE_TAG)`, así el menú público lee el cambio en la próxima request.
 
+## Administración de tienda y promociones
+
+- **Pantallas.** El layout admin tiene navegación Catálogo / Tienda / Promociones / Ver menú. La carta pública (`/`) es la misma con sesión admin, y suma la pestaña Admin.
+- **Tienda (`/bunker/admin/tienda`).**
+  - Estado calculado por el servidor (`evaluateStoreStatus`), con cierre del turno o próximo turno.
+  - Override `auto`/`open`/`paused`/`closed`: `auto` y `open` exigen tarifa de delivery, en el caso de uso y en el check `stores_delivery_fee_required_to_accept_orders`. Mientras el local toma pedidos, la tarifa no se puede quitar.
+  - WhatsApp normalizado a E.164.
+  - Turnos semanales: se rechazan los solapados (`findOverlappingShift`), incluidos los que cruzan medianoche o la semana.
+  - Medios de pago con nombre, instrucciones públicas, orden y habilitación.
+  - "Lo que ve el cliente": la misma frase de estado que el storefront, la tarifa, el WhatsApp y los medios habilitados.
+- **Promociones (`/bunker/admin/promociones`).**
+  - Listado en el orden en que se prueban (mayor prioridad primero), con fase: en vigencia, fuera de franja, programada, vencida o pausada.
+  - Pausar y reanudar.
+  - Reordenar: intercambia prioridades pasando por un valor libre, porque `(store_id, priority)` es único.
+  - Alta, edición y baja con productos, canales, fechas en la zona del local y franjas semanales. Al guardar, la promoción queda pausada mientras se reemplazan sus productos y franjas (con la misma verificación paso a paso que los vínculos de opciones) y recién después se activa si se pidió.
+  - La vista previa calcula los precios derivados con `promotionDiscount`, el mismo motor del checkout. Hay tests que comparan su resultado con `quoteCart`.
+- **Secretos.** Las pantallas y respuestas admin nunca leen ni devuelven credenciales. De Mercado Pago solo llega si está disponible y por qué no (motivos como "falta configurarlo en el servidor"), nunca su configuración. Lo cubren los tests de página y el e2e admin-auth, que busca los valores reales del entorno en el HTML.
+- **Código compartido.**
+  - `src/server/admin/use-case.ts`: gate, `store_id` de la membresía, mensajes y log.
+  - `src/server/admin/supabase-writes.ts`: escrituras con filas afectadas y mapeo de errores.
+
+  Los usan catálogo, tienda y promociones, y cada escritura invalida `CATALOG_CACHE_TAG`. No hay migraciones: BB-08 y BB-09 ya crearon el esquema y las policies.
+
 ## Estado del local, horarios y delivery
 
 - **Fuente de verdad en la base.** `stores.status_override` es el switch manual: `auto` (sigue los horarios), `open`, `paused` o `closed`; una tienda nueva arranca `closed`. `store_business_hours` guarda tramos semanales en la zona horaria de la tienda (`America/Argentina/Tucuman` por defecto, validada por trigger): `day_of_week` es el día en que abre el tramo y un `closes_at` que no es posterior a `opens_at` cierra al día siguiente (`00:00` = a medianoche). `stores.is_open` y `stores.business_hours` quedan deprecadas y la app no las lee.

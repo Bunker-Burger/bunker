@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { describe, expect, it, vi } from "vitest";
-import type { Database } from "@/server/supabase/database.types";
+import { describe, expect, it } from "vitest";
+import { fakeClient as baseFakeClient, op, type Call, type Reply } from "@/server/admin/fake-supabase-client";
 import { createSupabaseCatalogAdminRepository } from "./supabase-catalog-admin-repository";
 
 /* Only the PostgREST/Storage transport is faked: the chain of calls each method builds is recorded. */
@@ -8,49 +7,9 @@ import { createSupabaseCatalogAdminRepository } from "./supabase-catalog-admin-r
 const STORE = "0199b2c8-40b0-7000-8000-000000000001";
 const ID = "0199b2c8-40b0-7000-8000-000000000201";
 
-interface Call {
-  table: string;
-  ops: unknown[][];
-}
-
-type Reply = { data?: unknown; error?: unknown; status?: number } | Error;
-
-function fakeClient(reply: (call: Call) => Reply = () => ({ data: [{ id: ID }] })) {
-  const calls: Call[] = [];
-  const storage = {
-    upload: vi.fn<(path: string, body: Uint8Array, options: object) => Promise<{ data: object; error: unknown }>>(async () => ({ data: {}, error: null })),
-    remove: vi.fn<(paths: string[]) => Promise<{ data: unknown[]; error: unknown }>>(async () => ({ data: [], error: null }))
-  };
-  const client = {
-    from(table: string) {
-      const call: Call = { table, ops: [] };
-      calls.push(call);
-      const builder: Record<string, unknown> = new Proxy(
-        {},
-        {
-          get(_target, prop) {
-            if (prop === "then") {
-              return (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
-                const result = reply(call);
-                return result instanceof Error ? Promise.reject(result).then(resolve, reject) : Promise.resolve({ data: null, error: null, status: 200, ...result }).then(resolve, reject);
-              };
-            }
-            return (...args: unknown[]) => {
-              call.ops.push([prop, ...args]);
-              return builder;
-            };
-          }
-        }
-      );
-      return builder;
-    },
-    storage: { from: vi.fn(() => storage) }
-  };
-  return { client: client as unknown as SupabaseClient<Database>, calls, storage };
-}
+const fakeClient = (reply: (call: Call) => Reply = () => ({ data: [{ id: ID }] })) => baseFakeClient(reply);
 
 const fields = { categoryId: ID, name: "Smash", slug: "smash", description: "Doble.", priceCents: 780000n, inStock: true, featured: false };
-const op = (call: Call | undefined, name: string) => call?.ops.filter((entry) => entry[0] === name) ?? [];
 
 describe("store scoping and affected rows", () => {
   it.each([

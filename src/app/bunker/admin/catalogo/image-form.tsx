@@ -3,7 +3,7 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 import styles from "../../admin.module.css";
 import { deleteProductImageAction, saveProductImageAction } from "./actions";
-import { AdminForm, FieldError, TextField } from "./admin-form";
+import { AdminForm, FieldError, TextField } from "../admin-form";
 
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/avif";
 

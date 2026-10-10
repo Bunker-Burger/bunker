@@ -2,8 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { parseRows, productTypeByKind } from "@/server/catalog/adapters";
-import { catalogError, fromSupabaseError } from "@/server/catalog/errors";
+import { catalogError } from "@/server/catalog/errors";
 import { CATEGORY_SELECT, categoryRowSchema, optionGroupRowSchema } from "@/server/catalog/rows";
+import { fromWriteError, write, writeOne } from "@/server/admin/supabase-writes";
 import type { QueryResponse } from "@/server/catalog/supabase-catalog-repository";
 import type { Database } from "@/server/supabase/database.types";
 import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository, OptionGroupLink, StoredImage, StoredProduct } from "./ports";
@@ -16,34 +17,7 @@ import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository,
 
 export const CATALOG_BUCKET = "catalog";
 
-/** Database errors that mean "the values are wrong", not "try again". */
-const REJECTED_CODES = new Set(["23514", "23502", "22P02", "BB003", "BB012"]);
-
-export function fromWriteError(operation: string, error: unknown, status?: number): Result<never, AdminError> {
-  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
-  if (code === "23505") return err({ code: "conflict", message: `${operation}: duplicate value`, cause: error });
-  if (code === "23503") return err({ code: "conflict", message: `${operation}: still referenced`, cause: error });
-  if (REJECTED_CODES.has(code)) return err({ code: "rejected", message: `${operation}: rejected by the database (${code})`, cause: error });
-  return fromSupabaseError(operation, error, status);
-}
-
-async function write(operation: string, query: PromiseLike<QueryResponse>): Promise<AdminResult<unknown>> {
-  try {
-    const { data, error, status } = await query;
-    return error ? fromWriteError(operation, error, status) : ok(data);
-  } catch (thrown) {
-    return fromSupabaseError(operation, thrown);
-  }
-}
-
-/** Update/delete with `.select("id")`: zero rows means RLS or the store filter excluded it. */
-async function writeOne(operation: string, query: PromiseLike<QueryResponse>): Promise<AdminResult<void>> {
-  const result = await write(operation, query);
-  if (!result.ok) return result;
-  return Array.isArray(result.value) && result.value.length > 0
-    ? ok(undefined)
-    : catalogError("not_found", `${operation}: no row in this store`);
-}
+export { fromWriteError };
 
 function storageError(operation: string, error: unknown): Result<never, AdminError> {
   const record = (typeof error === "object" && error !== null ? error : {}) as { status?: unknown; statusCode?: unknown; message?: unknown };

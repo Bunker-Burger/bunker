@@ -83,3 +83,46 @@ test("the owner manages the catalog by product type and a fake image is rejected
   await page.getByRole("button", { name: /^(Subir foto|Guardar foto)$/ }).click();
   await expect(page.getByText("Formato no permitido: subí una imagen JPEG, PNG, WebP o AVIF.")).toBeVisible();
 });
+
+// BB-13: read-only walk. Nothing is saved: no form that writes is submitted.
+test("the owner sees store and promotion settings without secrets, and the same public menu", async ({ page }) => {
+  test.skip(!hasDevelopmentAuthConfig, "complete development Auth configuration is not available");
+
+  await page.goto("/bunker");
+  await page.getByRole("textbox", { name: "Email" }).fill(adminEmail!);
+  await page.getByLabel("Contraseña").fill(adminPassword!);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+  await expect(page).toHaveURL(/\/bunker\/admin$/);
+
+  const secrets = [
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.MERCADO_PAGO_ACCESS_TOKEN,
+    process.env.MERCADOPAGO_ACCESS_TOKEN,
+    process.env.MERCADOPAGO_WEBHOOK_SECRET,
+    adminPassword
+  ].filter((value): value is string => Boolean(value && value.length >= 8));
+
+  await page.getByRole("navigation", { name: "Administración" }).getByRole("link", { name: "Tienda" }).click();
+  await expect(page).toHaveURL(/\/bunker\/admin\/tienda$/);
+  for (const section of ["Estado ahora", "Delivery y WhatsApp", "Horarios", "Medios de pago", "Lo que ve el cliente"]) {
+    await expect(page.getByRole("heading", { level: 2, name: section })).toBeVisible();
+  }
+  await expect(page.locator("[role=alert]").filter({ hasText: /\S/ })).toHaveCount(0);
+  const storeHtml = await page.content();
+  for (const secret of secrets) expect(storeHtml).not.toContain(secret);
+
+  await page.getByRole("navigation", { name: "Administración" }).getByRole("link", { name: "Promociones" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Promociones" })).toBeVisible();
+  const promotionsHtml = await page.content();
+  for (const secret of secrets) expect(promotionsHtml).not.toContain(secret);
+  await page.getByRole("link", { name: "Nueva promoción" }).click();
+  const percent = page.getByRole("spinbutton", { name: "Descuento (%)" });
+  await percent.fill("50");
+  await expect(page.getByRole("region", { name: "Vista previa de precios" }).getByRole("row")).not.toHaveCount(0);
+
+  await page.getByRole("navigation", { name: "Administración" }).getByRole("link", { name: "Ver menú" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/bunker/admin");
+  await expect(page.getByRole("button", { name: /^Ver / }).first()).toBeVisible();
+});

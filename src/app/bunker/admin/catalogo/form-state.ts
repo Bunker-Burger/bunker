@@ -1,12 +1,4 @@
-export interface AdminFormState {
-  status: "idle" | "success" | "error";
-  message: string | null;
-  fieldErrors?: Record<string, string>;
-  /** Publication rules that failed, one sentence each. */
-  issues?: string[];
-}
-
-export const IDLE_FORM_STATE: AdminFormState = { status: "idle", message: null };
+export { IDLE_FORM_STATE, type AdminFormState } from "../form-state";
 
 export const ADMIN_CATALOG_PATH = "/bunker/admin/catalogo";
 

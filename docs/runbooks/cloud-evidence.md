@@ -28,7 +28,7 @@ PR. Es informativo: no ejecuta nada en la nube y no falla por alcance, sólo si 
 |---|---|
 | `supabase/migrations/**` (esquema, RLS, grants) | **Migración** (delta SQL revisado + dry-run del SHA; efecto real según §2.1) + pgTAP + Auth config. Estos dos últimos sólo detectan regresiones del esquema **ya aplicado**: **no validan la migración** |
 | `supabase/tests/database/**`, `supabase/seed.sql` | pgTAP |
-| `src/server/auth/**`, `src/server/catalog/admin-access*.ts`, `src/server/catalog/catalog-service.ts` (`loadAdminCatalog`), `src/server/catalog/index.ts` (`getAdminCatalog`), `src/server/catalog-admin/**` (escrituras admin del catálogo), `src/server/supabase/{clients,config,update-session}.ts`, `src/proxy.ts`, `src/app/bunker/**`, `src/app/sw.ts`, `src/app/sw-routes.ts`, `tests/e2e/admin-auth.spec.ts`, `playwright.admin-auth.config.ts` | Auth producto |
+| `src/server/auth/**`, `src/server/catalog/admin-access*.ts`, `src/server/catalog/catalog-service.ts` (`loadAdminCatalog`), `src/server/catalog/index.ts` (`getAdminCatalog`), `src/server/catalog-admin/**` (escrituras admin del catálogo), `src/server/store-admin/**` y `src/server/admin/**` (tienda, promociones y gate compartido), `src/server/supabase/{clients,config,update-session}.ts`, `src/proxy.ts`, `src/app/bunker/**`, `src/app/sw.ts`, `src/app/sw-routes.ts`, `tests/e2e/admin-auth.spec.ts`, `playwright.admin-auth.config.ts` | Auth producto |
 
 | Si la PR cambia infraestructura confiable de `main`… | Qué se exige |
 |---|---|

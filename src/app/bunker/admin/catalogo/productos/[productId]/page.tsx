@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
 import { deleteProductAction } from "../../actions";
-import { AdminForm } from "../../admin-form";
+import { AdminForm } from "../../../admin-form";
 import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
 import { ImageForm } from "../../image-form";
 import { ProductForm } from "../../product-form";

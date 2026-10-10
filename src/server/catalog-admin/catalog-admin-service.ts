@@ -1,7 +1,6 @@
 import { validateProductPublication } from "@/domain/options";
 import type { OptionGroup, Product, PublicationErrorCode } from "@/domain/types";
-import type { AdminAccessGate } from "@/server/catalog/admin-access";
-import type { CatalogError } from "@/server/catalog/errors";
+import { adminUseCases, type AdminUseCaseDependencies } from "@/server/admin/use-case";
 import { inspectImage, MAX_IMAGE_BYTES } from "./image";
 import {
   parseCategoryForm,
@@ -10,13 +9,11 @@ import {
   parseId,
   parseImageDetails,
   parseProductForm,
-  type FieldErrors
 } from "./input";
 import {
   ADMIN_CATEGORY_KINDS,
   PRODUCT_TYPE_BY_KIND,
   type AdminCategoryKind,
-  type AdminError,
   type CatalogAdminRepository,
   type OptionGroupLink,
   type OrderedRow,
@@ -30,44 +27,15 @@ import {
  * write in the database. Results carry a message for the admin; error details only go to logs.
  */
 
-export interface CatalogAdminDependencies {
+export type { AdminOutcome } from "@/server/admin/use-case";
+
+export interface CatalogAdminDependencies extends AdminUseCaseDependencies {
   repository: CatalogAdminRepository;
-  access: AdminAccessGate;
-  storeSlug: string;
   /** Random component of new storage paths. */
   newId?: () => string;
-  log?: Pick<Console, "error">;
 }
 
-export type AdminOutcome<T = undefined> =
-  | { ok: true; message: string; value: T }
-  | { ok: false; message: string; fieldErrors?: FieldErrors; issues?: string[] };
-
-const GENERIC_FAILURE = "No pudimos guardar los cambios. Intentá nuevamente.";
-
-const success = <T>(message: string, value: T): AdminOutcome<T> => ({ ok: true, message, value });
-const invalid = (fieldErrors: FieldErrors): AdminOutcome<never> => ({ ok: false, message: "Revisá los datos marcados.", fieldErrors });
-
-function failure(deps: CatalogAdminDependencies, operation: string, error: AdminError | CatalogError, messages: Partial<Record<string, string>> = {}): AdminOutcome<never> {
-  (deps.log ?? console).error(`[catalog-admin:${operation}] ${error.code}: ${error.message}`);
-  const message =
-    messages[error.code] ??
-    {
-      unauthorized: "Tu sesión no tiene permisos de administración. Volvé a iniciar sesión.",
-      not_found: "Ese elemento ya no existe. Recargá la página.",
-      conflict: "Ya existe un elemento con ese slug.",
-      rejected: "La base de datos rechazó los datos. Revisalos e intentá nuevamente."
-    }[error.code as string] ??
-    GENERIC_FAILURE;
-  return { ok: false, message };
-}
-
-/** Runs `operation` with the store id of the verified admin, or fails without touching anything. */
-async function asAdmin<T>(deps: CatalogAdminDependencies, name: string, operation: (storeId: string) => Promise<AdminOutcome<T>>) {
-  const membership = await deps.access.requireStoreAdmin(deps.storeSlug);
-  if (!membership.ok) return failure(deps, name, membership.error);
-  return operation(membership.value.storeId);
-}
+const { success, invalid, failure, asAdmin } = adminUseCases("catalog-admin");
 
 function renumber<T extends OrderedRow>(rows: T[], id: string, direction: "up" | "down"): OrderedRow[] | null {
   const index = rows.findIndex((row) => row.id === id);

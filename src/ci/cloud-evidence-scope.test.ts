@@ -50,6 +50,9 @@ describe("cloud evidence scope (scripts/ci/cloud-evidence-scope.mjs)", () => {
     // BB-12: catalog writes authorize through the gate and write with the session client.
     ["the admin catalog writes", "src/server/catalog-admin/catalog-admin-service.ts", ["authProduct"]],
     ["the admin catalog Storage/RLS repository", "src/server/catalog-admin/supabase-catalog-admin-repository.ts", ["authProduct"]],
+    // BB-13: store/promotion writes and the shared admin gate.
+    ["the store and promotion admin writes", "src/server/store-admin/store-admin-service.ts", ["authProduct"]],
+    ["the shared admin use-case gate", "src/server/admin/use-case.ts", ["authProduct"]],
     ["the SSR cookie client", "src/server/supabase/clients.ts", ["authProduct"]],
     ["session refresh", "src/server/supabase/update-session.ts", ["authProduct"]],
     ["Supabase config validation", "src/server/supabase/config.ts", ["authProduct"]],

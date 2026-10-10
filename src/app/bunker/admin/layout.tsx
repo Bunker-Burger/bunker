@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { logout } from "../actions";
 import { ADMIN_LOGIN_PATH } from "../paths";
+import { AdminNav } from "./admin-nav";
 import styles from "../admin.module.css";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -27,7 +28,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </form>
         </div>
       </header>
-      <div className={styles.adminContent}>{children}</div>
+      <div className={styles.adminContent}>
+        <AdminNav />
+        {children}
+      </div>
     </main>
   );
 }
