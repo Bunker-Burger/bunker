@@ -1,6 +1,8 @@
 import { execFile, type ExecFileException } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 /*
  * The development-project preflight exactly as admin-auth-product-reviewed.yml runs it: `node
@@ -27,18 +29,40 @@ const valid = {
   SUPABASE_TEST_ADMIN_PASSWORD: PASSWORD
 };
 
-function preflight(overrides: Record<string, string | undefined> = {}): Promise<{ code: number; output: string }> {
-  const env: Record<string, string> = { PATH: process.env.PATH ?? "" };
-  for (const [key, value] of Object.entries({ ...valid, ...overrides })) if (value !== undefined) env[key] = value;
+function run(args: string[], env: Record<string, string>): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     execFile(
       process.execPath,
-      [SCRIPT],
+      [SCRIPT, ...args],
       { encoding: "utf8", env: env as unknown as NodeJS.ProcessEnv },
       (error: ExecFileException | null, stdout: string, stderr: string) =>
         resolve({ code: error ? Number(error.code ?? 1) : 0, output: `${stdout}${stderr}` })
     );
   });
+}
+
+function preflight(overrides: Record<string, string | undefined> = {}) {
+  const env: Record<string, string> = { PATH: process.env.PATH ?? "" };
+  for (const [key, value] of Object.entries({ ...valid, ...overrides })) if (value !== undefined) env[key] = value;
+  return run([], env);
+}
+
+const fixtures = mkdtempSync(path.join(tmpdir(), "bb11-environment-"));
+afterAll(() => rmSync(fixtures, { recursive: true, force: true }));
+
+/** Shape of GET /repos/:repo/environments/admin-auth-product, protected as the runbook requires. */
+const protectedEnvironment = {
+  name: "admin-auth-product",
+  can_admins_bypass: false,
+  protection_rules: [{ id: 1, type: "required_reviewers", prevent_self_review: false, reviewers: [{ type: "User", reviewer: { login: "Lautaro073" } }] }],
+  deployment_branch_policy: { protected_branches: true, custom_branch_policies: false }
+};
+
+/** Runs the real script in its `authorize` mode on a JSON file (or a missing one). */
+function environmentCheck(environment: unknown, raw?: string) {
+  const file = path.join(fixtures, `environment-${Math.random().toString(36).slice(2)}.json`);
+  if (environment !== undefined || raw !== undefined) writeFileSync(file, raw ?? JSON.stringify(environment));
+  return run(["--environment-protection", file], { PATH: process.env.PATH ?? "" });
 }
 
 function expectNoSecrets(output: string) {
@@ -86,5 +110,34 @@ describe("development project preflight (scripts/ci/preflight-supabase-dev.mjs, 
     expect(result.output).toMatch(reason);
     expect(result.output).not.toContain("Preflight OK");
     expectNoSecrets(result.output);
+  });
+});
+
+describe("admin-auth-product environment protection (same script, `authorize` mode)", () => {
+  it.each([
+    ["required reviewers, no admin bypass and protected branches", protectedEnvironment],
+    ["a custom branch policy", { ...protectedEnvironment, deployment_branch_policy: { protected_branches: false, custom_branch_policies: true } }]
+  ])("lets authorize continue with %s", async (_case, environment) => {
+    const result = await environmentCheck(environment);
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("Entorno admin-auth-product protegido: 1 reviewer(s)");
+  });
+
+  it.each<[string, unknown, RegExp, string?]>([
+    ["the environment does not exist (no file)", undefined, /no existe o no se pudo leer/],
+    ["the API answer is not JSON", undefined, /no existe o no se pudo leer/, "<html>Not Found</html>"],
+    ["another environment", { ...protectedEnvironment, name: "main" }, /no es el entorno esperado/],
+    ["no protection rules at all", { ...protectedEnvironment, protection_rules: [] }, /debe exigir required reviewers/],
+    ["only a wait timer", { ...protectedEnvironment, protection_rules: [{ id: 2, type: "wait_timer", wait_timer: 5 }] }, /debe exigir required reviewers/],
+    ["a reviewers rule with nobody in it", { ...protectedEnvironment, protection_rules: [{ id: 1, type: "required_reviewers", reviewers: [] }] }, /debe exigir required reviewers/],
+    ["admins allowed to bypass", { ...protectedEnvironment, can_admins_bypass: true }, /no deben poder saltear/],
+    ["bypass setting absent", { ...protectedEnvironment, can_admins_bypass: undefined }, /no deben poder saltear/],
+    ["no branch policy (any branch, including a PR workflow, could deploy)", { ...protectedEnvironment, deployment_branch_policy: null }, /política de ramas/],
+    ["an empty branch policy", { ...protectedEnvironment, deployment_branch_policy: { protected_branches: false, custom_branch_policies: false } }, /política de ramas/]
+  ])("makes authorize FAIL when %s", async (_case, environment, reason, raw) => {
+    const result = await environmentCheck(environment, raw);
+    expect(result.code).toBe(1);
+    expect(result.output).toMatch(reason);
+    expect(result.output).not.toContain("protegido:");
   });
 });

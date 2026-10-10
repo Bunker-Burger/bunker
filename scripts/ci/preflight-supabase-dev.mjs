@@ -11,7 +11,14 @@
  *     anon JWT whose `ref` claim is the expected project; secret / service_role keys fail;
  *   - the admin test credentials are present.
  * Dependency-free, no network. Prints no URL, key, e-mail or password; only the (public) ref.
+ *
+ * `--environment-protection <file>` mode (job `authorize`, before any secret exists in the run):
+ * checks the JSON of GET /repos/:repo/environments/admin-auth-product. Secrets are released only
+ * if the environment requires at least one human reviewer, administrators cannot bypass that rule,
+ * and deployments are restricted by a branch policy (a workflow added by a PR cannot claim it).
  */
+
+import { readFileSync } from "node:fs";
 
 const PROJECT_REF = /^[a-z0-9]{20}$/;
 
@@ -74,8 +81,37 @@ export function preflight(env = process.env) {
   }
 }
 
+/** Returns { ok, message } for the environment JSON returned by the GitHub API (or null). */
+export function checkEnvironmentProtection(environment) {
+  const fail = (reason) => ({ ok: false, message: `::error::Entorno admin-auth-product: ${reason}` });
+  if (!environment || typeof environment !== "object") return fail("no existe o no se pudo leer");
+  if (environment.name !== "admin-auth-product") return fail("no es el entorno esperado");
+  const rules = Array.isArray(environment.protection_rules) ? environment.protection_rules : [];
+  const reviewers = rules
+    .filter((rule) => rule?.type === "required_reviewers")
+    .reduce((total, rule) => total + (Array.isArray(rule.reviewers) ? rule.reviewers.length : 0), 0);
+  if (reviewers < 1) return fail("debe exigir required reviewers");
+  if (environment.can_admins_bypass !== false) return fail("los administradores no deben poder saltear la aprobación");
+  const policy = environment.deployment_branch_policy;
+  if (!policy || (policy.protected_branches !== true && policy.custom_branch_policies !== true)) {
+    return fail("debe restringir despliegues con una política de ramas");
+  }
+  return { ok: true, message: `Entorno admin-auth-product protegido: ${reviewers} reviewer(s), sin bypass de admins, con política de ramas.` };
+}
+
+function readEnvironmentFile(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 if (process.argv[1]?.replaceAll("\\", "/").endsWith("/scripts/ci/preflight-supabase-dev.mjs")) {
-  const result = preflight();
+  const result =
+    process.argv[2] === "--environment-protection"
+      ? checkEnvironmentProtection(process.argv[3] ? readEnvironmentFile(process.argv[3]) : null)
+      : preflight();
   console.log(result.message);
   process.exit(result.ok ? 0 : 1);
 }
