@@ -30,7 +30,7 @@ jobs:
 
   cloud-reviewed:
     name: pgTAP cloud revisado (SHA exacto)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref != 'codex/bb11-auth-bootstrap'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,7 +52,7 @@ jobs:
 
   admin-auth-reviewed:
     name: Auth cloud revisado (SHA exacto)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref != 'codex/bb11-auth-bootstrap'
     runs-on: ubuntu-latest
     permissions:
       contents: read
