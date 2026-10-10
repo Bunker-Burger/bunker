@@ -28,7 +28,7 @@ Mercado Pago se ofrece solo si un checkout puede iniciarse (`getMercadoPagoAvail
 | `pnpm run db:types` / `db:types:check` | Regenera / verifica `src/server/supabase/database.types.ts` desde el proyecto de desarrollo. |
 | `pnpm run test:integration` | Lee el catálogo semilla del proyecto de desarrollo con el repositorio real y prueba el acceso admin (usa `.env.local`). Los casos "usuario sin membresía" y "admin activo" solo corren si se definen `SUPABASE_TEST_MEMBERLESS_EMAIL/PASSWORD` y `SUPABASE_TEST_ADMIN_EMAIL/PASSWORD` de cuentas de prueba del proyecto de desarrollo. |
 
-Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las pruebas específicas. El CI de PR ejecuta unitarios, build, Playwright y **exige el estado `cloud/pgTAP-reviewed` para el SHA exacto**; NO carga secretos ni ejecuta SQL de PR contra la base cloud directamente.
+Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las pruebas específicas. El CI de PR ejecuta lint, typecheck, unitarios, build y Playwright; NO carga secretos ni ejecuta SQL de PR contra la base cloud. Las verificaciones cloud (pgTAP, Auth) no son un gate del CI: se corren a mano desde `main` cuando hacen falta (ver `docs/runbooks/admin-auth-reviewed.md`).
 
 ## Supabase y acceso a datos
 

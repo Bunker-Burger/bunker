@@ -1,6 +1,12 @@
 # Evidencia cloud de BB-11 (pgTAP, Auth config y Auth producto)
 
-Una PR hacia `main` sólo pasa el gate de CI con tres statuses en su **SHA de HEAD exacto**:
+> **Estado actual:** estos statuses **no son un gate del CI**. Se quitaron porque hay un único proyecto Supabase y
+> no existe el entorno protegido `admin-auth-product`. Los workflows siguen en `main` para correrlos a mano, y
+> `node scripts/ci/verify-cloud-statuses.mjs` (con `GH_TOKEN`, `GITHUB_REPOSITORY`, `PR_NUMBER` y `REVIEWED_SHA`)
+> verifica un SHA de forma manual. El resto de este runbook describe cómo producir y validar esa evidencia cuando se
+> quiera.
+
+Evidencia cloud por **SHA de HEAD exacto**:
 
 | Contexto | Workflow confiable (vive en `main`) | `run-name` exigido |
 |---|---|---|
@@ -11,9 +17,9 @@ Una PR hacia `main` sólo pasa el gate de CI con tres statuses en su **SHA de HE
 `cloud/admin-auth-reviewed` sólo acredita la configuración del proyecto Supabase (harness de `main`). La aplicación
 (Server Actions, proxy, cookies SSR, layout, navegación) se acredita con `cloud/admin-auth-product-reviewed`.
 
-## Cómo verifica el gate
+## Cómo se verifica un SHA
 
-El job `status-provenance` de `ci.yml` ejecuta `node scripts/ci/verify-cloud-statuses.mjs`, sin dependencias ni
+`node scripts/ci/verify-cloud-statuses.mjs` (antes lo ejecutaba el job `status-provenance` de `ci.yml`), sin dependencias ni
 secretos y con token de sólo lectura. Ese mismo archivo es el que corre `src/ci/verify-cloud-statuses.test.ts`, como
 proceso hijo contra una API de GitHub de fixtures. Para cada contexto:
 

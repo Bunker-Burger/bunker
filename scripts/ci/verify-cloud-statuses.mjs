@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
- * Cloud evidence gate for pull requests (job `status-provenance` in ci.yml runs THIS file; its
- * tests run THIS file too, as a child process against a fixture GitHub API). Dependency-free Node
- * ESM: no app code, no secrets, read-only GitHub token.
+ * Cloud evidence check for a pull request SHA. It is no longer a CI gate: run it manually (see
+ * docs/runbooks/admin-auth-reviewed.md). Its tests run THIS file as a child process against a
+ * fixture GitHub API. Dependency-free Node ESM: no app code, no secrets, read-only GitHub token.
  *
  * Every required context must be the newest status of the exact PR head SHA and must come from a
  * trusted workflow that runs from `main` and reviews another commit:

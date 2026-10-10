@@ -5,8 +5,8 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /*
- * The cloud evidence gate exactly as CI runs it: `node scripts/ci/verify-cloud-statuses.mjs` in a
- * child process, with the same environment variables the `status-provenance` job passes, against
+ * The cloud evidence check exactly as a manual run invokes it: `node scripts/ci/verify-cloud-statuses.mjs`
+ * in a child process, with the environment variables that run passes, against
  * a fixture GitHub REST API. Fixtures follow the real shape of run 38007678913 (pgTAP): a
  * workflow_dispatch run of a trusted workflow on main (head_sha = main's commit) that posted
  * success on the PR head SHA. No secrets, no network beyond localhost.
