@@ -94,7 +94,7 @@ jobs:
             export CONTEXT="$context"
             status="$(gh api "$api/statuses/$REVIEWED_SHA" --jq '[.[] | select(.context == env.CONTEXT)][0] // empty')"
             [[ -n "$status" ]] || { echo "::error::Falta status $context"; return 1; }
-            local state creator target permission run_id run_sha run_path run_status run_conclusion
+            local status run_json state creator target permission run_id run_sha run_path run_status run_conclusion
             state="$(jq -r '.state' <<< "$status")"
             creator="$(jq -r '.creator.login // empty' <<< "$status")"
             target="$(jq -r '.target_url // empty' <<< "$status")"
