@@ -134,13 +134,14 @@ select throws_ok(
   null,
   'non-alcoholic products cannot carry ABV'
 );
+-- Outside a drink category: in drinks the BB-12 trigger rejects alcohol first (BB012).
 select throws_ok(
   $$insert into public.products (
       store_id, category_id, name, slug, description, base_price_cents,
       contains_alcohol, alcohol_by_volume, requires_age_verification
     ) values (
       '10000000-0000-0000-0000-000000000001',
-      '20000000-0000-0000-0000-000000000003',
+      '20000000-0000-0000-0000-000000000002',
       'Alcohol sin control', 'alcohol-sin-control', 'Bebida', 100000,
       true, 5.0, false
     )$$,
