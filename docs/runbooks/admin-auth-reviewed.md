@@ -42,15 +42,25 @@ hay que repetirlos con `workflow_dispatch` sobre el SHA final.
 2. Crear en *Settings → Environments* el entorno **`admin-auth-product`** con:
    - **Required reviewers** (el owner).
    - **Allow administrators to bypass** desactivado.
-   - **Deployment branches** restringido a ramas protegidas o a `main`. Así un workflow agregado por una PR no puede
-     reclamar el entorno.
+   - **Deployment branches and tags → Selected branches and tags**, con **una sola regla: la rama `main`** (tipo
+     *branch*, nombre exacto `main`, sin comodines ni tags). Así sólo un run de `main` recibe los secretos, y un
+     workflow agregado por una PR no puede reclamar el entorno.
+     **No usar "Protected branches only"**: admite cualquier rama protegida y, si no hay ninguna (hoy `main` tiene
+     `protected:false`), GitHub admite todas. El guard lo rechaza siempre.
    - Sus propios secretos del proyecto development: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
      `SUPABASE_TEST_ADMIN_EMAIL` y `SUPABASE_TEST_ADMIN_PASSWORD`.
 
-   El job `authorize` lee el entorno por API y lo verifica con
-   `scripts/ci/preflight-supabase-dev.mjs --environment-protection`, código de `main` testeado en
-   `src/ci/preflight-supabase-dev.test.ts`. Si el entorno no existe, no exige reviewers, admite bypass de admins o no
-   tiene política de ramas, falla antes de que exista ningún secreto en el run.
+   El job `authorize` verifica la **condición efectiva** con
+   `scripts/ci/preflight-supabase-dev.mjs --environment-protection`: código de `main` testeado en
+   `src/ci/preflight-supabase-dev.test.ts`, que consulta la API con el token de sólo lectura del run, antes de que
+   exista ningún secreto. Lee `GET /repos/:repo/environments/admin-auth-product` y todas las páginas de
+   `GET …/deployment-branch-policies`, y exige:
+   - al menos un required reviewer y `can_admins_bypass: false`;
+   - `custom_branch_policies: true`, `protected_branches: false`;
+   - exactamente una política `{ name: "main", type: "branch" }`.
+
+   Si el entorno no existe, la API responde con error o la paginación no cierra con `total_count`, falla y no se
+   expone nada.
 
 ## Procedimiento por SHA
 
