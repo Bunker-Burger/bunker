@@ -4,13 +4,21 @@ import {
   CATALOG_REVALIDATE_SECONDS,
   createOperationalReadClient,
   createPublicReadClient,
-  createSessionClient
+  createSessionClient,
+  clearSessionCookies
 } from "./clients";
 import type { SupabaseConfig } from "./config";
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ getAll: () => [], set: () => undefined })
-}));
+const cookieJar = new Map<string, string>();
+const cookieStore = {
+  getAll: () => [...cookieJar].map(([name, value]) => ({ name, value })),
+  set: (name: string, value: string) => {
+    if (value) cookieJar.set(name, value);
+    else cookieJar.delete(name);
+  }
+};
+
+vi.mock("next/headers", () => ({ cookies: async () => cookieStore }));
 
 const config: SupabaseConfig = {
   url: "https://abcdefghijklmnopqrst.supabase.co",
@@ -34,7 +42,10 @@ function captureFetch() {
   return calls;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  cookieJar.clear();
+});
 
 describe("Supabase clients", () => {
   it("public reads go through Next's data cache with the catalog tag", async () => {
@@ -60,5 +71,15 @@ describe("Supabase clients", () => {
     const last = calls.at(-1);
     expect(last?.cache).toBe("no-store");
     expect(last?.next).toBeUndefined();
+  });
+
+  it("clears only this project's auth cookie chunks through the real SSR adapter", async () => {
+    cookieJar.set("sb-abcdefghijklmnopqrst-auth-token", "session");
+    cookieJar.set("sb-abcdefghijklmnopqrst-auth-token.0", "chunk");
+    cookieJar.set("sb-otherprojectref00000-auth-token", "other-session");
+
+    await clearSessionCookies(config);
+
+    expect(cookieStore.getAll()).toEqual([{ name: "sb-otherprojectref00000-auth-token", value: "other-session" }]);
   });
 });

@@ -2,6 +2,7 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { NetworkOnly, Serwist } from "serwist";
+import { isSensitiveRuntimeRequest } from "./sw-routes";
 
 // Minimal worker so the production build is installable; BB-16 owns the final caching strategy.
 declare global {
@@ -18,15 +19,10 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Store status (BB-08), promotions (BB-09), fresh catalog (BB-06) and the WhatsApp checkout (BB-10) must always
-    // come from the server: never answer them from a cache.
+    // Auth/Admin (BB-11), store status (BB-08), promotions (BB-09), fresh catalog (BB-06)
+    // and checkout (BB-10) always come from the server: never answer them from a cache.
     {
-      matcher: ({ sameOrigin, url: { pathname } }) =>
-        sameOrigin &&
-        (pathname === "/api/store/status" ||
-          pathname === "/api/store/promotions" ||
-          pathname === "/api/store/products" ||
-          pathname.startsWith("/api/checkout/")),
+      matcher: isSensitiveRuntimeRequest,
       handler: new NetworkOnly()
     },
     ...defaultCache

@@ -99,6 +99,14 @@ describe("Storefront", () => {
     window.location.hash = "";
   });
 
+  it("links authorized admins to the protected panel and hides the item by default", () => {
+    const { rerender } = render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+
+    rerender(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} showAdminNav />);
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/bunker/admin");
+  });
+
   it("only shows Mercado Pago when the public capability is enabled", () => {
     const { rerender } = render(
       <Storefront initialProductSlug={null} mercadoPagoEnabled={false} />
