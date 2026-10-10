@@ -68,82 +68,83 @@ describe("store settings", () => {
   });
 });
 
-describe("promotion columns", () => {
+describe("saving a promotion", () => {
+  const promotion = (mechanic: PromotionFields["mechanic"], overrides: object) => ({
+    name: "Promo",
+    slug: "promo",
+    description: "",
+    badge_text: null,
+    is_active: false,
+    starts_at: "2026-10-01T03:00:00.000Z",
+    ends_at: "2026-11-01T03:00:00.000Z",
+    applies_to_delivery: true,
+    applies_to_pickup: false,
+    ...overrides
+  });
+
   it.each([
     ["percent_off", { type: "percent_off", percentOff: 15 } as const, { promotion_type: "percent_off", percent_off: 15, fixed_price_cents: null, buy_quantity: null, get_quantity: null }],
-    ["fixed_price", { type: "fixed_price", fixedPriceCents: 900000n } as const, { promotion_type: "fixed_price", fixed_price_cents: 900000, percent_off: null, buy_quantity: null, get_quantity: null }],
+    ["fixed_price", { type: "fixed_price", fixedPriceCents: 9007199254740993n } as const, { promotion_type: "fixed_price", fixed_price_cents: "9007199254740993", percent_off: null, buy_quantity: null, get_quantity: null }],
     ["buy_x_get_y", { type: "buy_x_get_y", buyQuantity: 2, getQuantity: 1 } as const, { promotion_type: "buy_x_get_y", buy_quantity: 2, get_quantity: 1, percent_off: null, fixed_price_cents: null }],
     ["free_delivery", { type: "free_delivery" } as const, { promotion_type: "free_delivery", percent_off: null, fixed_price_cents: null, buy_quantity: null, get_quantity: null }]
-  ])("writes only the parameters of %s (the mechanic check needs the rest null)", async (_type, mechanic, columns) => {
-    const { repository, calls } = repo(() => ({ data: { id: PROMO } }));
-    await repository.createPromotion(STORE, { ...fields(mechanic), priority: 3 });
-    expect(op(calls[0], "insert")[0]?.[1]).toEqual({
-      store_id: STORE,
-      priority: 3,
-      name: "Promo",
-      slug: "promo",
-      description: "",
-      badge_text: null,
-      is_active: false,
-      starts_at: "2026-10-01T03:00:00.000Z",
-      ends_at: "2026-11-01T03:00:00.000Z",
-      applies_to_delivery: true,
-      applies_to_pickup: false,
-      ...columns
+  ])("sends only the parameters of %s (the mechanic check needs the rest null) in one call", async (_type, mechanic, columns) => {
+    const { repository, calls } = repo(() => ({ data: PROMO }));
+    const draft = { fields: fields(mechanic), items: [{ productId: "p1", quantity: 2 }], schedule: [{ dayOfWeek: 5, startsAt: "19:00", endsAt: "23:30" }] };
+    expect(await repository.savePromotion(STORE, PROMO, draft)).toEqual({ ok: true, value: { id: PROMO } });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.table).toBe("rpc:admin_save_promotion");
+    expect(first(calls[0])).toBe("rpc");
+    expect(calls[0]?.ops[0]?.[1]).toEqual({
+      target_store_id: STORE,
+      target_promotion_id: PROMO,
+      promotion: promotion(mechanic, columns),
+      items: [{ product_id: "p1", quantity: 2 }],
+      schedule: [{ day_of_week: 5, starts_at: "19:00", ends_at: "23:30" }]
+    });
+  });
+
+  it("creates with a null id and returns the id the database assigned", async () => {
+    const { repository, calls } = repo(() => ({ data: PROMO }));
+    expect(await repository.savePromotion(STORE, null, { fields: fields({ type: "free_delivery" }), items: [], schedule: [] })).toEqual({ ok: true, value: { id: PROMO } });
+    expect(calls[0]?.ops[0]?.[1]).toMatchObject({ target_store_id: STORE, target_promotion_id: null, items: [], schedule: [] });
+  });
+
+  it.each([
+    ["23505", "conflict"],
+    ["23503", "conflict"],
+    ["23514", "rejected"],
+    ["BB013", "rejected"],
+    ["P0002", "not_found"],
+    ["42501", "unauthorized"]
+  ])("maps a %s from the transaction to %s", async (code, expected) => {
+    const { repository } = repo(() => ({ error: { code, message: "x" }, status: 400 }));
+    expect(await repository.savePromotion(STORE, PROMO, { fields: fields({ type: "free_delivery" }), items: [], schedule: [] })).toMatchObject({ ok: false, error: { code: expected } });
+  });
+
+  it("does not accept an answer without the id", async () => {
+    expect(await repo(() => ({ data: null })).repository.savePromotion(STORE, null, { fields: fields({ type: "free_delivery" }), items: [], schedule: [] })).toMatchObject({
+      ok: false,
+      error: { code: "invalid_data" }
     });
   });
 });
 
-describe("replacing a promotion's products and windows", () => {
-  const items = [{ productId: "p1", quantity: 2 }];
-
-  function itemsClient(answers: { before: unknown[]; deleted: unknown[]; inserted?: unknown[]; after?: unknown[] }) {
-    let selects = 0;
-    return repo((call) => {
-      if (first(call) === "delete") return { data: answers.deleted };
-      if (first(call) === "insert") return { data: answers.inserted ?? [{ product_id: "p1", quantity: 2 }] };
-      selects += 1;
-      return { data: selects === 1 ? answers.before : (answers.after ?? [{ product_id: "p1", quantity: 2 }]) };
-    });
-  }
-
-  it("replaces the products inside the store and reads them back", async () => {
-    const old = [{ product_id: "p0", quantity: 1 }];
-    const { repository, calls } = itemsClient({ before: old, deleted: old });
-    expect(await repository.replacePromotionItems(STORE, PROMO, items)).toEqual({ ok: true, value: undefined });
-    expect(calls.map(first)).toEqual(["select", "delete", "insert", "select"]);
-    expect(op(calls[1], "eq")).toEqual([["eq", "store_id", STORE], ["eq", "promotion_id", PROMO]]);
-    expect(op(calls[2], "insert")[0]?.[1]).toEqual([{ store_id: STORE, promotion_id: PROMO, product_id: "p1", quantity: 2 }]);
+describe("moving a promotion", () => {
+  it("swaps in one call and reports whether it moved", async () => {
+    const moved = repo(() => ({ data: true }));
+    expect(await moved.repository.movePromotion(STORE, PROMO, "up")).toEqual({ ok: true, value: { moved: true } });
+    expect(moved.calls).toHaveLength(1);
+    expect(moved.calls[0]?.table).toBe("rpc:admin_move_promotion");
+    expect(moved.calls[0]?.ops[0]?.[1]).toEqual({ target_store_id: STORE, target_promotion_id: PROMO, direction: "up" });
+    const edge = repo(() => ({ data: false }));
+    expect(await edge.repository.movePromotion(STORE, PROMO, "down")).toEqual({ ok: true, value: { moved: false } });
+    expect(edge.calls[0]?.ops[0]?.[1]).toEqual({ target_store_id: STORE, target_promotion_id: PROMO, direction: "down" });
   });
 
-  it("fails when the delete leaves old products behind (filtered by RLS)", async () => {
-    const { repository, calls } = itemsClient({ before: [{ product_id: "p0", quantity: 1 }], deleted: [] });
-    expect(await repository.replacePromotionItems(STORE, PROMO, items)).toMatchObject({ ok: false, error: { code: "unauthorized" } });
-    expect(calls.map(first)).toEqual(["select", "delete"]);
-  });
-
-  it("fails when fewer products are stored or read back than requested", async () => {
-    expect(await itemsClient({ before: [], deleted: [], inserted: [] }).repository.replacePromotionItems(STORE, PROMO, items)).toMatchObject({ ok: false, error: { code: "unauthorized" } });
-    expect(await itemsClient({ before: [], deleted: [], after: [{ product_id: "p1", quantity: 3 }] }).repository.replacePromotionItems(STORE, PROMO, items)).toMatchObject({ ok: false, error: { code: "unavailable" } });
-  });
-
-  it("checks the promotion belongs to the store before touching its windows (they have no store_id)", async () => {
-    const { repository, calls } = repo(() => ({ data: [] }));
-    expect(await repository.replacePromotionSchedule(STORE, PROMO, [{ dayOfWeek: 2, startsAt: "19:00", endsAt: "23:00" }])).toMatchObject({ ok: false, error: { code: "not_found" } });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.table).toBe("promotion_rules");
-    expect(op(calls[0], "eq")).toEqual([["eq", "store_id", STORE], ["eq", "id", PROMO]]);
-  });
-
-  it("compares windows ignoring the seconds PostgreSQL adds", async () => {
-    let call = 0;
-    const { repository } = repo((current) => {
-      call += 1;
-      if (current.table === "promotion_rules") return { data: [{ id: PROMO, priority: 1, is_active: false, name: "Promo" }] };
-      if (first(current) === "delete") return { data: [] };
-      if (first(current) === "insert") return { data: [{ day_of_week: 2, starts_at: "19:00:00", ends_at: "23:00:00" }] };
-      return { data: call === 2 ? [] : [{ day_of_week: 2, starts_at: "19:00:00", ends_at: "23:00:00" }] };
-    });
-    expect(await repository.replacePromotionSchedule(STORE, PROMO, [{ dayOfWeek: 2, startsAt: "19:00", endsAt: "23:00" }])).toEqual({ ok: true, value: undefined });
+  it("reports a failed swap and does not accept an answer that is not a boolean", async () => {
+    expect(await repo(() => ({ error: { code: "P0002", message: "x" }, status: 400 })).repository.movePromotion(STORE, PROMO, "up")).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(await repo(() => ({ error: { code: "BB013", message: "x" }, status: 400 })).repository.movePromotion(STORE, PROMO, "up")).toMatchObject({ ok: false, error: { code: "rejected" } });
+    expect(await repo(() => new Error("network")).repository.movePromotion(STORE, PROMO, "up")).toMatchObject({ ok: false, error: { code: "unavailable" } });
+    expect(await repo(() => ({ data: null })).repository.movePromotion(STORE, PROMO, "up")).toMatchObject({ ok: false, error: { code: "invalid_data" } });
   });
 });

@@ -32,6 +32,7 @@ import {
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule } from "@/domain/public-promotions";
+import { PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
 import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
@@ -911,9 +912,9 @@ function CheckoutSection({
 
           <fieldset className="choice-group payment-group">
             <legend>Método de pago</legend>
-            {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note="Pagá online de forma segura con tarjeta o dinero en cuenta" onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
-            {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia" note="Pedí el alias por WhatsApp y enviá el comprobante por ese chat" onChange={() => setPayment("transfer")} value="transfer" /> : null}
-            {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note="Tené el importe justo al recibir o retirar" onChange={() => setPayment("cash")} value="cash" /> : null}
+            {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note={PUBLIC_PAYMENT_NOTE.mercado_pago} onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
+            {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia" note={PUBLIC_PAYMENT_NOTE.bank_transfer} onChange={() => setPayment("transfer")} value="transfer" /> : null}
+            {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note={PUBLIC_PAYMENT_NOTE.cash} onChange={() => setPayment("cash")} value="cash" /> : null}
           </fieldset>
 
           {payment === "mercado-pago" ? (

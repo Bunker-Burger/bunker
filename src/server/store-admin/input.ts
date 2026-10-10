@@ -6,7 +6,7 @@ import { parsePriceCents, slugify } from "@/server/catalog-admin/input";
 import {
   PAYMENT_METHODS,
   STATUS_OVERRIDES,
-  type PromotionFields,
+  type PromotionDraft,
   type PromotionItem,
   type StoreContactFields,
   type StoredPaymentMethod,
@@ -58,6 +58,26 @@ export function parseShift(form: FormData): Result<Omit<StoredShift, "id">, Fiel
   return Object.keys(errors).length > 0 ? err(errors) : ok({ dayOfWeek: day, opensAt, closesAt });
 }
 
+/*
+ * Payment instructions are stored in a publicly readable column, and a transfer must never show
+ * an alias or bank details (the customer asks for them on WhatsApp). This refuses what looks like
+ * them; neutral copy such as "Pedí el alias por WhatsApp" is fine.
+ */
+const BANK_DETAILS = [
+  // "Alias: bunker.burger", "CBU = 0000…", "CVU: …"
+  /\b(?:alias|cbu|cvu)\s*[:=]/i,
+  // "alias bunker.burger.mp", "el alias es bunker-burger", "CBU 285059…"
+  /\b(?:alias|cbu|cvu)\s+(?:es\s+)?["“'«]?[a-z0-9ñ]*[.\-\d][a-z0-9ñ.\-]*/i,
+  // An alias on its own: words joined by dots ("bunker.burger.mp").
+  /[a-z0-9ñ-]+\.[a-z0-9ñ-]+\.[a-z0-9ñ-]+/i,
+  // CBU/CVU (22 digits), account numbers, CUIT: 11 or more digits, spaces or dashes in between.
+  /\d(?:[\s.\-/]*\d){10,}/
+];
+
+export function containsBankDetails(text: string) {
+  return BANK_DETAILS.some((pattern) => pattern.test(text));
+}
+
 export function parsePaymentMethod(form: FormData): Result<StoredPaymentMethod, FieldErrors> {
   const errors: FieldErrors = {};
   const method = text(form.get("method"));
@@ -66,6 +86,9 @@ export function parsePaymentMethod(form: FormData): Result<StoredPaymentMethod, 
   if (displayName.length < 1 || displayName.length > 60) errors.displayName = "Ingresá un nombre de hasta 60 caracteres.";
   const instructions = text(form.get("instructions")).trim();
   if (instructions.length > 500) errors.instructions = "Máximo 500 caracteres.";
+  else if (containsBankDetails(instructions)) {
+    errors.instructions = "No escribas alias, CBU, CVU ni números de cuenta: el cliente los pide por WhatsApp.";
+  }
   const sortOrder = Number(text(form.get("sortOrder")) || "0");
   if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1000) errors.sortOrder = "Orden entre 0 y 1000.";
   if (Object.keys(errors).length > 0) return err(errors);
@@ -110,11 +133,7 @@ function parseMechanic(form: FormData, errors: FieldErrors): PromotionMechanic |
   }
 }
 
-export interface PromotionForm {
-  fields: PromotionFields;
-  items: PromotionItem[];
-  schedule: PromotionWindow[];
-}
+export type PromotionForm = PromotionDraft;
 
 /** Dates arrive as `datetime-local` values typed in the store's time zone. */
 export function parsePromotionForm(form: FormData, timeZone: string): Result<PromotionForm, FieldErrors> {

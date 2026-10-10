@@ -50,11 +50,11 @@ export interface PromotionItem {
   quantity: number;
 }
 
-export interface StoredPromotion {
-  id: string;
-  priority: number;
-  active: boolean;
-  name: string;
+/** A promotion as the admin form sends it: row fields, products and weekly windows. */
+export interface PromotionDraft {
+  fields: PromotionFields;
+  items: PromotionItem[];
+  schedule: PromotionWindow[];
 }
 
 /**
@@ -73,14 +73,14 @@ export interface StoreAdminRepository {
   listPaymentMethods(storeId: string): Promise<AdminResult<StoredPaymentMethod[]>>;
   savePaymentMethod(storeId: string, method: StoredPaymentMethod): Promise<AdminResult<void>>;
 
-  listPromotions(storeId: string): Promise<AdminResult<StoredPromotion[]>>;
   listProductIds(storeId: string): Promise<AdminResult<string[]>>;
-  createPromotion(storeId: string, fields: PromotionFields & { priority: number }): Promise<AdminResult<{ id: string }>>;
-  updatePromotion(storeId: string, promotionId: string, fields: PromotionFields): Promise<AdminResult<void>>;
+  /**
+   * Creates (`promotionId` null, next priority) or updates a promotion with its products and
+   * windows in one transaction: everything is stored or nothing is.
+   */
+  savePromotion(storeId: string, promotionId: string | null, draft: PromotionDraft): Promise<AdminResult<{ id: string }>>;
   setPromotionActive(storeId: string, promotionId: string, active: boolean): Promise<AdminResult<void>>;
-  setPromotionPriority(storeId: string, promotionId: string, priority: number): Promise<AdminResult<void>>;
+  /** Swaps priorities with the neighbour in one transaction; `moved: false` at the end of the list. */
+  movePromotion(storeId: string, promotionId: string, direction: "up" | "down"): Promise<AdminResult<{ moved: boolean }>>;
   deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>>;
-  /** Verified like product option links: every old row removed, every new one stored, read back equal. */
-  replacePromotionItems(storeId: string, promotionId: string, items: PromotionItem[]): Promise<AdminResult<void>>;
-  replacePromotionSchedule(storeId: string, promotionId: string, windows: PromotionWindow[]): Promise<AdminResult<void>>;
 }

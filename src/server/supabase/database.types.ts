@@ -777,7 +777,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      admin_move_promotion: {
+        Args: {
+          direction: string
+          target_promotion_id: string
+          target_store_id: string
+        }
+        Returns: boolean
+      }
+      admin_save_promotion: {
+        Args: {
+          items: Json
+          promotion: Json
+          schedule: Json
+          target_promotion_id: string
+          target_store_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       admin_role: "owner" | "admin"

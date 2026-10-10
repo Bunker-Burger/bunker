@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryAdminAccess, type InMemorySession } from "@/server/catalog/in-memory-admin-access";
-import { InMemoryStoreAdminRepository } from "./in-memory-store-admin-repository";
+import { InMemoryStoreAdminRepository, type MemoryPromotion } from "./in-memory-store-admin-repository";
 import {
   addShift,
   deletePromotion,
@@ -126,7 +126,7 @@ describe("store status and contact", () => {
   it("maps the database's own fee check to the same explanation", async () => {
     repository.stores[0] = { ...repository.stores[0]!, deliveryFeeCents: 100000n };
     repository.failing.set("setStatusOverride", { code: "rejected", message: "23514" });
-    expect(await setStoreStatus(deps(), form({ statusOverride: "open" }))).toEqual({ ok: false, message: "Configurá la tarifa de delivery antes de habilitar pedidos." });
+    expect(await setStoreStatus(deps(), form({ statusOverride: "open" }))).toEqual({ ok: false, message: "Configurá la tarifa de delivery antes de habilitar pedidos.", mayHaveWritten: true });
   });
 
   it.each([
@@ -177,12 +177,44 @@ describe("business hours", () => {
 });
 
 describe("payment methods", () => {
-  it("saves a method with its public instructions", async () => {
-    expect(await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions: "Alias: bunker.burger", enabled: "on", sortOrder: "20" }))).toMatchObject({
-      ok: true,
-      message: "Transferencia: habilitado."
+  it("saves a method with neutral public instructions", async () => {
+    expect(
+      await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions: "Pedí el alias por WhatsApp y enviá el comprobante.", enabled: "on", sortOrder: "20" }))
+    ).toMatchObject({ ok: true, message: "Transferencia: habilitado." });
+    expect(repository.paymentMethods).toEqual([
+      { storeId: STORE, method: "bank_transfer", displayName: "Transferencia", instructions: "Pedí el alias por WhatsApp y enviá el comprobante.", enabled: true, sortOrder: 20 }
+    ]);
+  });
+
+  it.each([
+    ["Solicitá el alias actualizado por WhatsApp."],
+    ["Te pasamos los datos por WhatsApp; mandá el comprobante a ese chat."],
+    ["Abonás al recibir. Pedidos hasta las 23.30, envío $ 1500."],
+    [""]
+  ])("accepts neutral copy: %s", async (instructions) => {
+    expect(await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions, enabled: "on" }))).toMatchObject({ ok: true });
+  });
+
+  it.each([
+    ["Alias: bunker.burger"],
+    ["alias=bunkerburger"],
+    ["Nuestro alias es bunker-burger"],
+    ["Transferí al alias bunker.burger.mp"],
+    ["bunker.burger.mp"],
+    ["CBU 2850590940090418135201"],
+    ["CVU: 0000003100010000000001"],
+    ["Cuenta 4001234-5 123-4"],
+    ["CUIT 20-12345678-9"]
+  ])("refuses bank details in the public instructions and stores nothing: %s", async (instructions) => {
+    const outcome = await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions, enabled: "on" }));
+    expect(outcome).toEqual({
+      ok: false,
+      message: "Revisá los datos marcados.",
+      fieldErrors: { instructions: "No escribas alias, CBU, CVU ni números de cuenta: el cliente los pide por WhatsApp." }
     });
-    expect(repository.paymentMethods).toEqual([{ storeId: STORE, method: "bank_transfer", displayName: "Transferencia", instructions: "Alias: bunker.burger", enabled: true, sortOrder: 20 }]);
+    expect(outcome).not.toHaveProperty("mayHaveWritten");
+    expect(repository.paymentMethods).toEqual([]);
+    expect(repository.writes).toEqual([]);
   });
 
   it("warns that Mercado Pago is not offered until the server is configured, without revealing why", async () => {
@@ -200,16 +232,29 @@ describe("payment methods", () => {
 });
 
 describe("promotions", () => {
-  it("creates a promotion with the next priority: paused while its products and windows are stored, then active", async () => {
-    repository.promotions.push({ id: "0d000000-0000-4000-8000-000000000001", storeId: STORE, priority: 4, name: "Vieja", slug: "vieja", description: "", badgeText: null, mechanic: { type: "free_delivery" }, channels: ["delivery"], startsAt: new Date(0), endsAt: new Date(1), active: false, items: [], schedule: [] });
+  const stored = (overrides: Partial<MemoryPromotion> = {}): MemoryPromotion => ({
+    id: "0d000000-0000-4000-8000-000000000001",
+    storeId: STORE,
+    priority: 4,
+    name: "Vieja",
+    slug: "vieja",
+    description: "",
+    badgeText: null,
+    mechanic: { type: "percent_off", percentOff: 10 },
+    channels: ["delivery"],
+    startsAt: new Date("2026-10-01T03:00:00Z"),
+    endsAt: new Date("2026-12-01T03:00:00Z"),
+    active: true,
+    items: [{ productId: PAPAS, quantity: 1 }],
+    schedule: [{ dayOfWeek: 5, startsAt: "20:00", endsAt: "23:00" }],
+    ...overrides
+  });
+
+  it("creates a promotion with its products and windows in one write, with the next priority", async () => {
+    repository.promotions.push(stored({ active: false }));
     const outcome = await savePromotion(deps(), promotionForm());
     expect(outcome).toMatchObject({ ok: true, message: "“Martes de smash” guardada y activa.", value: { promotionId: expect.any(String) } });
-    expect(repository.writes).toEqual([
-      "createPromotion:active=false:priority=5",
-      "replacePromotionItems:1:active=false",
-      "replacePromotionSchedule:1:active=false",
-      "setPromotionActive:true"
-    ]);
+    expect(repository.writes).toEqual(["savePromotion:create:active=true:priority=5"]);
     expect(repository.promotions.at(-1)).toMatchObject({
       slug: "martes-de-smash",
       mechanic: { type: "percent_off", percentOff: 15 },
@@ -222,11 +267,34 @@ describe("promotions", () => {
     });
   });
 
-  it("keeps it paused when storing its windows fails", async () => {
-    repository.failing.set("replacePromotionSchedule", { code: "unavailable", message: "timeout" });
-    const outcome = await savePromotion(deps(), promotionForm());
-    expect(outcome).toMatchObject({ ok: false, message: expect.stringContaining("La promoción quedó pausada") });
-    expect(repository.promotions[0]?.active).toBe(false);
+  it("edits an active promotion without pausing it on the way", async () => {
+    repository.promotions.push(stored());
+    const outcome = await savePromotion(deps(), promotionForm({ promotionId: "0d000000-0000-4000-8000-000000000001", name: "Vieja renovada", slug: "vieja" }));
+    expect(outcome).toMatchObject({ ok: true, value: { promotionId: "0d000000-0000-4000-8000-000000000001" } });
+    expect(repository.writes).toEqual(["savePromotion:update:active=true"]);
+    expect(repository.promotions[0]).toMatchObject({ name: "Vieja renovada", priority: 4, active: true, items: [{ productId: SMASH, quantity: 1 }] });
+  });
+
+  it.each([
+    ["the connection fails", { code: "unavailable", message: "timeout" }, "No pudimos guardar los cambios. Intentá nuevamente."],
+    ["the slug is taken", { code: "conflict", message: "23505" }, "Ya existe una promoción con ese slug."],
+    ["the database rejects it", { code: "rejected", message: "23514" }, "La base de datos rechazó la promoción (o no quedan prioridades libres). No se guardó nada."]
+  ] as const)("leaves an edited promotion exactly as it was when %s, and says a write was attempted", async (_case, failure, message) => {
+    const before = stored();
+    repository.promotions.push(structuredClone(before));
+    repository.failing.set("savePromotion", failure);
+    const outcome = await savePromotion(deps(), promotionForm({ promotionId: before.id, name: "Nunca guardada" }));
+    expect(outcome).toEqual({ ok: false, message, mayHaveWritten: true });
+    expect(repository.promotions).toEqual([before]);
+  });
+
+  it("reports a promotion that is not in the store", async () => {
+    expect(await savePromotion(deps(), promotionForm({ promotionId: "0d000000-0000-4000-8000-000000000009" }))).toEqual({
+      ok: false,
+      message: "Ese elemento ya no existe. Recargá la página.",
+      mayHaveWritten: true
+    });
+    expect(repository.promotions).toEqual([]);
   });
 
   it.each([
@@ -239,7 +307,9 @@ describe("promotions", () => {
     ["no channel", { channel: [] }, "channel"],
     ["a repeated product", { itemProduct: [SMASH, SMASH], itemQuantity: ["1", "2"] }, "items"]
   ])("rejects %s without writing", async (_case, overrides, field) => {
-    expect(await savePromotion(deps(), promotionForm(overrides))).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
+    const outcome = await savePromotion(deps(), promotionForm(overrides));
+    expect(outcome).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
+    expect(outcome).not.toHaveProperty("mayHaveWritten");
     expect(repository.writes).toEqual([]);
   });
 
@@ -264,14 +334,38 @@ describe("promotions", () => {
       repository.promotions = [promo(1, 30), promo(2, 20), promo(3, 10)];
     });
 
-    it("moves a promotion up by swapping priorities through a free value", async () => {
-      expect(await movePromotion(deps(), form({ promotionId: "0d000000-0000-4000-8000-000000000003", direction: "up" }))).toMatchObject({ ok: true });
-      expect(repository.writes).toEqual(["setPromotionPriority:P3=31", "setPromotionPriority:P2=10", "setPromotionPriority:P3=20"]);
+    it("moves a promotion up by swapping priorities in one write", async () => {
+      expect(await movePromotion(deps(), form({ promotionId: "0d000000-0000-4000-8000-000000000003", direction: "up" }))).toEqual({
+        ok: true,
+        message: "Orden de promociones actualizado.",
+        value: undefined
+      });
+      expect(repository.writes).toEqual(["movePromotion:P3=20,P2=10"]);
       expect(repository.promotions.map((p) => [p.name, p.priority])).toEqual([["P1", 30], ["P2", 10], ["P3", 20]]);
     });
 
-    it("does nothing at the top", async () => {
-      expect(await movePromotion(deps(), form({ promotionId: "0d000000-0000-4000-8000-000000000001", direction: "up" }))).toMatchObject({ ok: true, message: "La promoción ya está en ese extremo." });
+    it.each([
+      ["top", "0d000000-0000-4000-8000-000000000001", "up"],
+      ["bottom", "0d000000-0000-4000-8000-000000000003", "down"]
+    ])("does nothing at the %s", async (_end, promotionId, direction) => {
+      expect(await movePromotion(deps(), form({ promotionId, direction }))).toMatchObject({ ok: true, message: "La promoción ya está en ese extremo." });
+      expect(repository.writes).toEqual([]);
+      expect(repository.promotions.map((p) => p.priority)).toEqual([30, 20, 10]);
+    });
+
+    it.each([
+      ["the swap fails", { code: "unavailable", message: "timeout" }, "No pudimos guardar los cambios. Intentá nuevamente."],
+      ["no priority is free", { code: "rejected", message: "BB013" }, "No hay más prioridades disponibles: eliminá promociones viejas."]
+    ] as const)("keeps every priority when %s", async (_case, failure, message) => {
+      repository.failing.set("movePromotion", failure);
+      expect(await movePromotion(deps(), form({ promotionId: "0d000000-0000-4000-8000-000000000003", direction: "up" }))).toEqual({ ok: false, message, mayHaveWritten: true });
+      expect(repository.promotions.map((p) => [p.name, p.priority])).toEqual([["P1", 30], ["P2", 20], ["P3", 10]]);
+    });
+
+    it("refuses an unknown direction without writing", async () => {
+      const outcome = await movePromotion(deps(), form({ promotionId: "0d000000-0000-4000-8000-000000000003", direction: "sideways" }));
+      expect(outcome).toMatchObject({ ok: false, fieldErrors: { direction: expect.any(String) } });
+      expect(outcome).not.toHaveProperty("mayHaveWritten");
       expect(repository.writes).toEqual([]);
     });
 

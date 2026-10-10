@@ -1,4 +1,5 @@
 import type { StoreState, StoreStatus } from "@/domain/store-status";
+import { offeredPaymentOptions } from "@/domain/public-payment-options";
 import type { PaymentMethodKind, PaymentMethodSetting } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { getStoreAdminView, PAYMENT_METHODS, type StoredShift } from "@/server/store-admin";
@@ -63,7 +64,11 @@ export default async function StoreAdminPage() {
         sortOrder: (PAYMENT_METHODS.indexOf(method) + 1) * 10
       }
   );
-  const enabledMethods = store.paymentMethods.filter((method) => method.enabled);
+  // Same rule as the checkout: enabled methods, Mercado Pago only while it is available.
+  const offered = offeredPaymentOptions(
+    store.paymentMethods.filter((method) => method.enabled).map((method) => method.method),
+    mercadoPago.available
+  );
 
   return (
     <section className={styles.adminPanel} aria-labelledby="store-title">
@@ -156,7 +161,7 @@ export default async function StoreAdminPage() {
               <TextField defaultValue={method.displayName} label="Nombre visible" maxLength={60} name="displayName" required />
               <TextAreaField
                 defaultValue={method.instructions}
-                hint="Texto público para el cliente (por ejemplo alias o CBU para transferencias). No pongas claves ni tokens."
+                hint="Texto opcional y público, por ejemplo «Pedí los datos por WhatsApp». Nunca alias, CBU, CVU ni números de cuenta (se piden por WhatsApp), ni claves o tokens."
                 label="Instrucciones"
                 maxLength={500}
                 name="instructions"
@@ -181,14 +186,13 @@ export default async function StoreAdminPage() {
           <dd>{store.whatsappE164}</dd>
           <dt>Medios de pago</dt>
           <dd>
-            {enabledMethods.length === 0 ? (
-              "Ninguno habilitado"
+            {offered.length === 0 ? (
+              "Ninguno disponible"
             ) : (
               <ul>
-                {enabledMethods.map((method) => (
-                  <li key={method.method}>
-                    <strong>{method.displayName}</strong>
-                    {method.instructions ? ` — ${method.instructions}` : null}
+                {offered.map((option) => (
+                  <li key={option.method}>
+                    <strong>{option.label}</strong> — {option.note}
                   </li>
                 ))}
               </ul>

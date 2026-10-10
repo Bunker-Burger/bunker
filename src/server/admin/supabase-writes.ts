@@ -10,12 +10,14 @@ import type { AdminError, AdminResult } from "./use-case";
  */
 
 /** Database errors that mean "the values are wrong", not "try again". */
-const REJECTED_CODES = new Set(["23514", "23502", "22P02", "22023", "BB003", "BB012"]);
+const REJECTED_CODES = new Set(["23514", "23502", "22P02", "22023", "22003", "BB003", "BB012", "BB013"]);
 
 export function fromWriteError(operation: string, error: unknown, status?: number): Result<never, AdminError> {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
   if (code === "23505") return err({ code: "conflict", message: `${operation}: duplicate value`, cause: error });
   if (code === "23503") return err({ code: "conflict", message: `${operation}: still referenced`, cause: error });
+  // Raised by the admin RPCs when the row is not in the caller's store.
+  if (code === "P0002") return err({ code: "not_found", message: `${operation}: no row in this store`, cause: error });
   if (REJECTED_CODES.has(code)) return err({ code: "rejected", message: `${operation}: rejected by the database (${code})`, cause: error });
   return fromSupabaseError(operation, error, status);
 }

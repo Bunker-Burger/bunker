@@ -2,9 +2,12 @@ import type { PromotionWindow } from "@/domain/types";
 import { err, ok } from "@/lib/result";
 import type { AdminResult } from "@/server/admin/use-case";
 import { catalogError } from "@/server/catalog/errors";
-import type { PromotionFields, PromotionItem, StoreAdminRepository, StoredPaymentMethod, StoredShift, StoredStore } from "./ports";
+import type { PromotionDraft, PromotionFields, PromotionItem, StoreAdminRepository, StoredPaymentMethod, StoredShift, StoredStore } from "./ports";
 
-/* Test double: one store's operation settings and promotions, with the DB rules the use cases rely on. */
+/*
+ * Test double: one store's operation settings and promotions, with the DB rules the use cases rely
+ * on. Saving and moving a promotion are all-or-nothing, like the SQL functions behind them.
+ */
 
 export interface MemoryPromotion extends PromotionFields {
   id: string;
@@ -100,13 +103,6 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return ok(undefined);
   }
 
-  async listPromotions(storeId: string) {
-    return (
-      this.fail("listPromotions") ??
-      ok(this.promotions.filter((promotion) => promotion.storeId === storeId).map((p) => ({ id: p.id, priority: p.priority, active: p.active, name: p.name })))
-    );
-  }
-
   async listProductIds(storeId: string) {
     return this.fail("listProductIds") ?? ok(this.productIds.filter((product) => product.storeId === storeId).map((product) => product.id));
   }
@@ -115,25 +111,26 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return this.promotions.find((promotion) => promotion.storeId === storeId && promotion.id === promotionId);
   }
 
-  async createPromotion(storeId: string, fields: PromotionFields & { priority: number }) {
-    const failed = this.fail("createPromotion");
+  async savePromotion(storeId: string, promotionId: string | null, { fields, items, schedule }: PromotionDraft) {
+    const failed = this.fail("savePromotion");
     if (failed) return failed;
-    if (this.promotions.some((p) => p.storeId === storeId && (p.slug === fields.slug || p.priority === fields.priority))) return err({ code: "conflict" as const, message: "23505" });
+    const existing = promotionId === null ? null : this.find(storeId, promotionId);
+    if (promotionId !== null && !existing) return catalogError("not_found", "P0002");
+    if (this.promotions.some((p) => p.storeId === storeId && p.id !== promotionId && p.slug === fields.slug)) return err({ code: "conflict" as const, message: "23505" });
+    // promotion_items_product_fk (product_id, store_id)
+    if (items.some((item) => !this.productIds.some((product) => product.storeId === storeId && product.id === item.productId))) return err({ code: "conflict" as const, message: "23503" });
+    const stored = { ...fields, items: items.map((item) => ({ ...item })), schedule: schedule.map((window) => ({ ...window })) };
+    if (existing) {
+      Object.assign(existing, stored);
+      this.writes.push(`savePromotion:update:active=${fields.active}`);
+      return ok({ id: existing.id });
+    }
+    const priority = this.promotions.filter((p) => p.storeId === storeId).reduce((max, p) => Math.max(max, p.priority), 0) + 1;
+    if (priority > 32_767) return err({ code: "rejected" as const, message: "BB013" });
     const id = this.id();
-    this.promotions.push({ id, storeId, ...fields, items: [], schedule: [] });
-    this.writes.push(`createPromotion:active=${fields.active}:priority=${fields.priority}`);
+    this.promotions.push({ id, storeId, priority, ...stored });
+    this.writes.push(`savePromotion:create:active=${fields.active}:priority=${priority}`);
     return ok({ id });
-  }
-
-  async updatePromotion(storeId: string, promotionId: string, fields: PromotionFields): Promise<AdminResult<void>> {
-    const failed = this.fail("updatePromotion");
-    if (failed) return failed;
-    const promotion = this.find(storeId, promotionId);
-    if (!promotion) return catalogError("not_found", "no row");
-    if (this.promotions.some((p) => p.storeId === storeId && p.id !== promotionId && p.slug === fields.slug)) return err({ code: "conflict", message: "23505" });
-    Object.assign(promotion, fields);
-    this.writes.push(`updatePromotion:active=${fields.active}`);
-    return ok(undefined);
   }
 
   async setPromotionActive(storeId: string, promotionId: string, active: boolean): Promise<AdminResult<void>> {
@@ -146,16 +143,17 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return ok(undefined);
   }
 
-  async setPromotionPriority(storeId: string, promotionId: string, priority: number): Promise<AdminResult<void>> {
-    const failed = this.fail("setPromotionPriority");
+  async movePromotion(storeId: string, promotionId: string, direction: "up" | "down") {
+    const failed = this.fail("movePromotion");
     if (failed) return failed;
     const promotion = this.find(storeId, promotionId);
-    if (!promotion) return catalogError("not_found", "no row");
-    // unique (store_id, priority)
-    if (this.promotions.some((p) => p.storeId === storeId && p.id !== promotionId && p.priority === priority)) return err({ code: "conflict", message: "23505" });
-    promotion.priority = priority;
-    this.writes.push(`setPromotionPriority:${promotion.name}=${priority}`);
-    return ok(undefined);
+    if (!promotion) return catalogError("not_found", "P0002");
+    const others = this.promotions.filter((p) => p.storeId === storeId && (direction === "up" ? p.priority > promotion.priority : p.priority < promotion.priority));
+    const neighbour = others.sort((a, b) => (direction === "up" ? a.priority - b.priority : b.priority - a.priority))[0];
+    if (!neighbour) return ok({ moved: false });
+    [promotion.priority, neighbour.priority] = [neighbour.priority, promotion.priority];
+    this.writes.push(`movePromotion:${promotion.name}=${promotion.priority},${neighbour.name}=${neighbour.priority}`);
+    return ok({ moved: true });
   }
 
   async deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>> {
@@ -165,26 +163,6 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     this.promotions = this.promotions.filter((promotion) => !(promotion.storeId === storeId && promotion.id === promotionId));
     if (before === this.promotions.length) return catalogError("not_found", "no row");
     this.writes.push(`deletePromotion:${promotionId}`);
-    return ok(undefined);
-  }
-
-  async replacePromotionItems(storeId: string, promotionId: string, items: PromotionItem[]): Promise<AdminResult<void>> {
-    const failed = this.fail("replacePromotionItems");
-    if (failed) return failed;
-    const promotion = this.find(storeId, promotionId);
-    if (!promotion) return catalogError("not_found", "no row");
-    promotion.items = items.map((item) => ({ ...item }));
-    this.writes.push(`replacePromotionItems:${items.length}:active=${promotion.active}`);
-    return ok(undefined);
-  }
-
-  async replacePromotionSchedule(storeId: string, promotionId: string, windows: PromotionWindow[]): Promise<AdminResult<void>> {
-    const failed = this.fail("replacePromotionSchedule");
-    if (failed) return failed;
-    const promotion = this.find(storeId, promotionId);
-    if (!promotion) return catalogError("not_found", "no row");
-    promotion.schedule = windows.map((window) => ({ ...window }));
-    this.writes.push(`replacePromotionSchedule:${windows.length}:active=${promotion.active}`);
     return ok(undefined);
   }
 }

@@ -28,7 +28,20 @@ export type AdminResult<T> = Result<T, AdminError | CatalogError>;
 
 export type AdminOutcome<T = undefined> =
   | { ok: true; message: string; value: T }
-  | { ok: false; message: string; fieldErrors?: FieldErrors; issues?: string[] };
+  | {
+      ok: false;
+      message: string;
+      fieldErrors?: FieldErrors;
+      issues?: string[];
+      /**
+       * A write reached the database and failed (or its answer was lost), so stored data may have
+       * changed: caches built from it must be expired anyway. Absent when the use case stopped
+       * before writing (validation, authorization, reads).
+       */
+      mayHaveWritten?: true;
+    };
+
+export type AdminFailure = Extract<AdminOutcome, { ok: false }>;
 
 export interface AdminUseCaseDependencies {
   access: AdminAccessGate;
@@ -54,9 +67,19 @@ export function adminUseCases(scope: string) {
     operation: string,
     error: AdminError | CatalogError,
     messages: Partial<Record<string, string>> = {}
-  ): AdminOutcome<never> {
+  ): AdminFailure {
     (deps.log ?? console).error(`[${scope}:${operation}] ${error.code}: ${error.message}`);
     return { ok: false, message: messages[error.code] ?? DEFAULT_MESSAGES[error.code] ?? GENERIC_FAILURE };
+  }
+
+  /** `failure` for a write that was sent: the caller must treat stored data as possibly changed. */
+  function writeFailure(
+    deps: Pick<AdminUseCaseDependencies, "log">,
+    operation: string,
+    error: AdminError | CatalogError,
+    messages: Partial<Record<string, string>> = {}
+  ): AdminFailure {
+    return { ...failure(deps, operation, error, messages), mayHaveWritten: true };
   }
 
   /** Runs `operation` with the store id of the verified admin, or fails without touching anything. */
@@ -66,5 +89,5 @@ export function adminUseCases(scope: string) {
     return operation(membership.value.storeId);
   }
 
-  return { success, invalid, failure, asAdmin };
+  return { success, invalid, failure, writeFailure, asAdmin };
 }
