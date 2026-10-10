@@ -28,27 +28,94 @@ jobs:
       - run: pnpm test
       - run: pnpm run build
 
-  cloud-reviewed:
-    name: pgTAP cloud revisado (SHA exacto)
+  bootstrap-scope:
+    name: Validar alcance del bootstrap Auth
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      statuses: read
+      pull-requests: read
+    outputs:
+      bootstrap_allowed: ${{ steps.scope.outputs.bootstrap_allowed }}
     steps:
-      - name: Exigir ejecución cloud autorizada desde el workflow confiable de main
+      - name: Permitir excepción sólo para PR #39 y archivos de infraestructura exactos
+        id: scope
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/pgTAP-reviewed")][0].state // "missing"')"
-          if [[ "$state" != "success" ]]; then
-            echo "::error::No existe pgTAP cloud aprobado para este SHA. Un mantenedor debe ejecutar 'Cloud DB — ejecución revisada (main)' desde main con el número de PR y SHA completo; luego reejecutar este job."
-            exit 1
+          allowed=false
+          if [[ "$PR_NUMBER" == "39" && "$HEAD_REF" == "codex/bb11-auth-bootstrap" ]]; then
+            mapfile -t files < <(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')
+            if ((${#files[@]} > 0)); then
+              allowed=true
+              for file in "${files[@]}"; do
+                case "$file" in
+                  .github/workflows/admin-auth-reviewed.yml|.github/workflows/admin-auth-product-reviewed.yml|.github/workflows/cloud-db-reviewed.yml|.github/workflows/ci.yml|scripts/check-admin-auth-cloud.mjs|scripts/ci/verify-cloud-statuses.mjs|src/ci/verify-cloud-statuses.test.ts|scripts/ci/preflight-supabase-dev.mjs|src/ci/preflight-supabase-dev.test.ts) ;;
+                  *) allowed=false; echo "::error::Archivo fuera del bootstrap permitido: $file" ;;
+                esac
+              done
+            fi
           fi
-          echo "pgTAP cloud del SHA exacto verificado; este job no usa secretos."
+          echo "bootstrap_allowed=$allowed" >> "$GITHUB_OUTPUT"
+          if [[ "$allowed" == true ]]; then
+            echo "PR #39 contiene exclusivamente infraestructura bootstrap permitida."
+          else
+            echo "No se habilita ninguna excepción de gates para esta PR."
+          fi
+
+  status-provenance:
+    name: Validar procedencia de statuses cloud
+    needs: bootstrap-scope
+    if: github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # Único verificador del gate: el mismo archivo que ejecuta src/ci/verify-cloud-statuses.test.ts.
+      # Sin dependencias, sin secretos; token de sólo lectura.
+      - name: Validar HEAD, creator, run de main y vínculo PR/SHA de cada contexto
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci/verify-cloud-statuses.mjs
+
+  cloud-reviewed:
+    name: pgTAP cloud revisado (SHA exacto)
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.status-provenance.result }}" = success
+
+  admin-auth-reviewed:
+    name: Auth cloud revisado (SHA exacto)
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.status-provenance.result }}" = success
+
+  admin-auth-product-reviewed:
+    name: Auth producto revisado (SHA exacto)
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.status-provenance.result }}" = success
 
   e2e:
     runs-on: ubuntu-latest

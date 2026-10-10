@@ -1,0 +1,92 @@
+name: Admin Auth — ejecución revisada (main)
+# Vincula el run con la PR y el SHA que autoriza: el gate de CI (scripts/ci/verify-cloud-statuses.mjs)
+# exige este título exacto, porque el head_sha del run es el de main por diseño.
+run-name: "Admin Auth config | PR #${{ inputs.pr_number }} | ${{ inputs.reviewed_sha }}"
+
+# Ejecuta un harness Auth autocontenido y revisado desde main. Nunca checkout ni ejecuta
+# JavaScript del SHA de la PR con secretos; el SHA sólo identifica el commit auditado.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR abierta hacia main"
+        required: true
+        type: number
+      reviewed_sha:
+        description: "SHA completo de 40 caracteres revisado"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: supabase-admin-auth-reviewed
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Autorizar SHA desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.verify.outputs.sha }}
+      pr: ${{ steps.verify.outputs.pr }}
+    steps:
+      - name: Verificar PR abierta y SHA exacto
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::PR inválida"; exit 1; }
+          [[ "$REVIEWED_SHA" =~ ^[a-fA-F0-9]{40}$ ]] || { echo "::error::Se exige SHA completo"; exit 1; }
+          REVIEWED_SHA="${REVIEWED_SHA,,}"
+          response="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [[ "$(jq -r '.state' <<< "$response")" == "open" ]] || { echo "::error::PR cerrada"; exit 1; }
+          [[ "$(jq -r '.base.ref' <<< "$response")" == "main" ]] || { echo "::error::Base no autorizada"; exit 1; }
+          [[ "$(jq -r '.head.repo.full_name' <<< "$response")" == "$GITHUB_REPOSITORY" ]] || { echo "::error::Repositorio de origen no autorizado"; exit 1; }
+          [[ "$(jq -r '.head.sha' <<< "$response")" == "$REVIEWED_SHA" ]] || { echo "::error::La PR cambió de SHA"; exit 1; }
+          echo "sha=$REVIEWED_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+  admin-auth:
+    name: Auth cloud harness confiable
+    needs: authorize
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout exclusivo de main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Ejecutar únicamente el harness confiable de main
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPECTED_PROJECT_REF: zokkgocmcaqcujltfkjf
+          SUPABASE_PROJECT_ENV: development
+          SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
+          SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
+        run: node scripts/check-admin-auth-cloud.mjs
+      - name: Registrar resultado para el SHA exacto
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$REVIEWED_SHA" \
+            -f state="$STATE" \
+            -f context=cloud/admin-auth-reviewed \
+            -f description="Trusted-main cloud Auth harness for reviewed SHA" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null

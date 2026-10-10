@@ -1,4 +1,9 @@
 name: Cloud DB — ejecución revisada (main)
+# Vincula el run con la operación, la PR y el SHA que autoriza: el gate de CI
+# (scripts/ci/verify-cloud-statuses.mjs) exige "Cloud DB | pgTAP | PR #<n> | <sha>", porque el
+# head_sha del run es el de main por diseño. Las ejecuciones por comentario no llevan el SHA en el
+# título y por eso no acreditan el gate.
+run-name: "${{ github.event_name == 'workflow_dispatch' && format('Cloud DB | {0} | PR #{1} | {2}', inputs.operation, inputs.pr_number, inputs.reviewed_sha) || format('Cloud DB | comentario | PR #{0}', github.event.issue.number) }}"
 
 # El workflow privilegiado SOLO se ejecuta desde el código de main.
 # No ejecutar desde una PR ni copiar scripts JS/pnpm de su checkout.
