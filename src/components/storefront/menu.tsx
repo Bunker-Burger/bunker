@@ -5,6 +5,7 @@ import { useId, useMemo, useRef, useState, type FocusEvent } from "react";
 import type { Category, Product } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
 import { formatArs } from "@/lib/money";
+import { focalStyle } from "./focal-style";
 import { buildMenuSections, menuCategories, menuFilters, type MenuFilter } from "./menu-sections";
 
 // Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
@@ -167,7 +168,7 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
       >
         <div className="product-image-wrap">
           {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} /> : null}
+          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
           {product.featured ? <span className="featured-dot" aria-hidden="true"><Check size={16} /></span> : null}
           {!product.inStock ? <span className="sold-out-badge" aria-hidden="true">Agotado</span> : null}
         </div>

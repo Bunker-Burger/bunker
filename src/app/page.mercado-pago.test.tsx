@@ -46,6 +46,7 @@ const productRow = {
   is_available: true,
   is_featured: true,
   contains_alcohol: false,
+  sort_order: 0,
   product_images: [],
   product_option_groups: []
 };

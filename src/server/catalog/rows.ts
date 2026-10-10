@@ -75,8 +75,8 @@ export type CategoryRow = z.output<typeof categoryRowSchema>;
 
 export const PRODUCT_SELECT = [
   "id, category_id, name, slug, description, base_price_cents:base_price_cents::text",
-  "is_published, is_available, is_featured, contains_alcohol",
-  "product_images(storage_path, alt_text, sort_order, is_primary)",
+  "is_published, is_available, is_featured, contains_alcohol, sort_order",
+  "product_images(storage_path, alt_text, sort_order, is_primary, focal_x, focal_y)",
   "product_option_groups(default_option_ids, minimum_selections_override, maximum_selections_override, sort_order, " +
     "option_groups(id, name, selection_mode, minimum_selections, maximum_selections, is_required, sort_order, applicable_category_kinds, " +
     "options(id, name, price_delta_cents:price_delta_cents::text, is_available, sort_order)))"
@@ -90,7 +90,7 @@ const optionRowSchema = z.object({
   sort_order: smallInt
 });
 
-const optionGroupRowSchema = z.object({
+export const optionGroupRowSchema = z.object({
   id: z.string(),
   name: z.string(),
   selection_mode: z.enum(enums.option_selection_mode),
@@ -113,8 +113,16 @@ export const productRowSchema = z.object({
   is_available: z.boolean(),
   is_featured: z.boolean(),
   contains_alcohol: z.boolean(),
+  sort_order: smallInt,
   product_images: z.array(
-    z.object({ storage_path: z.string(), alt_text: z.string(), sort_order: smallInt, is_primary: z.boolean() })
+    z.object({
+      storage_path: z.string(),
+      alt_text: z.string(),
+      sort_order: smallInt,
+      is_primary: z.boolean(),
+      focal_x: z.number().int().min(0).max(100),
+      focal_y: z.number().int().min(0).max(100)
+    })
   ),
   product_option_groups: z.array(
     z.object({

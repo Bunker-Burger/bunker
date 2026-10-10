@@ -55,3 +55,30 @@ test("the sole owner can enter, sees Admin navigation, logs out, and cannot retu
   await page.goto("/bunker/admin");
   await expect(page).toHaveURL(/\/bunker$/);
 });
+
+// BB-12: read-only walk through the catalog admin. Nothing is written: the SVG is rejected on the
+// server before any upload, and no form that saves data is submitted with valid values.
+test("the owner manages the catalog by product type and a fake image is rejected server-side", async ({ page }) => {
+  test.skip(!hasDevelopmentAuthConfig, "complete development Auth configuration is not available");
+
+  await page.goto("/bunker");
+  await page.getByRole("textbox", { name: "Email" }).fill(adminEmail!);
+  await page.getByLabel("Contraseña").fill(adminPassword!);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+  await expect(page).toHaveURL(/\/bunker\/admin$/);
+
+  await page.getByRole("link", { name: "Administrar catálogo" }).click();
+  const tabs = page.getByRole("navigation", { name: "Tipos de producto" }).getByRole("link");
+  await expect(tabs).toHaveText(["Hamburguesas", "Sándwiches", "Papas", "Bebidas"]);
+  await expect(page.locator("body")).not.toContainText(/pedidos|ventas|factura|ingresos|kpi/i);
+
+  await page.getByRole("list", { name: /^Productos de / }).first().getByRole("link").first().click();
+  await expect(page.getByRole("heading", { level: 2, name: "Foto" })).toBeVisible();
+  await page.getByLabel(/^(Foto|Reemplazar foto)$/).setInputFiles({
+    name: "logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"/>')
+  });
+  await page.getByRole("button", { name: /^(Subir foto|Guardar foto)$/ }).click();
+  await expect(page.getByText("Formato no permitido: subí una imagen JPEG, PNG, WebP o AVIF.")).toBeVisible();
+});

@@ -16,7 +16,7 @@ import type { CategoryRow, ProductRow, PromotionRow, StoreOperatingRow, StoreRow
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "es");
 
-const productTypeByKind: Record<CategoryRow["kind"], ProductType> = {
+export const productTypeByKind: Record<CategoryRow["kind"], ProductType> = {
   burger: "burger",
   sandwich: "sandwich",
   side: "fries",
@@ -139,7 +139,7 @@ function primaryImage(row: ProductRow) {
 }
 
 /**
- * Orders products by category order, featured first, then name. Products whose category is
+ * Orders products by category order, the admin's manual order, featured first, then name. Products whose category is
  * not readable keep type "other" and sort last instead of being dropped silently.
  */
 export function toProducts(rows: ProductRow[], context: ProductContext): Result<Product[], CatalogError> {
@@ -163,7 +163,8 @@ export function toProducts(rows: ProductRow[], context: ProductContext): Result<
         description: row.description,
         priceCents: row.base_price_cents,
         imageUrl: image ? `${base}/${image.storage_path.split("/").map(encodeURIComponent).join("/")}` : null,
-        ...(image ? { imageAlt: image.alt_text } : {}),
+        ...(image ? { imageAlt: image.alt_text, imageFocalPoint: { x: image.focal_x, y: image.focal_y } } : {}),
+        sortOrder: row.sort_order,
         published: row.is_published,
         featured: row.is_featured,
         inStock: row.is_available,
@@ -176,6 +177,7 @@ export function toProducts(rows: ProductRow[], context: ProductContext): Result<
   products.sort(
     (a, b) =>
       a.categoryOrder - b.categoryOrder ||
+      (a.product.sortOrder ?? 0) - (b.product.sortOrder ?? 0) ||
       Number(b.product.featured) - Number(a.product.featured) ||
       byName(a.product, b.product)
   );

@@ -148,6 +148,25 @@ describe("parsePublicProducts strict DTO validation (P1 A)", () => {
   });
 });
 
+describe("punto focal de la foto (BB-12)", () => {
+  const withFocal = (imageFocalPoint: unknown) => ({
+    products: [{ ...VALID_SAMPLE_PAYLOAD.products[0], imageUrl: "https://x.supabase.co/a.webp", imageFocalPoint }]
+  });
+
+  it("conserva un punto focal válido", () => {
+    expect(parsePublicProducts(withFocal({ x: 20, y: 80 }))?.[0]?.imageFocalPoint).toEqual({ x: 20, y: 80 });
+  });
+
+  it.each([[{ x: 101, y: 50 }], [{ x: -1, y: 50 }], [{ x: 12.5, y: 50 }], [{ x: "50", y: 50 }], ["50% 50%"], [null]])(
+    "ignora un punto focal malformado (%j) sin descartar el producto",
+    (focal) => {
+      const [product] = parsePublicProducts(withFocal(focal)) ?? [];
+      expect(product?.slug).toBe("hamburguesa-bunker");
+      expect(product).not.toHaveProperty("imageFocalPoint");
+    }
+  );
+});
+
 describe("parsePublicCatalog: productos y categorías de una misma lectura", () => {
   const category = { id: "cat-burgers", slug: "hamburguesas", name: "Hamburguesas", type: "burger", sortOrder: 10, visible: true };
 

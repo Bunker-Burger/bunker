@@ -32,6 +32,7 @@ function productRow(overrides: Record<string, unknown> = {}) {
     is_available: true,
     is_featured: false,
     contains_alcohol: false,
+    sort_order: 0,
     product_images: [],
     product_option_groups: [],
     ...overrides
@@ -177,8 +178,8 @@ describe("nulls", () => {
         id: "with-photo",
         slug: "con-foto",
         product_images: [
-          { storage_path: "0199b2c8-40b0-7000-8000-000000000001/secundaria.webp", alt_text: "Otra", sort_order: 0, is_primary: false },
-          { storage_path: "0199b2c8-40b0-7000-8000-000000000001/principal.webp", alt_text: "Hamburguesa", sort_order: 5, is_primary: true }
+          { storage_path: "0199b2c8-40b0-7000-8000-000000000001/secundaria.webp", alt_text: "Otra", sort_order: 0, is_primary: false, focal_x: 50, focal_y: 50 },
+          { storage_path: "0199b2c8-40b0-7000-8000-000000000001/principal.webp", alt_text: "Hamburguesa", sort_order: 5, is_primary: true, focal_x: 30, focal_y: 70 }
         ]
       })
     ]);
@@ -189,8 +190,10 @@ describe("nulls", () => {
     expect(bySlug["sin-foto"]).not.toHaveProperty("imageAlt");
     expect(bySlug["con-foto"]).toMatchObject({
       imageUrl: "https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/public/catalog/0199b2c8-40b0-7000-8000-000000000001/principal.webp",
-      imageAlt: "Hamburguesa"
+      imageAlt: "Hamburguesa",
+      imageFocalPoint: { x: 30, y: 70 }
     });
+    expect(bySlug["sin-foto"]).not.toHaveProperty("imageFocalPoint");
   });
 
   it("rejects a product whose linked option group is hidden (null embed)", () => {
@@ -307,6 +310,23 @@ describe("ordering", () => {
     if (!result.ok) throw new Error(result.error.message);
     expect(result.value.map((product) => product.slug)).toEqual(["smash", "oklahoma", "crispy", "aros", "limonada", "huerfano"]);
     expect(result.value.at(-1)?.type).toBe("other");
+  });
+
+  it("puts the admin's manual order before featured and name inside each category", () => {
+    const rows = parsedProducts([
+      productRow({ id: "1", slug: "smash", name: "Smash Doble", category_id: "c-burgers", is_featured: true, sort_order: 30 }),
+      productRow({ id: "2", slug: "oklahoma", name: "Oklahoma Onion", category_id: "c-burgers", sort_order: 10 }),
+      productRow({ id: "3", slug: "bacon", name: "Bacon King", category_id: "c-burgers", sort_order: 20 }),
+      productRow({ id: "4", slug: "limonada", name: "Limonada", category_id: "c-drinks", sort_order: 0 })
+    ]);
+    const result = toProducts(rows, { categories, imageBaseUrl: IMAGE_BASE });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value.map((product) => [product.slug, product.sortOrder])).toEqual([
+      ["oklahoma", 10],
+      ["bacon", 20],
+      ["smash", 30],
+      ["limonada", 0]
+    ]);
   });
 
   it("orders option groups by link order then group order, and options by sort order then name", () => {

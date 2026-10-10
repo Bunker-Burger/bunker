@@ -334,6 +334,8 @@ export type Database = {
         Row: {
           alt_text: string
           created_at: string
+          focal_x: number
+          focal_y: number
           id: string
           is_primary: boolean
           product_id: string
@@ -343,6 +345,8 @@ export type Database = {
         Insert: {
           alt_text: string
           created_at?: string
+          focal_x?: number
+          focal_y?: number
           id?: string
           is_primary?: boolean
           product_id: string
@@ -352,6 +356,8 @@ export type Database = {
         Update: {
           alt_text?: string
           created_at?: string
+          focal_x?: number
+          focal_y?: number
           id?: string
           is_primary?: boolean
           product_id?: string
@@ -432,6 +438,7 @@ export type Database = {
           name: string
           requires_age_verification: boolean
           slug: string
+          sort_order: number
           store_id: string
           updated_at: string
         }
@@ -450,6 +457,7 @@ export type Database = {
           name: string
           requires_age_verification?: boolean
           slug: string
+          sort_order?: number
           store_id: string
           updated_at?: string
         }
@@ -468,6 +476,7 @@ export type Database = {
           name?: string
           requires_age_verification?: boolean
           slug?: string
+          sort_order?: number
           store_id?: string
           updated_at?: string
         }
