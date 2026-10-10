@@ -76,14 +76,10 @@ jobs:
           [[ "$(jq -r '.base.ref' <<< "$pr_json")" == "main" ]] || { echo "::error::Base no autorizada"; exit 1; }
           [[ "$(jq -r '.head.repo.full_name' <<< "$pr_json")" == "$GITHUB_REPOSITORY" ]] || { echo "::error::Repositorio de origen no autorizado"; exit 1; }
           [[ "$(jq -r '.head.sha' <<< "$pr_json")" == "$REVIEWED_SHA" ]] || { echo "::error::La PR cambió de SHA"; exit 1; }
-          # Sin aprobación humana obligatoria, sin bloqueo del bypass de admins o sin política de ramas,
-          # el código de la PR podría recibir secretos sin revisión: fallar (código de main, testeado en
-          # src/ci/preflight-supabase-dev.test.ts).
-          environment_file="$RUNNER_TEMP/admin-auth-product-environment.json"
-          gh api "repos/$GITHUB_REPOSITORY/environments/admin-auth-product" > "$environment_file" || {
-            echo "::error::Falta el entorno protegido admin-auth-product"; exit 1;
-          }
-          node trusted/scripts/ci/preflight-supabase-dev.mjs --environment-protection "$environment_file"
+          # El entorno sólo puede liberar secretos a `main`, con aprobación humana y sin bypass de admins;
+          # si no, fallar antes de que exista ningún secreto en el run. Código de main (consulta la API
+          # con el token de sólo lectura), testeado en src/ci/preflight-supabase-dev.test.ts.
+          node trusted/scripts/ci/preflight-supabase-dev.mjs --environment-protection
           echo "sha=$REVIEWED_SHA" >> "$GITHUB_OUTPUT"
           echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 

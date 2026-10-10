@@ -12,13 +12,15 @@
  *   - the admin test credentials are present.
  * Dependency-free, no network. Prints no URL, key, e-mail or password; only the (public) ref.
  *
- * `--environment-protection <file>` mode (job `authorize`, before any secret exists in the run):
- * checks the JSON of GET /repos/:repo/environments/admin-auth-product. Secrets are released only
- * if the environment requires at least one human reviewer, administrators cannot bypass that rule,
- * and deployments are restricted by a branch policy (a workflow added by a PR cannot claim it).
+ * `--environment-protection` mode (job `authorize`, before any secret exists in the run): reads
+ * GET /repos/:repo/environments/admin-auth-product and its deployment branch policies with the
+ * run's read-only token. Secrets are released only if the EFFECTIVE policy admits nothing but
+ * `main`: at least one required reviewer, no administrator bypass, and custom deployment branch
+ * policies consisting of exactly one branch pattern, `main`. "Protected branches only" is refused:
+ * it admits every protected branch, and with no protected branches GitHub admits all of them.
+ * Any API error, missing field, wildcard, tag or incomplete pagination fails closed.
  */
 
-import { readFileSync } from "node:fs";
 
 const PROJECT_REF = /^[a-z0-9]{20}$/;
 
@@ -81,37 +83,98 @@ export function preflight(env = process.env) {
   }
 }
 
-/** Returns { ok, message } for the environment JSON returned by the GitHub API (or null). */
-export function checkEnvironmentProtection(environment) {
-  const fail = (reason) => ({ ok: false, message: `::error::Entorno admin-auth-product: ${reason}` });
-  if (!environment || typeof environment !== "object") return fail("no existe o no se pudo leer");
-  if (environment.name !== "admin-auth-product") return fail("no es el entorno esperado");
-  const rules = Array.isArray(environment.protection_rules) ? environment.protection_rules : [];
-  const reviewers = rules
-    .filter((rule) => rule?.type === "required_reviewers")
-    .reduce((total, rule) => total + (Array.isArray(rule.reviewers) ? rule.reviewers.length : 0), 0);
-  if (reviewers < 1) return fail("debe exigir required reviewers");
-  if (environment.can_admins_bypass !== false) return fail("los administradores no deben poder saltear la aprobación");
-  const policy = environment.deployment_branch_policy;
-  if (!policy || (policy.protected_branches !== true && policy.custom_branch_policies !== true)) {
-    return fail("debe restringir despliegues con una política de ramas");
-  }
-  return { ok: true, message: `Entorno admin-auth-product protegido: ${reviewers} reviewer(s), sin bypass de admins, con política de ramas.` };
+const ENVIRONMENT = "admin-auth-product";
+
+class ProtectionError extends Error {}
+
+function githubApi(env, fetchImpl) {
+  const repository = env.GITHUB_REPOSITORY ?? "";
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) throw new ProtectionError("GITHUB_REPOSITORY inválido");
+  const apiUrl = (env.GITHUB_API_URL ?? "https://api.github.com").replace(/\/+$/, "");
+  const token = env.GH_TOKEN ?? env.GITHUB_TOKEN ?? "";
+  return async (path) => {
+    let response;
+    try {
+      response = await fetchImpl(`${apiUrl}/repos/${repository}${path}`, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        redirect: "error"
+      });
+    } catch {
+      throw new ProtectionError(`no se pudo consultar ${path}`);
+    }
+    if (!response.ok) throw new ProtectionError(`GitHub API ${path} respondió HTTP ${response.status}`);
+    try {
+      return await response.json();
+    } catch {
+      throw new ProtectionError(`respuesta inválida de ${path}`);
+    }
+  };
 }
 
-function readEnvironmentFile(file) {
+/** Every deployment branch policy of the environment; fails unless the pages add up to total_count. */
+async function deploymentBranchPolicies(api) {
+  const policies = [];
+  let total = null;
+  for (let page = 1; page <= 10; page++) {
+    const body = await api(`/environments/${ENVIRONMENT}/deployment-branch-policies?per_page=100&page=${page}`);
+    if (!Number.isInteger(body?.total_count) || !Array.isArray(body?.branch_policies)) {
+      throw new ProtectionError("respuesta de deployment-branch-policies inválida");
+    }
+    total = body.total_count;
+    policies.push(...body.branch_policies);
+    if (policies.length >= total || body.branch_policies.length === 0) break;
+  }
+  if (policies.length !== total) throw new ProtectionError("paginación de políticas de ramas incompleta");
+  return policies;
+}
+
+/**
+ * Returns { ok, message }: whether `admin-auth-product` releases its secrets only to `main`, with a
+ * required human reviewer and no administrator bypass.
+ */
+export async function checkEnvironmentProtection(env = process.env, fetchImpl = globalThis.fetch) {
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
-  } catch {
-    return null;
+    const api = githubApi(env, fetchImpl);
+    const environment = await api(`/environments/${ENVIRONMENT}`);
+    if (environment?.name !== ENVIRONMENT) throw new ProtectionError("no es el entorno esperado");
+
+    const rules = Array.isArray(environment.protection_rules) ? environment.protection_rules : [];
+    const reviewers = rules
+      .filter((rule) => rule?.type === "required_reviewers")
+      .reduce((total, rule) => total + (Array.isArray(rule.reviewers) ? rule.reviewers.length : 0), 0);
+    if (reviewers < 1) throw new ProtectionError("debe exigir required reviewers");
+    if (environment.can_admins_bypass !== false) throw new ProtectionError("los administradores no deben poder saltear la aprobación");
+
+    const policy = environment.deployment_branch_policy;
+    if (!policy) throw new ProtectionError("sin política de ramas: cualquier rama, incluida la de una PR, podría desplegar");
+    if (policy.protected_branches === true) {
+      throw new ProtectionError(
+        "\"Protected branches only\" admite cualquier rama protegida (y todas si no hay ninguna); usar ramas seleccionadas con sólo main"
+      );
+    }
+    if (policy.custom_branch_policies !== true) throw new ProtectionError("debe usar ramas seleccionadas con sólo main");
+
+    const policies = await deploymentBranchPolicies(api);
+    if (policies.length !== 1) {
+      throw new ProtectionError(`debe tener exactamente una política de ramas (main); tiene ${policies.length}`);
+    }
+    const [only] = policies;
+    if (only?.name !== "main" || (only.type ?? "branch") !== "branch") {
+      throw new ProtectionError("la única política de ramas debe ser la rama main exacta, sin comodines ni tags");
+    }
+    return { ok: true, message: `Entorno ${ENVIRONMENT} protegido: ${reviewers} reviewer(s), sin bypass de admins, despliegue sólo desde main.` };
+  } catch (error) {
+    const reason = error instanceof ProtectionError ? error.message : "error inesperado";
+    return { ok: false, message: `::error::Entorno ${ENVIRONMENT}: ${reason}` };
   }
 }
 
 if (process.argv[1]?.replaceAll("\\", "/").endsWith("/scripts/ci/preflight-supabase-dev.mjs")) {
-  const result =
-    process.argv[2] === "--environment-protection"
-      ? checkEnvironmentProtection(process.argv[3] ? readEnvironmentFile(process.argv[3]) : null)
-      : preflight();
+  const result = process.argv[2] === "--environment-protection" ? await checkEnvironmentProtection() : preflight();
   console.log(result.message);
   process.exit(result.ok ? 0 : 1);
 }
