@@ -1,0 +1,168 @@
+name: Admin Auth producto — ejecución revisada (main)
+# Vincula el run con la PR y el SHA que acredita: el gate de CI (scripts/ci/verify-cloud-statuses.mjs)
+# exige este título exacto, porque el head_sha del run es el de main por diseño.
+run-name: "Admin Auth producto | PR #${{ inputs.pr_number }} | ${{ inputs.reviewed_sha }}"
+
+# Suite Auth del PRODUCTO (integración cloud 2/2 + E2E Auth 3/3) sobre el código exacto del SHA
+# revisado de la PR. Ese código recibe las credenciales del owner de development, por eso:
+#   - el workflow vive en main y sólo se dispara a mano, con PR y SHA completos;
+#   - `authorize` (sin secretos) verifica PR abierta hacia main desde este repo con ese HEAD, y que
+#     el entorno `admin-auth-product` exija aprobación humana; si no, falla y no se expone nada;
+#   - `product` espera esa aprobación (inspección explícita del SHA) y corre en un runner efímero
+#     de GitHub, sin caché, sin artifacts, sin reportes subidos y con token `contents: read`;
+#   - `publish` es el único job con `statuses: write` y nunca ejecuta código de la PR.
+# Un skip, un fallo o una aprobación denegada publican `failure`.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR abierta hacia main"
+        required: true
+        type: number
+      reviewed_sha:
+        description: "SHA completo de 40 caracteres revisado"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: supabase-admin-auth-product-reviewed
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Autorizar SHA y entorno protegido desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      sha: ${{ steps.verify.outputs.sha }}
+      pr: ${{ steps.verify.outputs.pr }}
+    steps:
+      - name: Verificar PR abierta, SHA exacto y aprobación humana obligatoria
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::PR inválida"; exit 1; }
+          [[ "$REVIEWED_SHA" =~ ^[a-fA-F0-9]{40}$ ]] || { echo "::error::Se exige SHA completo"; exit 1; }
+          REVIEWED_SHA="${REVIEWED_SHA,,}"
+          pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [[ "$(jq -r '.state' <<< "$pr_json")" == "open" ]] || { echo "::error::PR cerrada"; exit 1; }
+          [[ "$(jq -r '.base.ref' <<< "$pr_json")" == "main" ]] || { echo "::error::Base no autorizada"; exit 1; }
+          [[ "$(jq -r '.head.repo.full_name' <<< "$pr_json")" == "$GITHUB_REPOSITORY" ]] || { echo "::error::Repositorio de origen no autorizado"; exit 1; }
+          [[ "$(jq -r '.head.sha' <<< "$pr_json")" == "$REVIEWED_SHA" ]] || { echo "::error::La PR cambió de SHA"; exit 1; }
+          # Sin aprobación humana obligatoria el código de la PR recibiría secretos sin revisión: fallar.
+          environment="$(gh api "repos/$GITHUB_REPOSITORY/environments/admin-auth-product")" || {
+            echo "::error::Falta el entorno protegido admin-auth-product"; exit 1;
+          }
+          reviewers="$(jq '[.protection_rules[]? | select(.type == "required_reviewers") | (.reviewers | length)] | add // 0' <<< "$environment")"
+          [[ "$reviewers" -ge 1 ]] || { echo "::error::admin-auth-product debe exigir required reviewers"; exit 1; }
+          echo "sha=$REVIEWED_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+  product:
+    name: Suite Auth del producto sobre el SHA exacto
+    needs: authorize
+    runs-on: ubuntu-latest
+    # Required reviewers: la persona que aprueba inspeccionó este SHA antes de liberar los secretos.
+    environment: admin-auth-product
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - name: Checkout del SHA revisado (no una rama móvil ni pull/*/merge)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
+      - name: Confirmar SHA exacto
+        env:
+          REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$REVIEWED_SHA"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Instalar dependencias (sin secretos)
+        run: pnpm install --frozen-lockfile
+      - name: Instalar Chromium (sin secretos)
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build de producción (sólo configuración pública)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ENV: development
+        run: pnpm run build
+      - name: Integración Auth cloud (exactamente 2/2, sin skips)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ENV: development
+          SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
+          SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
+          SUPABASE_TEST_REQUIRE_CLOUD: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/auth-integration.json"
+          pnpm run test:integration:auth --reporter=json --outputFile="$report"
+          # Verificado con código de este workflow (main), no de la PR.
+          node -e '
+            const report = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+            const file = report.testResults.find((r) => r.name.replaceAll("\\", "/").endsWith("src/server/auth/admin-session.integration.test.ts"));
+            const statuses = file ? file.assertionResults.map((a) => a.status) : [];
+            const ok = report.numFailedTests === 0 && report.numPendingTests === 0 && report.numTodoTests === 0 &&
+              statuses.length === 2 && statuses.every((s) => s === "passed");
+            console.log(`Integración Auth cloud: ${statuses.filter((s) => s === "passed").length}/${statuses.length}; fallidos ${report.numFailedTests}, pendientes ${report.numPendingTests}`);
+            process.exit(ok ? 0 : 1);
+          ' "$report"
+      - name: E2E Auth del producto (exactamente 3/3, sin skips)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_ENV: development
+          SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
+          SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
+          SUPABASE_TEST_REQUIRE_CLOUD: "1"
+          CI: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/auth-e2e.json"
+          pnpm run test:e2e:admin-auth --reporter=json > /dev/null
+          node -e '
+            const { stats } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+            const ok = stats.expected === 3 && stats.unexpected === 0 && stats.skipped === 0 && stats.flaky === 0;
+            console.log(`E2E Auth: esperados ${stats.expected}, inesperados ${stats.unexpected}, saltados ${stats.skipped}, flaky ${stats.flaky}`);
+            process.exit(ok ? 0 : 1);
+          ' "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+      # Sin upload-artifact: ni reportes, ni trazas, ni capturas salen del runner efímero.
+
+  publish:
+    name: Registrar resultado para el SHA exacto
+    needs: [authorize, product]
+    if: always() && needs.authorize.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - name: Publicar cloud/admin-auth-product-reviewed (sin checkout ni código de la PR)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
+          STATE: ${{ needs.product.result == 'success' && 'success' || 'failure' }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$REVIEWED_SHA" \
+            -f state="$STATE" \
+            -f context=cloud/admin-auth-product-reviewed \
+            -f description="Auth product integration 2/2 + E2E 3/3 on exact reviewed SHA" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null

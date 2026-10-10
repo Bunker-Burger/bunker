@@ -1,4 +1,7 @@
 name: Admin Auth — ejecución revisada (main)
+# Vincula el run con la PR y el SHA que autoriza: el gate de CI (scripts/ci/verify-cloud-statuses.mjs)
+# exige este título exacto, porque el head_sha del run es el de main por diseño.
+run-name: "Admin Auth config | PR #${{ inputs.pr_number }} | ${{ inputs.reviewed_sha }}"
 
 # Ejecuta un harness Auth autocontenido y revisado desde main. Nunca checkout ni ejecuta
 # JavaScript del SHA de la PR con secretos; el SHA sólo identifica el commit auditado.
