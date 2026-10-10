@@ -6,7 +6,7 @@ import { catalogError, fromSupabaseError } from "@/server/catalog/errors";
 import { CATEGORY_SELECT, categoryRowSchema, optionGroupRowSchema } from "@/server/catalog/rows";
 import type { QueryResponse } from "@/server/catalog/supabase-catalog-repository";
 import type { Database } from "@/server/supabase/database.types";
-import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository, StoredImage, StoredProduct } from "./ports";
+import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository, OptionGroupLink, StoredImage, StoredProduct } from "./ports";
 
 /*
  * Catalog writes through the signed-in admin's session client: no service role. RLS decides on
@@ -91,6 +91,23 @@ function toStoredProduct(row: z.output<typeof storedProductRowSchema>): StoredPr
 export const OPTION_GROUP_SELECT =
   "id, name, selection_mode, minimum_selections, maximum_selections, is_required, sort_order, applicable_category_kinds, " +
   "options(id, name, price_delta_cents:price_delta_cents::text, is_available, sort_order)";
+
+const LINK_SELECT = "option_group_id, default_option_ids";
+
+const linkRowSchema = z.object({ option_group_id: z.string(), default_option_ids: z.array(z.string()) });
+
+async function readLinks(operation: string, query: PromiseLike<QueryResponse>): Promise<AdminResult<OptionGroupLink[]>> {
+  const response = await write(operation, query);
+  if (!response.ok) return response;
+  const rows = parseRows("product_option_groups", linkRowSchema, response.value ?? []);
+  return rows.ok ? ok(rows.value.map((row) => ({ groupId: row.option_group_id, defaultOptionIds: row.default_option_ids }))) : rows;
+}
+
+/** Same groups with the same defaults; order is irrelevant. */
+function sameLinks(a: OptionGroupLink[], b: OptionGroupLink[]) {
+  const key = (links: OptionGroupLink[]) => JSON.stringify(links.map((link) => [link.groupId, [...link.defaultOptionIds].sort()]).sort());
+  return key(a) === key(b);
+}
 
 const imageRowSchema = z.object({
   id: z.string(),
@@ -272,26 +289,58 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
       );
     },
 
+    /*
+     * Not atomic (PostgREST runs one statement per request), so each step is checked instead of
+     * trusted: the delete must remove every link that was there, the insert must store every new
+     * one, and reading back must give exactly the requested links. A step that RLS filters out
+     * (zero rows, no error) or a concurrent change fails the whole replacement.
+     */
     async replaceOptionGroups(storeId, productId, links) {
-      const removed = await write(
+      const read = () =>
+        readLinks(
+          "product_option_groups.select",
+          client.from("product_option_groups").select(LINK_SELECT).eq("store_id", storeId).eq("product_id", productId) as PromiseLike<QueryResponse>
+        );
+
+      const before = await read();
+      if (!before.ok) return before;
+      const removed = await readLinks(
         "product_option_groups.delete",
-        client.from("product_option_groups").delete().eq("store_id", storeId).eq("product_id", productId) as PromiseLike<QueryResponse>
+        client.from("product_option_groups").delete().eq("store_id", storeId).eq("product_id", productId).select(LINK_SELECT) as PromiseLike<QueryResponse>
       );
       if (!removed.ok) return removed;
-      if (links.length === 0) return ok(undefined);
-      const inserted = await write(
-        "product_option_groups.insert",
-        client.from("product_option_groups").insert(
-          links.map((link, index) => ({
-            store_id: storeId,
-            product_id: productId,
-            option_group_id: link.groupId,
-            default_option_ids: link.defaultOptionIds,
-            sort_order: (index + 1) * 10
-          }))
-        ) as PromiseLike<QueryResponse>
-      );
-      return inserted.ok ? ok(undefined) : inserted;
+      const removedIds = new Set(removed.value.map((link) => link.groupId));
+      if (before.value.some((link) => !removedIds.has(link.groupId))) {
+        return catalogError("unauthorized", "product_option_groups.delete: existing links were not removed (RLS or concurrent change)");
+      }
+
+      if (links.length > 0) {
+        const inserted = await readLinks(
+          "product_option_groups.insert",
+          client
+            .from("product_option_groups")
+            .insert(
+              links.map((link, index) => ({
+                store_id: storeId,
+                product_id: productId,
+                option_group_id: link.groupId,
+                default_option_ids: link.defaultOptionIds,
+                sort_order: (index + 1) * 10
+              }))
+            )
+            .select(LINK_SELECT) as PromiseLike<QueryResponse>
+        );
+        if (!inserted.ok) return inserted;
+        if (inserted.value.length !== links.length) {
+          return catalogError("unauthorized", `product_option_groups.insert: stored ${inserted.value.length} of ${links.length} links`);
+        }
+      }
+
+      const after = await read();
+      if (!after.ok) return after;
+      return sameLinks(after.value, links)
+        ? ok(undefined)
+        : catalogError("unavailable", "product_option_groups: links read back differ from the requested ones");
     },
 
     async setProductOrder(storeId, rows) {

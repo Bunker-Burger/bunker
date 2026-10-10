@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryAdminAccess, type InMemorySession } from "@/server/catalog/in-memory-admin-access";
 import {
   createCategory,
@@ -14,6 +14,7 @@ import {
   type CatalogAdminDependencies
 } from "./catalog-admin-service";
 import { InMemoryCatalogAdminRepository } from "./in-memory-catalog-admin-repository";
+import { corruptMiddle, realImage, truncate } from "./test-images";
 
 const STORE = "0199b2c8-40b0-7000-8000-000000000001";
 const OTHER_STORE = "0199b2c8-40b0-7000-8000-000000000999";
@@ -70,11 +71,17 @@ const smashForm = (overrides: Record<string, string | string[]> = {}) =>
     ...overrides
   });
 
-function png(width = 1200, height = 900) {
+/** Signature + IHDR 800×600 and padding: looks like a PNG, has no pixel data (no IDAT/IEND). */
+function headerOnlyPng() {
   const header = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52];
-  const size = [width >>> 24, (width >>> 16) & 255, (width >>> 8) & 255, width & 255, height >>> 24, (height >>> 16) & 255, (height >>> 8) & 255, height & 255];
-  return new Uint8Array([...header, ...size, 8, 6, 0, 0, 0, ...new Array(64).fill(0)]);
+  return new Uint8Array([...header, 0, 0, 3, 32, 0, 0, 2, 88, 8, 6, 0, 0, 0, ...new Array(64).fill(0)]);
 }
+
+const real = {} as Record<"png" | "jpeg" | "webp" | "avif" | "tiny", Uint8Array<ArrayBuffer>>;
+beforeAll(async () => {
+  for (const format of ["png", "jpeg", "webp", "avif"] as const) real[format] = await realImage(format);
+  real.tiny = await realImage("png", 100, 100);
+}, 60_000);
 
 beforeEach(() => {
   log = { error: vi.fn<(message: string) => void>() };
@@ -147,7 +154,7 @@ describe("authorization", () => {
       saveProduct(d, smashForm({ price: "1" })),
       moveProduct(d, form({ productId: SMASH, direction: "down" })),
       deleteProduct(d, form({ productId: OKLAHOMA })),
-      saveProductImage(d, form({ productId: SMASH, image: new File([png()], "a.png", { type: "image/png" }) })),
+      saveProductImage(d, form({ productId: SMASH, image: new File([real.png], "a.png", { type: "image/png" }) })),
       deleteProductImage(d, form({ productId: SMASH }))
     ]);
     for (const outcome of outcomes) {
@@ -346,7 +353,7 @@ describe("ordering and deleting products", () => {
 
   it("deletes the product row first, then its stored photo", async () => {
     repository.images.push({ id: "img-1", productId: SMASH, storagePath: `${STORE}/smash.webp`, altText: "Smash", focalX: 50, focalY: 50 });
-    repository.objects.set(`${STORE}/smash.webp`, { bytes: png(), contentType: "image/webp" });
+    repository.objects.set(`${STORE}/smash.webp`, { bytes: real.webp, contentType: "image/webp" });
     expect(await deleteProduct(deps(), form({ productId: SMASH }))).toMatchObject({ ok: true });
     expect(repository.writes).toEqual([`deleteProduct:${SMASH}`, `removeObjects:${STORE}/smash.webp`]);
   });
@@ -363,7 +370,7 @@ describe("product photos", () => {
   const upload = (file: File, extra: Record<string, string> = {}) => form({ productId: SMASH, image: file, altText: "Smash doble", focalX: "30", focalY: "70", ...extra });
 
   it("uploads a new photo under the store folder with a name derived from the bytes", async () => {
-    const outcome = await saveProductImage(deps(), upload(new File([png()], "foto.svg", { type: "" })));
+    const outcome = await saveProductImage(deps(), upload(new File([real.png], "foto.svg", { type: "" })));
     expect(outcome).toMatchObject({ ok: true, message: "Foto agregada." });
     const path = `${STORE}/${SMASH}-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`;
     expect(path).toMatch(/^[0-9a-f-]{36}\/[A-Za-z0-9_-]+\.(avif|jpe?g|png|webp)$/);
@@ -371,14 +378,29 @@ describe("product photos", () => {
     expect(repository.images).toEqual([expect.objectContaining({ storagePath: path, altText: "Smash doble", focalX: 30, focalY: 70 })]);
   });
 
+  const DAMAGED = "dañado o incompleto";
   it.each([
-    ["an SVG", new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], "a.svg", { type: "image/svg+xml" }), "Formato no permitido"],
-    ["a text file renamed to .png", new File(["hola"], "a.png", { type: "image/png" }), "Formato no permitido"],
-    ["a PNG declared as JPEG", new File([png()], "a.jpg", { type: "image/jpeg" }), "no coincide"],
-    ["a tiny image", new File([png(100, 100)], "a.png", { type: "image/png" }), "el mínimo es 320 px"],
-    ["a file over 5 MB", new File([new Uint8Array(5 * 1024 * 1024 + 1)], "a.png", { type: "image/png" }), "supera los 5 MB"]
-  ])("rejects %s on the server without uploading", async (_case, file, message) => {
-    const outcome = await saveProductImage(deps(), upload(file));
+    ["jpeg", "image/jpeg", "jpg"],
+    ["webp", "image/webp", "webp"],
+    ["avif", "image/avif", "avif"]
+  ] as const)("uploads a real %s with the type and extension found in its bytes", async (format, mime, extension) => {
+    expect(await saveProductImage(deps(), upload(new File([real[format]], "foto", { type: mime })))).toMatchObject({ ok: true });
+    expect(repository.objects.get(`${STORE}/${SMASH}-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.${extension}`)?.contentType).toBe(mime);
+  });
+
+  it.each([
+    ["an SVG", () => new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], "a.svg", { type: "image/svg+xml" }), "Formato no permitido"],
+    ["a text file renamed to .png", () => new File(["hola"], "a.png", { type: "image/png" }), "Formato no permitido"],
+    ["a PNG declared as JPEG", () => new File([real.png], "a.jpg", { type: "image/jpeg" }), "no coincide"],
+    ["a tiny image", () => new File([real.tiny], "a.png", { type: "image/png" }), "el mínimo es 320 px"],
+    ["a file over 5 MB", () => new File([new Uint8Array(5 * 1024 * 1024 + 1)], "a.png", { type: "image/png" }), "supera los 5 MB"],
+    ["a PNG with signature + IHDR 800×600 but no IDAT/IEND", () => new File([headerOnlyPng()], "a.png", { type: "image/png" }), DAMAGED],
+    ["a truncated JPEG", () => new File([truncate(real.jpeg, 0.6)], "a.jpg", { type: "image/jpeg" }), DAMAGED],
+    ["a truncated WebP", () => new File([truncate(real.webp, 0.6)], "a.webp", { type: "image/webp" }), DAMAGED],
+    ["a truncated AVIF", () => new File([truncate(real.avif, 0.6)], "a.avif", { type: "image/avif" }), DAMAGED],
+    ["a PNG with corrupted pixel data", () => new File([corruptMiddle(real.png)], "a.png", { type: "image/png" }), DAMAGED]
+  ])("rejects %s on the server without uploading", async (_case, makeFile, message) => {
+    const outcome = await saveProductImage(deps(), upload(makeFile()));
     expect(outcome).toMatchObject({ ok: false, fieldErrors: { image: expect.stringContaining(message) } });
     expect(repository.objects.size).toBe(0);
     expect(repository.writes).toEqual([]);
@@ -386,8 +408,8 @@ describe("product photos", () => {
 
   it("replaces a photo: new object, then the row, then the old object", async () => {
     repository.images.push({ id: "img-1", productId: SMASH, storagePath: `${STORE}/old.webp`, altText: "Vieja", focalX: 50, focalY: 50 });
-    repository.objects.set(`${STORE}/old.webp`, { bytes: png(), contentType: "image/webp" });
-    expect(await saveProductImage(deps(), upload(new File([png()], "nueva.png", { type: "image/png" })))).toMatchObject({ ok: true, message: "Foto reemplazada." });
+    repository.objects.set(`${STORE}/old.webp`, { bytes: real.webp, contentType: "image/webp" });
+    expect(await saveProductImage(deps(), upload(new File([real.png], "nueva.png", { type: "image/png" })))).toMatchObject({ ok: true, message: "Foto reemplazada." });
     const path = `${STORE}/${SMASH}-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`;
     expect(repository.writes).toEqual([`putObject:${path}`, `savePrimaryImage:${path}`, `removeObjects:${STORE}/old.webp`]);
     expect([...repository.objects.keys()]).toEqual([path]);
@@ -395,9 +417,9 @@ describe("product photos", () => {
 
   it("removes the uploaded object when the row cannot be saved, keeping the old photo", async () => {
     repository.images.push({ id: "img-1", productId: SMASH, storagePath: `${STORE}/old.webp`, altText: "Vieja", focalX: 50, focalY: 50 });
-    repository.objects.set(`${STORE}/old.webp`, { bytes: png(), contentType: "image/webp" });
+    repository.objects.set(`${STORE}/old.webp`, { bytes: real.webp, contentType: "image/webp" });
     repository.failing.set("savePrimaryImage", { code: "unavailable", message: "timeout" });
-    expect(await saveProductImage(deps(), upload(new File([png()], "nueva.png", { type: "image/png" })))).toMatchObject({ ok: false });
+    expect(await saveProductImage(deps(), upload(new File([real.png], "nueva.png", { type: "image/png" })))).toMatchObject({ ok: false });
     expect([...repository.objects.keys()]).toEqual([`${STORE}/old.webp`]);
     expect(repository.images[0]?.storagePath).toBe(`${STORE}/old.webp`);
   });
@@ -413,7 +435,7 @@ describe("product photos", () => {
   });
 
   it.each([["-1"], ["101"], ["12.5"], ["abc"]])("rejects a focal point of %s", async (value) => {
-    expect(await saveProductImage(deps(), upload(new File([png()], "a.png", { type: "image/png" }), { focalX: value }))).toMatchObject({ ok: false, fieldErrors: { focalX: expect.any(String) } });
+    expect(await saveProductImage(deps(), upload(new File([real.png], "a.png", { type: "image/png" }), { focalX: value }))).toMatchObject({ ok: false, fieldErrors: { focalX: expect.any(String) } });
     expect(repository.objects.size).toBe(0);
   });
 

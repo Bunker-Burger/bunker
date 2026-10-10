@@ -360,7 +360,7 @@ export function saveProductImage(deps: CatalogAdminDependencies, form: FormData)
 
     if (file.size > MAX_IMAGE_BYTES) return invalid({ image: "La imagen supera los 5 MB." });
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const image = inspectImage(bytes, file.type);
+    const image = await inspectImage(bytes, file.type);
     if (!image.ok) return invalid({ image: image.error.message });
 
     const random = (deps.newId ?? (() => crypto.randomUUID()))();

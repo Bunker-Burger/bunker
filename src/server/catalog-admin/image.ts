@@ -1,10 +1,23 @@
+import "server-only";
+
+import sharp from "sharp";
 import { err, ok, type Result } from "@/lib/result";
 
 /*
- * Server-side inspection of an uploaded product photo. The browser's declared type and the file
- * name are never trusted: the format comes from the file's own bytes (magic numbers) and the
- * dimensions from its header. Anything that is not a well-formed JPEG, PNG, WebP or AVIF
- * (SVG, GIF, HTML, a renamed text file, a truncated header) is rejected.
+ * Server-side inspection of an uploaded product photo, in two stages:
+ *
+ * 1. Header (cheap, before any decoding): the format comes from the file's own bytes (magic
+ *    numbers), never from its name or the browser's declared type, and the dimensions from its
+ *    header, so oversized or hostile files are refused before a decoder sees them.
+ * 2. Integrity: the whole image is decoded with libvips (sharp) with warnings treated as errors.
+ *    A file whose header looks right but whose pixel data is missing, truncated or corrupted
+ *    (no IDAT/IEND, a JPEG without scan/EOI, a cut WebP/AVIF, a bad PNG CRC) is rejected, and the
+ *    decoded format and size must match what the header said.
+ *
+ * Known limit: JPEG and lossy WebP (VP8) carry no checksum over their compressed data, so a few
+ * flipped bytes that still decode cannot be told from a real picture. Truncation, missing scans,
+ * stray markers, broken RIFF/chunk sizes and badly damaged data are rejected; PNG (CRC) and AVIF
+ * corruption is rejected.
  */
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "avif";
@@ -31,7 +44,15 @@ export interface InspectedImage {
   height: number;
 }
 
-export type ImageRejectionCode = "empty" | "too_large" | "unsupported_type" | "type_mismatch" | "corrupt" | "too_small" | "too_big";
+export type ImageRejectionCode =
+  | "empty"
+  | "too_large"
+  | "unsupported_type"
+  | "type_mismatch"
+  | "corrupt"
+  | "animated"
+  | "too_small"
+  | "too_big";
 
 export interface ImageRejection {
   code: ImageRejectionCode;
@@ -180,11 +201,13 @@ const DECLARED_ALIASES: Record<string, ImageFormat> = {
   "image/avif": "avif"
 };
 
+const CORRUPT = "No pudimos leer la imagen: el archivo está dañado o incompleto.";
+
 /**
- * Accepts a JPEG/PNG/WebP/AVIF of at most 5 MiB whose sides are between 320 and 4096 px.
- * `declaredType` (the browser's File.type) only matters when it contradicts the bytes.
+ * Stage 1 only: format, declared type and header dimensions, without decoding. Never enough on
+ * its own to accept a file; `inspectImage` adds the integrity check.
  */
-export function inspectImage(bytes: Uint8Array, declaredType = ""): Result<InspectedImage, ImageRejection> {
+export function inspectImageHeader(bytes: Uint8Array, declaredType = ""): Result<InspectedImage, ImageRejection> {
   if (bytes.length === 0) return reject("empty", "Elegí una imagen.");
   if (bytes.length > MAX_IMAGE_BYTES) return reject("too_large", "La imagen supera los 5 MB.");
 
@@ -198,7 +221,7 @@ export function inspectImage(bytes: Uint8Array, declaredType = ""): Result<Inspe
 
   const dimensions = DIMENSIONS[format](bytes);
   if (!dimensions || dimensions.width === 0 || dimensions.height === 0) {
-    return reject("corrupt", "No pudimos leer la imagen: el archivo está dañado o incompleto.");
+    return reject("corrupt", CORRUPT);
   }
   const { width, height } = dimensions;
   if (width < MIN_IMAGE_SIDE || height < MIN_IMAGE_SIDE) {
@@ -208,4 +231,50 @@ export function inspectImage(bytes: Uint8Array, declaredType = ""): Result<Inspe
     return reject("too_big", `La imagen mide ${width}×${height} px; el máximo es ${MAX_IMAGE_SIDE} px por lado.`);
   }
   return ok({ format, mime: IMAGE_MIME[format], extension: EXTENSION[format], width, height });
+}
+
+/** The RIFF size field must cover the file exactly: a cut or padded WebP fails here. */
+function riffSizeMatches(b: Uint8Array) {
+  const declared = (b[4]! | (b[5]! << 8) | (b[6]! << 16) | (b[7]! << 24)) >>> 0;
+  return declared + 8 === b.length;
+}
+
+/** libvips names AVIF "heif" and tells it apart by the AV1 compression. */
+const DECODED: Record<ImageFormat, { format: string; compression?: string }> = {
+  jpeg: { format: "jpeg" },
+  png: { format: "png" },
+  webp: { format: "webp" },
+  avif: { format: "heif", compression: "av1" }
+};
+
+/**
+ * Accepts a complete, decodable JPEG/PNG/WebP/AVIF of at most 5 MiB whose sides are between
+ * 320 and 4096 px. `declaredType` (the browser's File.type) only matters when it contradicts the
+ * bytes.
+ */
+export async function inspectImage(bytes: Uint8Array, declaredType = ""): Promise<Result<InspectedImage, ImageRejection>> {
+  const header = inspectImageHeader(bytes, declaredType);
+  if (!header.ok) return header;
+  const { format, width, height } = header.value;
+  if (format === "webp" && !riffSizeMatches(bytes)) return reject("corrupt", CORRUPT);
+
+  try {
+    const image = sharp(bytes, {
+      failOn: "warning",
+      limitInputPixels: MAX_IMAGE_SIDE * MAX_IMAGE_SIDE,
+      animated: false
+    });
+    const metadata = await image.metadata();
+    const expected = DECODED[format];
+    if (metadata.format !== expected.format || (expected.compression && metadata.compression !== expected.compression)) {
+      return reject("corrupt", CORRUPT);
+    }
+    if ((metadata.pages ?? 1) > 1) return reject("animated", "No se admiten imágenes animadas: subí una foto.");
+    // Decoding every pixel is what proves the data is complete; the pixels themselves are discarded.
+    const { info } = await image.raw().toBuffer({ resolveWithObject: true });
+    if (info.width !== width || info.height !== height) return reject("corrupt", CORRUPT);
+  } catch {
+    return reject("corrupt", CORRUPT);
+  }
+  return header;
 }

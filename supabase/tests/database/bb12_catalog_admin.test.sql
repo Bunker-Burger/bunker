@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(14);
+select plan(18);
 
 select has_column('public', 'products', 'sort_order', 'products carry a manual order');
 select col_default_is('public', 'products', 'sort_order', 0, 'existing products keep order 0');
@@ -97,23 +97,49 @@ select throws_ok(
   'the focal point stays inside the image'
 );
 
+-- An UPDATE that RLS filters out affects 0 rows without raising, so lives_ok would pass either
+-- way. Each write below records how many rows it really changed (a data-modifying CTE cannot run
+-- inside results_eq's cursor), and the persisted values are checked afterwards as the owner.
+create temp table bb12_affected (write text primary key, row_count bigint not null);
+grant insert, select on bb12_affected to authenticated;
+
 select set_config(
   'request.jwt.claims',
   '{"sub":"98120000-0000-0000-0000-000000000002","role":"authenticated"}',
   true
 );
 set local role authenticated;
-update public.products set sort_order = 99 where id = '99120000-0000-0000-0000-000000000201';
-update public.product_images set focal_x = 10 where id = '99120000-0000-0000-0000-000000000301';
+with changed as (
+  update public.products set sort_order = 99
+  where id = '99120000-0000-0000-0000-000000000201'
+  returning 1
+)
+insert into bb12_affected select 'outsider reorders', count(*) from changed;
+with changed as (
+  update public.product_images set focal_x = 10, focal_y = 10
+  where id = '99120000-0000-0000-0000-000000000301'
+  returning 1
+)
+insert into bb12_affected select 'outsider moves focal point', count(*) from changed;
 reset role;
+select results_eq(
+  $$select row_count from bb12_affected where write = 'outsider reorders'$$,
+  $$values (0::bigint)$$,
+  'RLS gives a non-admin no product row to reorder'
+);
+select results_eq(
+  $$select row_count from bb12_affected where write = 'outsider moves focal point'$$,
+  $$values (0::bigint)$$,
+  'RLS gives a non-admin no image row to change'
+);
 select results_eq(
   $$select sort_order from public.products where id = '99120000-0000-0000-0000-000000000201'$$,
   $$values (0)$$,
   'a non-admin cannot reorder products'
 );
 select results_eq(
-  $$select focal_x from public.product_images where id = '99120000-0000-0000-0000-000000000301'$$,
-  $$values (50::smallint)$$,
+  $$select focal_x, focal_y from public.product_images where id = '99120000-0000-0000-0000-000000000301'$$,
+  $$values (50::smallint, 50::smallint)$$,
   'a non-admin cannot move the focal point'
 );
 
@@ -123,16 +149,39 @@ select set_config(
   true
 );
 set local role authenticated;
-select lives_ok(
-  $$update public.products set sort_order = 20 where id = '99120000-0000-0000-0000-000000000201'$$,
-  'an active admin reorders products'
-);
-select lives_ok(
-  $$update public.product_images set focal_x = 30, focal_y = 70
-    where id = '99120000-0000-0000-0000-000000000301'$$,
-  'an active admin sets the focal point'
-);
+with changed as (
+  update public.products set sort_order = 20
+  where id = '99120000-0000-0000-0000-000000000201'
+  returning 1
+)
+insert into bb12_affected select 'admin reorders', count(*) from changed;
+with changed as (
+  update public.product_images set focal_x = 30, focal_y = 70
+  where id = '99120000-0000-0000-0000-000000000301'
+  returning 1
+)
+insert into bb12_affected select 'admin moves focal point', count(*) from changed;
 reset role;
+select results_eq(
+  $$select row_count from bb12_affected where write = 'admin reorders'$$,
+  $$values (1::bigint)$$,
+  'an active admin updates exactly the product row'
+);
+select results_eq(
+  $$select row_count from bb12_affected where write = 'admin moves focal point'$$,
+  $$values (1::bigint)$$,
+  'an active admin updates exactly the image row'
+);
+select results_eq(
+  $$select sort_order from public.products where id = '99120000-0000-0000-0000-000000000201'$$,
+  $$values (20)$$,
+  'the admin''s new product order is persisted'
+);
+select results_eq(
+  $$select focal_x, focal_y from public.product_images where id = '99120000-0000-0000-0000-000000000301'$$,
+  $$values (30::smallint, 70::smallint)$$,
+  'the admin''s focal point is persisted'
+);
 
 select * from finish();
 rollback;

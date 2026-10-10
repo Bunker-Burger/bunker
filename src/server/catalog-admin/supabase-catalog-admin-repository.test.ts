@@ -124,17 +124,88 @@ describe("product writes", () => {
     expect(result).toMatchObject({ ok: false, error: { code: "rejected" } });
     expect(calls).toEqual([]);
   });
+});
 
-  it("replaces option links inside the store: delete then insert in order", async () => {
-    const { client, calls } = fakeClient(() => ({ data: null }));
-    const links = [{ groupId: "g1", defaultOptionIds: ["o1"] }, { groupId: "g2", defaultOptionIds: [] }];
+describe("replacing option links", () => {
+  const OLD = [{ option_group_id: "g-old", default_option_ids: ["o-old"] }];
+  const links = [{ groupId: "g1", defaultOptionIds: ["o1"] }, { groupId: "g2", defaultOptionIds: [] }];
+  const stored = links.map((link) => ({ option_group_id: link.groupId, default_option_ids: link.defaultOptionIds }));
+
+  /** Answers like PostgREST: the first select is the "before" read, the second the read-back. */
+  function relinkClient(answers: { before?: unknown[]; deleted?: unknown[]; inserted?: Reply; after?: unknown[] }) {
+    let selects = 0;
+    return fakeClient((call) => {
+      const first = call.ops[0]?.[0];
+      if (first === "delete") return { data: answers.deleted ?? [] };
+      if (first === "insert") return answers.inserted ?? { data: stored };
+      selects += 1;
+      return { data: selects === 1 ? (answers.before ?? []) : (answers.after ?? stored) };
+    });
+  }
+
+  it("replaces the links inside the store: read, delete, insert in order, read back", async () => {
+    const { client, calls } = relinkClient({ before: OLD, deleted: OLD });
     expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links)).toEqual({ ok: true, value: undefined });
-    expect(calls.map((call) => call.ops[0]?.[0])).toEqual(["delete", "insert"]);
-    expect(op(calls[0], "eq")).toEqual([["eq", "store_id", STORE], ["eq", "product_id", ID]]);
-    expect(op(calls[1], "insert")[0]?.[1]).toEqual([
+    expect(calls.map((call) => call.ops[0]?.[0])).toEqual(["select", "delete", "insert", "select"]);
+    for (const call of calls) {
+      expect(call.table).toBe("product_option_groups");
+      expect(op(call, "eq")).toEqual(call.ops[0]?.[0] === "insert" ? [] : [["eq", "store_id", STORE], ["eq", "product_id", ID]]);
+    }
+    expect(op(calls[2], "insert")[0]?.[1]).toEqual([
       { store_id: STORE, product_id: ID, option_group_id: "g1", default_option_ids: ["o1"], sort_order: 10 },
       { store_id: STORE, product_id: ID, option_group_id: "g2", default_option_ids: [], sort_order: 20 }
     ]);
+    expect(op(calls[1], "select")).toEqual([["select", "option_group_id, default_option_ids"]]);
+    expect(op(calls[2], "select")).toEqual([["select", "option_group_id, default_option_ids"]]);
+  });
+
+  it("fails when the delete removes nothing although links existed (filtered by RLS)", async () => {
+    const { client, calls } = relinkClient({ before: OLD, deleted: [] });
+    const result = await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links);
+    expect(result).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+    expect(calls.map((call) => call.ops[0]?.[0])).toEqual(["select", "delete"]);
+  });
+
+  it("fails when only part of the existing links is deleted", async () => {
+    const before = [...OLD, { option_group_id: "g-other", default_option_ids: [] }];
+    const { client } = relinkClient({ before, deleted: OLD });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, [])).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+  });
+
+  it("accepts a product without previous links and without new ones", async () => {
+    const { client, calls } = relinkClient({ before: [], deleted: [], after: [] });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, [])).toEqual({ ok: true, value: undefined });
+    expect(calls.map((call) => call.ops[0]?.[0])).toEqual(["select", "delete", "select"]);
+  });
+
+  it("removes every link when the new set is empty, and checks nothing is left", async () => {
+    const { client } = relinkClient({ before: OLD, deleted: OLD, after: OLD });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, [])).toMatchObject({ ok: false, error: { code: "unavailable" } });
+    const clean = relinkClient({ before: OLD, deleted: OLD, after: [] });
+    expect(await createSupabaseCatalogAdminRepository(clean.client).replaceOptionGroups(STORE, ID, [])).toEqual({ ok: true, value: undefined });
+  });
+
+  it("fails when the insert fails", async () => {
+    const { client, calls } = relinkClient({ before: OLD, deleted: OLD, inserted: { error: { code: "23503", message: "fk" }, status: 409 } });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links)).toMatchObject({ ok: false, error: { code: "conflict" } });
+    expect(calls).toHaveLength(3);
+  });
+
+  it("fails when the insert stores fewer links than requested", async () => {
+    const { client } = relinkClient({ before: OLD, deleted: OLD, inserted: { data: stored.slice(0, 1) } });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links)).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+  });
+
+  it("fails when the links read back are not the requested ones", async () => {
+    const changedDefaults = [{ option_group_id: "g1", default_option_ids: ["o-other"] }, stored[1]];
+    const { client } = relinkClient({ before: OLD, deleted: OLD, after: changedDefaults });
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links)).toMatchObject({ ok: false, error: { code: "unavailable" } });
+  });
+
+  it("fails when reading the current links fails, before deleting anything", async () => {
+    const { client, calls } = fakeClient(() => ({ error: { code: "42501", message: "permission denied" }, status: 403 }));
+    expect(await createSupabaseCatalogAdminRepository(client).replaceOptionGroups(STORE, ID, links)).toMatchObject({ ok: false, error: { code: "unauthorized" } });
+    expect(calls.map((call) => call.ops[0]?.[0])).toEqual(["select"]);
   });
 });
 
