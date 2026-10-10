@@ -8,8 +8,11 @@ run-name: "Admin Auth producto | PR #${{ inputs.pr_number }} | ${{ inputs.review
 #   - el workflow vive en main y sólo se dispara a mano, con PR y SHA completos;
 #   - `authorize` (sin secretos) verifica PR abierta hacia main desde este repo con ese HEAD, y que
 #     el entorno `admin-auth-product` exija aprobación humana; si no, falla y no se expone nada;
-#   - `product` espera esa aprobación (inspección explícita del SHA) y corre en un runner efímero
-#     de GitHub, sin caché, sin artifacts, sin reportes subidos y con token `contents: read`;
+#   - `product` espera esa aprobación (inspección explícita del SHA); antes de traer código de la
+#     PR, un preflight de main (scripts/ci/preflight-supabase-dev.mjs) prueba que los secretos son
+#     del proyecto development exacto (URL canónica, clave publishable, credenciales presentes);
+#     luego corre en un runner efímero de GitHub, sin caché, sin artifacts, sin reportes subidos y
+#     con token `contents: read`;
 #   - `publish` es el único job con `statuses: write` y nunca ejecuta código de la PR.
 # Un skip, un fallo o una aprobación denegada publican `failure`.
 on:
@@ -78,20 +81,49 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 30
+    # Todo `run:` ocurre en el checkout de la PR (`pr/`) salvo el preflight, que corre código de main.
+    defaults:
+      run:
+        working-directory: pr
     steps:
+      - name: Código confiable de main para el preflight (sin código de la PR)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci/preflight-supabase-dev.mjs
+            .nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: trusted/.nvmrc
+      # SUPABASE_PROJECT_ENV=development es sólo una etiqueta: la identidad del proyecto se prueba acá,
+      # antes de traer o ejecutar código de la PR. Proyecto equivocado, producción, URL rara, clave
+      # secreta o configuración faltante => falla, `product` no pasa y `publish` publica failure.
+      - name: Preflight del proyecto development (URL canónica, clave publishable, credenciales)
+        working-directory: trusted
+        env:
+          EXPECTED_PROJECT_REF: zokkgocmcaqcujltfkjf
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_TEST_ADMIN_EMAIL: ${{ secrets.SUPABASE_TEST_ADMIN_EMAIL }}
+          SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
+        run: node scripts/ci/preflight-supabase-dev.mjs
       - name: Checkout del SHA revisado (no una rama móvil ni pull/*/merge)
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.authorize.outputs.sha }}
+          path: pr
           persist-credentials: false
       - name: Confirmar SHA exacto
         env:
           REVIEWED_SHA: ${{ needs.authorize.outputs.sha }}
         run: test "$(git rev-parse HEAD)" = "$REVIEWED_SHA"
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          package_json_file: pr/package.json
       - name: Instalar dependencias (sin secretos)
         run: pnpm install --frozen-lockfile
       - name: Instalar Chromium (sin secretos)

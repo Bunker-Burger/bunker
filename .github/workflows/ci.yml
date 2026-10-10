@@ -54,7 +54,7 @@ jobs:
               allowed=true
               for file in "${files[@]}"; do
                 case "$file" in
-                  .github/workflows/admin-auth-reviewed.yml|.github/workflows/admin-auth-product-reviewed.yml|.github/workflows/cloud-db-reviewed.yml|.github/workflows/ci.yml|scripts/check-admin-auth-cloud.mjs|scripts/ci/verify-cloud-statuses.mjs|src/ci/verify-cloud-statuses.test.ts) ;;
+                  .github/workflows/admin-auth-reviewed.yml|.github/workflows/admin-auth-product-reviewed.yml|.github/workflows/cloud-db-reviewed.yml|.github/workflows/ci.yml|scripts/check-admin-auth-cloud.mjs|scripts/ci/verify-cloud-statuses.mjs|src/ci/verify-cloud-statuses.test.ts|scripts/ci/preflight-supabase-dev.mjs|src/ci/preflight-supabase-dev.test.ts) ;;
                   *) allowed=false; echo "::error::Archivo fuera del bootstrap permitido: $file" ;;
                 esac
               done
