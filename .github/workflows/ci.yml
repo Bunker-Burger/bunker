@@ -67,92 +67,83 @@ jobs:
             echo "No se habilita ninguna excepción de gates para esta PR."
           fi
 
-  cloud-reviewed:
-    name: pgTAP cloud revisado (SHA exacto)
+  status-provenance:
+    name: Validar procedencia de statuses cloud
     needs: bootstrap-scope
     if: github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
       statuses: read
     steps:
-      - name: Exigir ejecución cloud autorizada desde el workflow confiable de main
+      - name: Validar HEAD, creator, run y conclusión de cada contexto
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/pgTAP-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
-          [[ -n "$status" ]] || { echo "::error::Falta pgTAP cloud del SHA exacto"; exit 1; }
-          state="$(jq -r '.state' <<< "$status")"
-          creator="$(jq -r '.creator.login // empty' <<< "$status")"
-          target="$(jq -r '.target_url // empty' <<< "$status")"
-          permission="none"
-          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
-          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
-            echo "::error::pgTAP status inválido: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
-            exit 1
-          fi
-          echo "pgTAP cloud del SHA exacto y procedencia autorizada verificados; este job no usa secretos."
+          api="repos/$GITHUB_REPOSITORY"
+          pr_sha="$(gh api "$api/pulls/$PR_NUMBER" --jq '.head.sha')"
+          [[ "$pr_sha" == "$REVIEWED_SHA" ]] || { echo "::error::La PR cambió de SHA durante la validación"; exit 1; }
+
+          validate_context() {
+            local context="$1" expected_workflow="$2"
+            export CONTEXT="$context"
+            status="$(gh api "$api/statuses/$REVIEWED_SHA" --jq '[.[] | select(.context == env.CONTEXT)][0] // empty')"
+            [[ -n "$status" ]] || { echo "::error::Falta status $context"; return 1; }
+            local state creator target permission run_id run_sha run_path run_status run_conclusion
+            state="$(jq -r '.state' <<< "$status")"
+            creator="$(jq -r '.creator.login // empty' <<< "$status")"
+            target="$(jq -r '.target_url // empty' <<< "$status")"
+            permission="none"
+            if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then
+              permission="$(gh api "$api/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"
+            fi
+            [[ "$state" == "success" && -n "$creator" ]] || { echo "::error::Status $context no está en success o no tiene creator"; return 1; }
+            [[ "$target" =~ ^https://github\.com/$GITHUB_REPOSITORY/actions/runs/([0-9]+)$ ]] || { echo "::error::target_url inválida para $context"; return 1; }
+            run_id="${BASH_REMATCH[1]}"
+            run_json="$(gh api "$api/actions/runs/$run_id")"
+            run_sha="$(jq -r '.head_sha // empty' <<< "$run_json")"
+            run_path="$(jq -r '.path // empty' <<< "$run_json")"
+            run_status="$(jq -r '.status // empty' <<< "$run_json")"
+            run_conclusion="$(jq -r '.conclusion // empty' <<< "$run_json")"
+            [[ "$run_sha" == "$REVIEWED_SHA" && "$run_status" == "completed" && "$run_conclusion" == "success" && "$run_path" == "$expected_workflow" ]] || { echo "::error::Run $run_id no corresponde al SHA/workflow/conclusión esperados para $context"; return 1; }
+            if [[ "$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin" ]]; then
+              echo "::error::Creator no autorizado para $context: $creator"; return 1
+            fi
+            echo "Status $context verificado: run $run_id, SHA exacto, workflow $run_path, creator autorizado."
+          }
+
+          validate_context cloud/pgTAP-reviewed .github/workflows/cloud-db-reviewed.yml
+          validate_context cloud/admin-auth-reviewed .github/workflows/admin-auth-reviewed.yml
+          validate_context cloud/admin-auth-product-reviewed .github/workflows/admin-auth-product-reviewed.yml
+
+  cloud-reviewed:
+    name: pgTAP cloud revisado (SHA exacto)
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.status-provenance.result }}" = success
 
   admin-auth-reviewed:
     name: Auth cloud revisado (SHA exacto)
-    needs: bootstrap-scope
-    if: github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      statuses: read
     steps:
-      - name: Exigir harness Auth confiable ejecutado desde main
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
-          [[ -n "$status" ]] || { echo "::error::Falta Auth cloud del SHA exacto"; exit 1; }
-          state="$(jq -r '.state' <<< "$status")"
-          creator="$(jq -r '.creator.login // empty' <<< "$status")"
-          target="$(jq -r '.target_url // empty' <<< "$status")"
-          permission="none"
-          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
-          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
-            echo "::error::Auth cloud status inválido: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
-            exit 1
-          fi
-          echo "Auth cloud del SHA exacto y procedencia autorizada verificados; este job no usa secretos."
+      - run: test "${{ needs.status-provenance.result }}" = success
 
   admin-auth-product-reviewed:
     name: Auth producto revisado (SHA exacto)
-    needs: bootstrap-scope
-    if: github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
+    needs: [bootstrap-scope, status-provenance]
+    if: always() && github.event_name == 'pull_request' && needs.bootstrap-scope.outputs.bootstrap_allowed != 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      statuses: read
     steps:
-      - name: Exigir attestation externa del código Auth del SHA exacto
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed" and .sha == env.REVIEWED_SHA)][0] // empty')"
-          [[ -n "$status" ]] || { echo "::error::Falta attestation Auth producto del SHA exacto"; exit 1; }
-          state="$(jq -r '.state' <<< "$status")"
-          creator="$(jq -r '.creator.login // empty' <<< "$status")"
-          target="$(jq -r '.target_url // empty' <<< "$status")"
-          permission="none"
-          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
-          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
-            echo "::error::Attestation Auth producto inválida: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
-            exit 1
-          fi
-          echo "Attestation Auth producto del SHA exacto y procedencia autorizada verificadas; este job no usa secretos."
+      - run: test "${{ needs.status-provenance.result }}" = success
 
   e2e:
     runs-on: ubuntu-latest
