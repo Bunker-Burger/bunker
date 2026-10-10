@@ -83,12 +83,18 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/pgTAP-reviewed")][0].state // "missing"')"
-          if [[ "$state" != "success" ]]; then
-            echo "::error::No existe pgTAP cloud aprobado para este SHA. Un mantenedor debe ejecutar 'Cloud DB — ejecución revisada (main)' desde main con el número de PR y SHA completo; luego reejecutar este job."
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/pgTAP-reviewed" and .sha == $sha)][0] // empty')"
+          [[ -n "$status" ]] || { echo "::error::Falta pgTAP cloud del SHA exacto"; exit 1; }
+          state="$(jq -r '.state' <<< "$status")"
+          creator="$(jq -r '.creator.login // empty' <<< "$status")"
+          target="$(jq -r '.target_url // empty' <<< "$status")"
+          permission="none"
+          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
+          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
+            echo "::error::pgTAP status inválido: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
             exit 1
           fi
-          echo "pgTAP cloud del SHA exacto verificado; este job no usa secretos."
+          echo "pgTAP cloud del SHA exacto y procedencia autorizada verificados; este job no usa secretos."
 
   admin-auth-reviewed:
     name: Auth cloud revisado (SHA exacto)
@@ -106,12 +112,18 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-reviewed")][0].state // "missing"')"
-          if [[ "$state" != "success" ]]; then
-            echo "::error::No existe Auth cloud aprobado para este SHA. Un mantenedor debe activar el workflow confiable desde main y luego reejecutar este job."
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/admin-auth-reviewed" and .sha == $sha)][0] // empty')"
+          [[ -n "$status" ]] || { echo "::error::Falta Auth cloud del SHA exacto"; exit 1; }
+          state="$(jq -r '.state' <<< "$status")"
+          creator="$(jq -r '.creator.login // empty' <<< "$status")"
+          target="$(jq -r '.target_url // empty' <<< "$status")"
+          permission="none"
+          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
+          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
+            echo "::error::Auth cloud status inválido: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
             exit 1
           fi
-          echo "Auth cloud del SHA exacto verificado; este job no usa secretos."
+          echo "Auth cloud del SHA exacto y procedencia autorizada verificados; este job no usa secretos."
 
   admin-auth-product-reviewed:
     name: Auth producto revisado (SHA exacto)
@@ -129,12 +141,18 @@ jobs:
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed")][0].state // "missing"')"
-          if [[ "$state" != "success" ]]; then
-            echo "::error::Falta la attestation del runner aislado para test:integration:auth + test:e2e:admin-auth sobre este SHA exacto."
+          status="$(gh api "repos/$GITHUB_REPOSITORY/commits/$REVIEWED_SHA/status" --jq --arg sha "$REVIEWED_SHA" '[.statuses[] | select(.context == "cloud/admin-auth-product-reviewed" and .sha == $sha)][0] // empty')"
+          [[ -n "$status" ]] || { echo "::error::Falta attestation Auth producto del SHA exacto"; exit 1; }
+          state="$(jq -r '.state' <<< "$status")"
+          creator="$(jq -r '.creator.login // empty' <<< "$status")"
+          target="$(jq -r '.target_url // empty' <<< "$status")"
+          permission="none"
+          if [[ "$creator" != "github-actions[bot]" && -n "$creator" ]]; then permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"; fi
+          if [[ "$state" != "success" || -z "$creator" || -z "$target" || "$target" != "https://github.com/$GITHUB_REPOSITORY/actions/runs/"* || ("$creator" != "github-actions[bot]" && "$permission" != "write" && "$permission" != "maintain" && "$permission" != "admin") ]]; then
+            echo "::error::Attestation Auth producto inválida: exige success, SHA exacto, actor autorizado y URL de run GitHub inmutable"
             exit 1
           fi
-          echo "Attestation del producto Auth del SHA exacto verificada; este job no usa secretos."
+          echo "Attestation Auth producto del SHA exacto y procedencia autorizada verificadas; este job no usa secretos."
 
   e2e:
     runs-on: ubuntu-latest
