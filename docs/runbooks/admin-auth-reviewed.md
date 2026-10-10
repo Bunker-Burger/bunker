@@ -1,6 +1,11 @@
 # Evidencia cloud de BB-11 (pgTAP, Auth config y Auth producto)
 
-Una PR hacia `main` sólo pasa el gate de CI con tres statuses en su **SHA de HEAD exacto**:
+> Este runbook describe **cómo** funcionan los workflows confiables y cómo se verifica su procedencia. **Cuándo**
+> se exige cada evidencia, cómo se registra en la PR y qué hacer si no se puede producir lo define el protocolo
+> por alcance: `docs/runbooks/cloud-evidence.md`. El CI no exige estos statuses. Hoy no existe el entorno protegido
+> `admin-auth-product`, por lo que la evidencia de Auth producto no se puede producir.
+
+Evidencia cloud por **SHA de HEAD exacto**:
 
 | Contexto | Workflow confiable (vive en `main`) | `run-name` exigido |
 |---|---|---|
@@ -11,11 +16,13 @@ Una PR hacia `main` sólo pasa el gate de CI con tres statuses en su **SHA de HE
 `cloud/admin-auth-reviewed` sólo acredita la configuración del proyecto Supabase (harness de `main`). La aplicación
 (Server Actions, proxy, cookies SSR, layout, navegación) se acredita con `cloud/admin-auth-product-reviewed`.
 
-## Cómo verifica el gate
+## Cómo se verifica un SHA
 
-El job `status-provenance` de `ci.yml` ejecuta `node scripts/ci/verify-cloud-statuses.mjs`, sin dependencias ni
-secretos y con token de sólo lectura. Ese mismo archivo es el que corre `src/ci/verify-cloud-statuses.test.ts`, como
-proceso hijo contra una API de GitHub de fixtures. Para cada contexto:
+`node scripts/ci/verify-cloud-statuses.mjs` lo corre a mano quien registra la evidencia, sin dependencias ni secretos y
+con token de sólo lectura (`GH_TOKEN`, `GITHUB_REPOSITORY`, `PR_NUMBER`, `REVIEWED_SHA` y, opcional, `CONTEXTS`
+separados por comas para verificar sólo los contextos que exige el alcance). Sus tests
+(`src/ci/verify-cloud-statuses.test.ts`) ejecutan el mismo archivo contra una API de GitHub de fixtures y sólo prueban
+que rechaza evidencia falsa: no son evidencia de pgTAP ni de Auth. Para cada contexto:
 
 1. La PR sigue abierta hacia `main` desde este repositorio y su HEAD es el SHA evaluado.
 2. Toma el status **más reciente** del contexto en `GET /repos/:repo/statuses/<SHA>`. Debe estar en `success`, con
@@ -95,5 +102,5 @@ hay que repetirlos con `workflow_dispatch` sobre el SHA final.
    `admin_memberships` o del logout, comprobar que falla el caso correspondiente y repetir con el árbol limpio. No
    publicar la mutación ni sus secretos.
 
-Ningún status manual, de otro SHA, de un run por comentario o de un workflow distinto desbloquea el merge. Si el
-SHA de la PR cambia, hay que repetir los tres runs.
+Ningún status manual, de otro SHA, de un run por comentario o de un workflow distinto acredita la evidencia. Si el
+SHA de la PR cambia, hay que repetir los runs que exija su alcance y registrarlos de nuevo (`cloud-evidence.md`).

@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 /*
- * Cloud evidence gate for pull requests (job `status-provenance` in ci.yml runs THIS file; its
- * tests run THIS file too, as a child process against a fixture GitHub API). Dependency-free Node
- * ESM: no app code, no secrets, read-only GitHub token.
+ * Cloud evidence check for a pull request SHA, run manually by whoever records the evidence of the
+ * protocol (docs/runbooks/cloud-evidence.md); it is not a CI job. It only checks that statuses come
+ * from genuine trusted runs: it does not run pgTAP or Auth itself. Its tests run THIS file as a
+ * child process against a fixture GitHub API. Dependency-free Node ESM: no app code, no secrets,
+ * read-only GitHub token.
  *
- * Every required context must be the newest status of the exact PR head SHA and must come from a
+ * `CONTEXTS` (optional, comma-separated) limits the check to the contexts the PR's scope requires
+ * (scripts/ci/cloud-evidence-scope.mjs); by default all three. An unknown context fails.
+ *
+ * Every checked context must be the newest status of the exact PR head SHA and must come from a
  * trusted workflow that runs from `main` and reviews another commit:
  *   - status: state=success, creator github-actions[bot], target_url = canonical URL of one run;
  *   - run: same repository, event workflow_dispatch, head_branch main, exact workflow path,
@@ -138,8 +143,19 @@ export async function verifyCloudStatuses(env = process.env, fetchImpl = globalT
   }
 }
 
+/** Contexts selected by `CONTEXTS` (comma-separated), or all of them; null if one is unknown. */
+export function selectContexts(raw) {
+  if (raw === undefined || raw.trim() === "") return REQUIRED_CONTEXTS;
+  const names = [...new Set(raw.split(",").map((name) => name.trim()).filter(Boolean))];
+  const selected = names.map((name) => REQUIRED_CONTEXTS.find((entry) => entry.context === name));
+  return names.length > 0 && selected.every(Boolean) ? selected : null;
+}
+
 if (process.argv[1]?.replaceAll("\\", "/").endsWith("/scripts/ci/verify-cloud-statuses.mjs")) {
-  const result = await verifyCloudStatuses();
+  const contexts = selectContexts(process.env.CONTEXTS);
+  const result = contexts
+    ? await verifyCloudStatuses(process.env, globalThis.fetch, contexts)
+    : { ok: false, lines: [`::error::CONTEXTS contiene un contexto desconocido; válidos: ${REQUIRED_CONTEXTS.map((entry) => entry.context).join(", ")}`] };
   for (const line of result.lines) console.log(line);
   process.exit(result.ok ? 0 : 1);
 }

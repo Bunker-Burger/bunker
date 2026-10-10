@@ -5,11 +5,14 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /*
- * The cloud evidence gate exactly as CI runs it: `node scripts/ci/verify-cloud-statuses.mjs` in a
- * child process, with the same environment variables the `status-provenance` job passes, against
+ * The cloud evidence check exactly as a manual run invokes it: `node scripts/ci/verify-cloud-statuses.mjs`
+ * in a child process, with the environment variables that run passes, against
  * a fixture GitHub REST API. Fixtures follow the real shape of run 38007678913 (pgTAP): a
  * workflow_dispatch run of a trusted workflow on main (head_sha = main's commit) that posted
  * success on the PR head SHA. No secrets, no network beyond localhost.
+ *
+ * Passing these tests only proves the verifier rejects false or foreign evidence. It is not pgTAP or
+ * Auth evidence for any PR: that comes from the real runs (docs/runbooks/cloud-evidence.md).
  */
 
 const SCRIPT = path.resolve(__dirname, "../../scripts/ci/verify-cloud-statuses.mjs");
@@ -106,7 +109,7 @@ function route(request: IncomingMessage, response: ServerResponse) {
   return respond(response, 404, { message: "Not Found" });
 }
 
-/** Runs the real gate script with the environment the CI job provides. */
+/** Runs the real verifier script with the environment a manual run provides. */
 function gate(env: Record<string, string> = {}): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     execFile(
@@ -147,7 +150,7 @@ beforeEach(() => {
   requests.length = 0;
 });
 
-describe("cloud evidence gate (scripts/ci/verify-cloud-statuses.mjs, as run by CI)", () => {
+describe("cloud evidence verifier (scripts/ci/verify-cloud-statuses.mjs, as run manually)", () => {
   it("accepts trusted runs on main that reviewed this PR SHA (real shape: run.head_sha = main ≠ PR SHA)", async () => {
     const result = await gate();
 
@@ -215,5 +218,49 @@ describe("cloud evidence gate (scripts/ci/verify-cloud-statuses.mjs, as run by C
     const result = await gate(env);
     expect(result.code).toBe(1);
     expect(result.output).toMatch(reason);
+  });
+
+  describe("CONTEXTS: only the evidence the PR's scope requires", () => {
+    const pgtapOnly = () => (fixture.statuses = fixture.statuses.filter((status) => status.context === "cloud/pgTAP-reviewed"));
+
+    it("verifies just pgTAP when that is all the scope requires, ignoring the absent Auth contexts", async () => {
+      pgtapOnly();
+      const result = await gate({ CONTEXTS: "cloud/pgTAP-reviewed" });
+      expect(result.code).toBe(0);
+      expect(result.output).toContain("Status cloud/pgTAP-reviewed verificado: run 38007678913");
+      expect(result.output).not.toContain("cloud/admin-auth");
+    });
+
+    it("still applies the full per-context check to the selected context", async () => {
+      pgtapOnly();
+      fixture.runs.set("38007678913", trustedRun(0, { display_title: `Cloud DB | pgTAP | PR #${PR} | ${OTHER_SHA}` }));
+      const result = await gate({ CONTEXTS: "cloud/pgTAP-reviewed" });
+      expect(result.code).toBe(1);
+      expect(result.output).toMatch(/run-name no vincula/);
+    });
+
+    it("requires every selected context", async () => {
+      pgtapOnly();
+      const result = await gate({ CONTEXTS: "cloud/pgTAP-reviewed, cloud/admin-auth-reviewed" });
+      expect(result.code).toBe(1);
+      expect(result.output).toContain("Falta status cloud/admin-auth-reviewed");
+    });
+
+    it.each([
+      ["an unknown context", "cloud/pgTAP-reviewed,cloud/everything-ok"],
+      ["only separators", " , ,"]
+    ])("refuses %s instead of verifying nothing", async (_case, contexts) => {
+      const result = await gate({ CONTEXTS: contexts });
+      expect(result.code).toBe(1);
+      expect(result.output).toMatch(/CONTEXTS contiene un contexto desconocido/);
+      expect(result.output).not.toContain("verificado");
+    });
+
+    it("checks all three contexts when CONTEXTS is empty", async () => {
+      pgtapOnly();
+      const result = await gate({ CONTEXTS: "" });
+      expect(result.code).toBe(1);
+      expect(result.output).toContain("Falta status cloud/admin-auth-reviewed");
+    });
   });
 });

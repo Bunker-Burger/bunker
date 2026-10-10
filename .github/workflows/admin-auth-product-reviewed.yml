@@ -1,6 +1,6 @@
 name: Admin Auth producto — ejecución revisada (main)
-# Vincula el run con la PR y el SHA que acredita: el gate de CI (scripts/ci/verify-cloud-statuses.mjs)
-# exige este título exacto, porque el head_sha del run es el de main por diseño.
+# Vincula el run con la PR y el SHA que acredita: el verificador manual (scripts/ci/verify-cloud-statuses.mjs,
+# docs/runbooks/cloud-evidence.md) exige este título exacto, porque el head_sha del run es el de main por diseño.
 run-name: "Admin Auth producto | PR #${{ inputs.pr_number }} | ${{ inputs.reviewed_sha }}"
 
 # Suite Auth del PRODUCTO (integración cloud 2/2 + E2E Auth 3/3) sobre el código exacto del SHA
