@@ -103,8 +103,10 @@ jobs:
               permission="$(gh api "$api/collaborators/$creator/permission" --jq '.permission // "none"' 2>/dev/null || echo none)"
             fi
             [[ "$state" == "success" && -n "$creator" ]] || { echo "::error::Status $context no está en success o no tiene creator"; return 1; }
-            [[ "$target" =~ ^https://github\.com/$GITHUB_REPOSITORY/actions/runs/([0-9]+)$ ]] || { echo "::error::target_url inválida para $context"; return 1; }
-            run_id="${BASH_REMATCH[1]}"
+            run_prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
+            [[ "$target" == "$run_prefix"* ]] || { echo "::error::target_url inválida para $context"; return 1; }
+            run_id="${target#"$run_prefix"}"
+            [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "::error::target_url sin ID numérico para $context"; return 1; }
             run_json="$(gh api "$api/actions/runs/$run_id")"
             run_sha="$(jq -r '.head_sha // empty' <<< "$run_json")"
             run_path="$(jq -r '.path // empty' <<< "$run_json")"
