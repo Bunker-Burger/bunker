@@ -39,10 +39,18 @@ hay que repetirlos con `workflow_dispatch` sobre el SHA final.
 
 1. Revisar y, si corresponde, mergear el bootstrap #39 (sólo infraestructura). No ejecutar nada de esto desde una
    workflow que exista sólo en la PR #37.
-2. Crear en *Settings → Environments* el entorno **`admin-auth-product`** con **required reviewers** (el owner) y con
-   sus propios secretos: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   `SUPABASE_TEST_ADMIN_EMAIL` y `SUPABASE_TEST_ADMIN_PASSWORD` del proyecto development. Si el entorno no existe o
-   no exige reviewers, el job `authorize` del workflow falla antes de exponer nada.
+2. Crear en *Settings → Environments* el entorno **`admin-auth-product`** con:
+   - **Required reviewers** (el owner).
+   - **Allow administrators to bypass** desactivado.
+   - **Deployment branches** restringido a ramas protegidas o a `main`. Así un workflow agregado por una PR no puede
+     reclamar el entorno.
+   - Sus propios secretos del proyecto development: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+     `SUPABASE_TEST_ADMIN_EMAIL` y `SUPABASE_TEST_ADMIN_PASSWORD`.
+
+   El job `authorize` lee el entorno por API y lo verifica con
+   `scripts/ci/preflight-supabase-dev.mjs --environment-protection`, código de `main` testeado en
+   `src/ci/preflight-supabase-dev.test.ts`. Si el entorno no existe, no exige reviewers, admite bypass de admins o no
+   tiene política de ramas, falla antes de que exista ningún secreto en el run.
 
 ## Procedimiento por SHA
 
