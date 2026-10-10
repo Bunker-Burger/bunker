@@ -10,6 +10,11 @@
 import { appendFileSync, readFileSync } from "node:fs";
 
 export const EVIDENCE = {
+  migration: {
+    label: "Migración: delta SQL revisado + dry-run del SHA; efecto real sólo con destino aislado",
+    context: "sin status (run Cloud DB operation dry-run + comentario del mantenedor)",
+    how: "revisar el SQL nuevo y correr Actions → Cloud DB — ejecución revisada (main), operation dry-run, desde main (docs/runbooks/cloud-evidence.md §Migraciones)"
+  },
   pgtap: {
     label: "pgTAP cloud",
     context: "cloud/pgTAP-reviewed",
@@ -33,11 +38,15 @@ export const EVIDENCE = {
  * merged. `review`: maintainer review of the diff, no cloud run.
  */
 export const RULES = [
-  { pattern: /^supabase\/migrations\//, before: ["pgtap", "authConfig"], reason: "migraciones (esquema, RLS, grants)" },
+  { pattern: /^supabase\/migrations\//, before: ["migration", "pgtap", "authConfig"], reason: "migraciones (esquema, RLS, grants)" },
   { pattern: /^supabase\/tests\/database\//, before: ["pgtap"], reason: "tests pgTAP" },
   { pattern: /^supabase\/seed\.sql$/, before: ["pgtap"], reason: "seed de datos" },
   { pattern: /^src\/server\/auth\//, before: ["authProduct"], reason: "sesión y login administrativos" },
   { pattern: /^src\/server\/catalog\/admin-access[^/]*\.ts$/, before: ["authProduct"], reason: "gate admin_memberships" },
+  // loadAdminCatalog exige requireStoreAdmin y que la tienda leída sea la del admin.
+  { pattern: /^src\/server\/catalog\/catalog-service\.ts$/, before: ["authProduct"], reason: "loadAdminCatalog: gate admin y tienda del admin" },
+  // getAdminCatalog: único acceso al catálogo admin; arma cliente de sesión (RLS del usuario), scope admin y gate.
+  { pattern: /^src\/server\/catalog\/index\.ts$/, before: ["authProduct"], reason: "getAdminCatalog: cliente de sesión, scope admin y gate" },
   { pattern: /^src\/server\/supabase\/(clients|config|update-session)\.ts$/, before: ["authProduct"], reason: "clientes Supabase y cookies SSR" },
   { pattern: /^src\/proxy\.ts$/, before: ["authProduct"], reason: "proxy de sesión" },
   { pattern: /^src\/app\/bunker\//, before: ["authProduct"], reason: "rutas administrativas /bunker" },
@@ -73,6 +82,16 @@ export function classify(paths) {
   return { before: sorted(before), afterMerge: sorted(afterMerge), review };
 }
 
+/**
+ * Shown whenever a PR changes supabase/migrations: what the available runs do NOT prove about the
+ * new migration, so a pgTAP/Auth success is never read as validation of it.
+ */
+export const MIGRATION_WARNING = [
+  "> **Atención — migraciones:** pgTAP y Auth config corren contra el esquema cloud **ya aplicado**; no aplican ni ejecutan la migración nueva, así que su success **no valida la migración**.",
+  "> El dry-run sólo lista qué migraciones se aplicarían; no ejecuta su SQL.",
+  "> Sin un destino de desarrollo aislado donde se haya aplicado deliberadamente, el **efecto de la migración queda NO verificado**: registrarlo así y mergear sólo con decisión explícita del mantenedor (bloquear o aceptar el riesgo)."
+];
+
 /** Markdown for the job summary; never contains secrets (only paths, SHA and PR number). */
 export function report(result, { sha = "", pr = "" } = {}) {
   const head = sha ? `\`${sha}\`` : "(HEAD de la PR)";
@@ -80,6 +99,9 @@ export function report(result, { sha = "", pr = "" } = {}) {
   if (result.before.length === 0 && result.afterMerge.length === 0 && result.review.length === 0) {
     lines.push("Sin cambios en Supabase, Auth, sesiones admin ni infraestructura cloud: no se requiere evidencia cloud.");
     return lines.join("\n");
+  }
+  if (result.before.some((item) => item.id === "migration")) {
+    lines.push(...MIGRATION_WARNING, "");
   }
   if (result.before.length > 0) {
     lines.push("**Antes del merge, sobre este SHA exacto** (registrar en un comentario de la PR, ver docs/runbooks/cloud-evidence.md):", "");
@@ -119,6 +141,9 @@ if (process.argv[1]?.replaceAll("\\", "/").endsWith("/scripts/ci/cloud-evidence-
   const markdown = report(result, { sha: process.env.HEAD_SHA ?? "", pr: process.env.PR_NUMBER ?? "" });
   console.log(markdown);
   for (const item of result.before) console.log(`::notice title=Evidencia cloud requerida::${item.label} (${item.context}) antes del merge`);
+  if (result.before.some((item) => item.id === "migration")) {
+    console.log("::warning title=Migración sin validación automática::pgTAP/Auth config prueban el esquema ya aplicado y el dry-run no ejecuta SQL: el efecto de la migración no queda verificado sin destino aislado; requiere decisión del mantenedor");
+  }
   for (const item of result.afterMerge) console.log(`::notice title=Infra cloud modificada::${item.label}: validar con el primer run desde main posterior al merge`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
 }

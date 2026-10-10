@@ -26,9 +26,9 @@ PR. Es informativo: no ejecuta nada en la nube y no falla por alcance, sólo si 
 
 | Si la PR cambia… | Evidencia **antes del merge**, sobre el HEAD exacto |
 |---|---|
-| `supabase/migrations/**` (esquema, RLS, grants) | pgTAP + Auth config |
+| `supabase/migrations/**` (esquema, RLS, grants) | **Migración** (delta SQL revisado + dry-run del SHA; efecto real según §2.1) + pgTAP + Auth config. Estos dos últimos sólo detectan regresiones del esquema **ya aplicado**: **no validan la migración** |
 | `supabase/tests/database/**`, `supabase/seed.sql` | pgTAP |
-| `src/server/auth/**`, `src/server/catalog/admin-access*.ts`, `src/server/supabase/{clients,config,update-session}.ts`, `src/proxy.ts`, `src/app/bunker/**`, `src/app/sw.ts`, `src/app/sw-routes.ts`, `tests/e2e/admin-auth.spec.ts`, `playwright.admin-auth.config.ts` | Auth producto |
+| `src/server/auth/**`, `src/server/catalog/admin-access*.ts`, `src/server/catalog/catalog-service.ts` (`loadAdminCatalog`), `src/server/catalog/index.ts` (`getAdminCatalog`), `src/server/supabase/{clients,config,update-session}.ts`, `src/proxy.ts`, `src/app/bunker/**`, `src/app/sw.ts`, `src/app/sw-routes.ts`, `tests/e2e/admin-auth.spec.ts`, `playwright.admin-auth.config.ts` | Auth producto |
 
 | Si la PR cambia infraestructura confiable de `main`… | Qué se exige |
 |---|---|
@@ -42,7 +42,9 @@ workflows exigen una PR abierta. Por eso un cambio de infraestructura se valida 
 sobre la siguiente PR que necesite esa evidencia. Ese run se enlaza también en un comentario de la PR de
 infraestructura.
 
-Cualquier otro cambio (menú, carrito, pagos, catálogo público, docs) no requiere evidencia cloud.
+Cualquier otro cambio (menú, carrito, pagos, adaptadores o repositorio del catálogo, la home, docs) no requiere
+evidencia cloud. La home (`src/app/page.tsx`) sólo decide si *muestra* la pestaña Admin; la autorización vive en
+`src/app/bunker/**`, `loadAdminCatalog` y el gate, que sí están en la tabla.
 
 ## 2. Cómo producir la evidencia (sobre el SHA de HEAD exacto)
 
@@ -50,9 +52,10 @@ Lo hace un **mantenedor** (permiso `maintain` o `admin`) después de leer el dif
 
 1. Anotar el SHA completo: `gh pr view <n> --json headRefOid -q .headRefOid`.
 2. Disparar desde la rama `main` (*Actions → workflow → Run workflow*) con `pr_number=<n>` y `reviewed_sha=<SHA>`:
-   - **pgTAP:** "Cloud DB — ejecución revisada (main)", `operation=pgTAP`. Corre los tests de
-     `supabase/tests/database` de ese SHA contra el proyecto Supabase con herramientas de `main`; no ejecuta JS de la
-     PR. Como el proyecto es único, revisar el SQL antes de dispararlo.
+   - **pgTAP:** "Cloud DB — ejecución revisada (main)", `operation=pgTAP`. Copia **sólo** `supabase/tests/database`
+     de ese SHA y corre `supabase test db` contra el esquema **ya aplicado** del proyecto, con herramientas de `main`;
+     no ejecuta JS de la PR y **no aplica ni ejecuta migraciones** (ver §2.1). Como el proyecto es único, revisar el
+     SQL antes de dispararlo.
    - **Auth config:** "Admin Auth — ejecución revisada (main)". Corre el harness de `main` (contraseña inválida
      rechazada, owner activo de `bunker-burger`, logout local 204); no ejecuta código de la PR.
    - **Auth producto:** "Admin Auth producto — ejecución revisada (main)". Ejecuta código de la PR con secretos, por eso
@@ -72,6 +75,54 @@ Lo hace un **mantenedor** (permiso `maintain` o `admin`) después de leer el dif
    apunta a un run `workflow_dispatch` de `main`, del workflow exacto, `completed/success`, con `run-name`
    `<título> | PR #<n> | <SHA>` y `head_sha` alcanzable desde `main` (detalle en `admin-auth-reviewed.md`).
 
+### 2.1 Migraciones: qué se verifica y qué no
+
+Con una PR que cambia `supabase/migrations/**`, los runs disponibles **no** prueban la migración nueva:
+
+| Run | Qué hace | Qué NO prueba |
+|---|---|---|
+| pgTAP (`operation=pgTAP`) | Copia sólo `supabase/tests/database/*.sql` del SHA y corre `supabase test db` sobre el esquema ya aplicado | No aplica la migración. Su success sólo dice que el esquema **actual** pasa los tests. Si los tests de la PR esperan el esquema nuevo, fallan, y eso es esperable |
+| Auth config | Prueba la configuración Auth actual del proyecto | Nada de la migración |
+| Dry-run (`operation=dry-run`) | Copia `supabase/migrations/*.sql` del SHA y corre `supabase db push --dry-run`: lista qué migraciones se aplicarían | No ejecuta su SQL: no detecta errores de sintaxis o semántica ni prueba RLS o grants. No publica status |
+
+Procedimiento antes del merge, en este orden:
+
+1. **Inspección del delta SQL** (mantenedor), sobre el SHA exacto:
+   - `git diff --name-status origin/main...<SHA> -- supabase/migrations` muestra **sólo archivos agregados** (`A`).
+     Modificar o borrar una migración ya aplicada se bloquea.
+   - Cada archivo nuevo tiene un timestamp posterior a la última migración de `main`.
+   - Las tablas nuevas tienen RLS habilitada, policies y grants explícitos (BB-03). `anon` no gana acceso a datos
+     privados. Ninguna policy usa `user_metadata`.
+   - No hay `DROP` ni borrado de datos sin justificación escrita en la PR, ni secretos.
+2. **Dry-run del SHA exacto:** desde `main`, "Cloud DB — ejecución revisada (main)" con `operation=dry-run`,
+   `pr_number` y `reviewed_sha`. Hay éxito si se cumple todo esto:
+   - el run termina `completed/success`;
+   - `gh api repos/Bunker-Burger/bunker/actions/runs/<id> --jq '{display_title,event,head_branch,path,conclusion}'`
+     da `display_title = "Cloud DB | dry-run | PR #<n> | <SHA>"`, `event = workflow_dispatch`, `head_branch = main` y
+     `path = .github/workflows/cloud-db-reviewed.yml`;
+   - el log del step "Previsualizar migraciones" lista **exactamente** los archivos nuevos de la PR. Otra migración
+     pendiente indica que el proyecto no está al día con `main`, y eso bloquea.
+
+   El dry-run **no** demuestra que la migración funcione.
+3. **Efecto real:** sólo es verificable aplicando la migración en un **destino de desarrollo aislado** y corriendo
+   ahí pgTAP, que entonces sí prueba el esquema nuevo. **Hoy no existe**: hay un único proyecto, que irá a producción.
+   Por eso:
+   - se registra **"Efecto de la migración: NO verificado (no hay destino aislado)"**;
+   - el mantenedor decide por escrito: **bloquear** hasta tener un destino aislado, o **mergear aceptando el riesgo**,
+     nombrando qué queda sin verificar;
+   - aplicarla al proyecto único (`operation=apply`, que exige `confirm_project`) es **desplegar** en el entorno que irá
+     a producción. Es una decisión consciente del mantenedor, no una validación previa, y nunca ocurre desde una PR ni
+     automáticamente. Si se decide, después se corren pgTAP y Auth config y se registran con el SHA, aclarando que el
+     efecto se comprobó en el proyecto único **después** de aplicarla.
+
+**Criterios de éxito para una PR con migraciones** (todos):
+- delta inspeccionado y registrado;
+- dry-run `success` del SHA con la lista esperada;
+- efecto **verificado** en un destino aislado (pgTAP `success` después de aplicar), **o** registrado como **NO
+  verificado** con la decisión explícita del mantenedor.
+
+Un success de pgTAP o Auth config sin la migración aplicada nunca cuenta como validación de la migración.
+
 ## 3. Registro (dónde y cómo queda acreditada)
 
 La evidencia queda en tres lugares, enlazados entre sí:
@@ -81,8 +132,12 @@ La evidencia queda en tres lugares, enlazados entre sí:
 
 ```text
 ### Evidencia cloud — PR #<n> @ <SHA de 40 caracteres>
-Alcance (job "Alcance de evidencia cloud"): <pgTAP / Auth config / Auth producto / ninguno>
+Alcance (job "Alcance de evidencia cloud"): <Migración / pgTAP / Auth config / Auth producto / ninguno>
+- Migración — delta SQL: revisado por @<mantenedor> (<archivos agregados>; RLS/grants/DROP revisados)
+  — dry-run: <URL del run> success, lista <archivos> — efecto: NO verificado (sin destino aislado)
+  | verificado en <destino aislado> con pgTAP <URL> después de aplicar
 - pgTAP: <URL del run> — status cloud/pgTAP-reviewed success — responsable @<usuario> — <fecha>
+  (con migraciones: "sólo regresión del esquema ya aplicado")
 - Auth config: <URL del run> — status cloud/admin-auth-reviewed success — responsable @<usuario> — <fecha>
 - Auth producto: <URL del run> — 2/2 + 3/3 — status cloud/admin-auth-product-reviewed success — @<usuario> — <fecha>
   o: BLOQUEADO — <causa concreta, p. ej. "no existe el entorno admin-auth-product"> — <URL del run fallido si lo hubo>
@@ -112,7 +167,9 @@ El mantenedor mergea una PR con alcance cloud sólo si:
 - cada evidencia requerida tiene un run `success` verificado con `verify-cloud-statuses.mjs`, **o** un bloqueo
   registrado con su decisión explícita de aceptar el riesgo;
 - en cambios de infraestructura confiable, revisó el diff y dejó constancia de que el workflow se validará en el
-  primer run posterior al merge.
+  primer run posterior al merge;
+- con migraciones, se cumplen los criterios de §2.1: delta inspeccionado, dry-run `success` del SHA con la lista
+  esperada y efecto verificado en un destino aislado **o** su decisión escrita sobre el efecto **NO verificado**.
 
 ## 6. Qué NO es evidencia cloud
 
@@ -121,3 +178,5 @@ El mantenedor mergea una PR con alcance cloud sólo si:
 - El job de alcance, `pnpm test` y los E2E públicos: corren sin credenciales. Los tests cloud se saltan o fallan
   cerrados.
 - Un status publicado a mano, de otro SHA, de un run por comentario (`/verify-db`) o de otro workflow.
+- En una PR con migraciones: pgTAP o Auth config `success` sin la migración aplicada, o un dry-run `success`, como
+  prueba de que la migración funciona.
