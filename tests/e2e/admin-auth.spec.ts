@@ -74,7 +74,8 @@ test("the owner manages the catalog by product type and a fake image is rejected
 
   await page.getByRole("list", { name: /^Productos de / }).first().getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 2, name: "Foto" })).toBeVisible();
-  await page.getByLabel(/^(Foto|Reemplazar foto)$/).setInputFiles({
+  // The "Foto" section is also labelled "Foto" (aria-labelledby); target the file input itself.
+  await page.locator('input[type="file"][name="image"]').setInputFiles({
     name: "logo.png",
     mimeType: "image/png",
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"/>')
