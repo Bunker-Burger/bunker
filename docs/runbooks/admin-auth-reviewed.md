@@ -34,10 +34,14 @@ proxy, cookies SSR, layout ni navegación de la aplicación. La evidencia del pr
      -f state=success \
      -f context=cloud/admin-auth-product-reviewed \
      -f description="Auth product integration 2/2 + E2E 3/3 on exact reviewed SHA" \
-     -f target_url="<URL_PRIVADA_DEL_RUNNER>"
+     -f target_url="https://github.com/Bunker-Burger/bunker/actions/runs/<RUN_ID>"
    ```
 
-   Ante cualquier fallo, skip, SHA distinto o duda sobre el aislamiento, publicar `failure` o no publicar status.
+   El `target_url` debe ser una ejecución GitHub Actions inmutable del runner efímero aprobado. El CI además verifica
+   que el status esté adjunto al SHA consultado y que su `creator` sea `github-actions[bot]` o un colaborador con
+   permiso `write`, `maintain` o `admin`; un status genérico, URL privada/no verificable, actor no autorizado o SHA
+   distinto no desbloquea el merge. Ante cualquier fallo, skip o duda sobre el aislamiento, publicar `failure` o no
+   publicar status.
 
 El CI de la PR exige este contexto exacto además de `cloud/admin-auth-reviewed` y `cloud/pgTAP-reviewed`. Un status de
 otro SHA, una autodeclaración desde la PR o el probe REST del proveedor no desbloquean el merge.
