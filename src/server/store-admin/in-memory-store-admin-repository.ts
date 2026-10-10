@@ -87,14 +87,6 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return ok(undefined);
   }
 
-  async listPaymentMethods(storeId: string) {
-    return this.fail("listPaymentMethods") ?? ok(
-        this.paymentMethods
-          .filter((method) => method.storeId === storeId)
-          .map((method) => ({ method: method.method, displayName: method.displayName, instructions: method.instructions, enabled: method.enabled, sortOrder: method.sortOrder }))
-      );
-  }
-
   async savePaymentMethod(storeId: string, method: StoredPaymentMethod): Promise<AdminResult<void>> {
     const failed = this.fail("savePaymentMethod");
     if (failed) return failed;

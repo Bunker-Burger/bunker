@@ -51,12 +51,12 @@ describe("store settings", () => {
     });
   });
 
-  it("upserts a payment method by store and method", async () => {
+  it("upserts a payment method by store and method, with its fixed name and no public instructions", async () => {
     const { repository, calls } = repo(() => ({ data: [{ id: "x" }] }));
-    await repository.savePaymentMethod(STORE, { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 });
+    await repository.savePaymentMethod(STORE, { method: "bank_transfer", enabled: true, sortOrder: 20 });
     expect(op(calls[0], "upsert")[0]).toEqual([
       "upsert",
-      { store_id: STORE, method: "cash", display_name: "Efectivo", public_instructions: "", is_enabled: true, sort_order: 10 },
+      { store_id: STORE, method: "bank_transfer", display_name: "Transferencia", public_instructions: "", is_enabled: true, sort_order: 20 },
       { onConflict: "store_id,method" }
     ]);
   });

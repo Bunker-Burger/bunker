@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryAdminAccess, type InMemorySession } from "@/server/catalog/in-memory-admin-access";
+import { fakeClient, op } from "@/server/admin/fake-supabase-client";
 import { InMemoryStoreAdminRepository, type MemoryPromotion } from "./in-memory-store-admin-repository";
+import { createSupabaseStoreAdminRepository } from "./supabase-store-admin-repository";
 import {
   addShift,
   deletePromotion,
@@ -177,58 +179,47 @@ describe("business hours", () => {
 });
 
 describe("payment methods", () => {
-  it("saves a method with neutral public instructions", async () => {
-    expect(
-      await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions: "Pedí el alias por WhatsApp y enviá el comprobante.", enabled: "on", sortOrder: "20" }))
-    ).toMatchObject({ ok: true, message: "Transferencia: habilitado." });
-    expect(repository.paymentMethods).toEqual([
-      { storeId: STORE, method: "bank_transfer", displayName: "Transferencia", instructions: "Pedí el alias por WhatsApp y enviá el comprobante.", enabled: true, sortOrder: 20 }
-    ]);
+  // What a crafted request could try to publish through the publicly readable row.
+  const BANK_TEXT = [
+    ["an alias without separators", "Alias bunkerburger"],
+    ["an alias in a sentence", "Mi alias bancoburger"],
+    ["a labelled alias", "Alias: bunker.burger"],
+    ["a CBU", "CBU 2850590940090418135201"],
+    ["a CVU", "CVU: 0000003100010000000001"],
+    ["an account number", "Cuenta 4001234-5 123-4"]
+  ];
+
+  it.each(BANK_TEXT)("never stores %s sent as the name or the instructions of a transfer", async (_case, text) => {
+    const outcome = await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: text, instructions: text, enabled: "on", sortOrder: "20" }));
+    expect(outcome).toEqual({ ok: true, value: undefined, message: "Transferencia: habilitado." });
+    expect(repository.paymentMethods).toEqual([{ storeId: STORE, method: "bank_transfer", enabled: true, sortOrder: 20 }]);
+    expect(JSON.stringify(repository.paymentMethods)).not.toContain(text);
   });
 
   it.each([
-    ["Solicitá el alias actualizado por WhatsApp."],
-    ["Te pasamos los datos por WhatsApp; mandá el comprobante a ese chat."],
-    ["Abonás al recibir. Pedidos hasta las 23.30, envío $ 1500."],
-    [""]
-  ])("accepts neutral copy: %s", async (instructions) => {
-    expect(await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions, enabled: "on" }))).toMatchObject({ ok: true });
-  });
-
-  it.each([
-    ["Alias: bunker.burger"],
-    ["alias=bunkerburger"],
-    ["Nuestro alias es bunker-burger"],
-    ["Transferí al alias bunker.burger.mp"],
-    ["bunker.burger.mp"],
-    ["CBU 2850590940090418135201"],
-    ["CVU: 0000003100010000000001"],
-    ["Cuenta 4001234-5 123-4"],
-    ["CUIT 20-12345678-9"]
-  ])("refuses bank details in the public instructions and stores nothing: %s", async (instructions) => {
-    const outcome = await savePaymentMethod(deps(), form({ method: "bank_transfer", displayName: "Transferencia", instructions, enabled: "on" }));
-    expect(outcome).toEqual({
-      ok: false,
-      message: "Revisá los datos marcados.",
-      fieldErrors: { instructions: "No escribas alias, CBU, CVU ni números de cuenta: el cliente los pide por WhatsApp." }
-    });
-    expect(outcome).not.toHaveProperty("mayHaveWritten");
-    expect(repository.paymentMethods).toEqual([]);
-    expect(repository.writes).toEqual([]);
+    ["cash", "Efectivo"],
+    ["bank_transfer", "Transferencia"],
+    ["mercado_pago", "Mercado Pago"]
+  ])("writes %s with its fixed name and no instructions, whatever the request says", async (method, name) => {
+    const fake = fakeClient(() => ({ data: [{ id: "x" }] }));
+    const outcome = await savePaymentMethod(
+      { ...deps(), repository: createSupabaseStoreAdminRepository(fake.client) },
+      form({ method, displayName: "Alias bunkerburger", instructions: "Mi alias bancoburger", enabled: "on", sortOrder: "10" })
+    );
+    expect(outcome).toMatchObject({ ok: true });
+    expect(op(fake.calls[0], "upsert")[0]?.[1]).toEqual({ store_id: STORE, method, display_name: name, public_instructions: "", is_enabled: true, sort_order: 10 });
   });
 
   it("warns that Mercado Pago is not offered until the server is configured, without revealing why", async () => {
     mercadoPagoConfigured = false;
-    const outcome = await savePaymentMethod(deps(), form({ method: "mercado_pago", displayName: "Mercado Pago", enabled: "on" }));
+    const outcome = await savePaymentMethod(deps(), form({ method: "mercado_pago", enabled: "on" }));
     expect(outcome).toEqual({ ok: true, value: undefined, message: "Guardado. Mercado Pago no se ofrece a los clientes hasta completar su configuración en el servidor." });
   });
 
-  it.each([[{ method: "crypto", displayName: "X" }, "method"], [{ method: "cash", displayName: "" }, "displayName"], [{ method: "cash", displayName: "Efectivo", sortOrder: "-1" }, "sortOrder"]])(
-    "rejects %j",
-    async (fields, field) => {
-      expect(await savePaymentMethod(deps(), form(fields))).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
-    }
-  );
+  it.each([[{ method: "crypto" }, "method"], [{ method: "cash", sortOrder: "-1" }, "sortOrder"], [{ method: "cash", sortOrder: "1001" }, "sortOrder"]])("rejects %j without writing", async (fields, field) => {
+    expect(await savePaymentMethod(deps(), form(fields))).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
+    expect(repository.writes).toEqual([]);
+  });
 });
 
 describe("promotions", () => {

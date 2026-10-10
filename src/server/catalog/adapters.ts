@@ -67,8 +67,6 @@ export function toStoreSettings(row: StoreRow): StoreSettings {
     paymentMethods: row.store_payment_methods
       .map((method) => ({
         method: method.method,
-        displayName: method.display_name,
-        instructions: method.public_instructions,
         enabled: method.is_enabled,
         sortOrder: method.sort_order
       }))

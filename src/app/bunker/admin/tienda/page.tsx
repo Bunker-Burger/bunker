@@ -1,10 +1,10 @@
 import type { StoreState, StoreStatus } from "@/domain/store-status";
-import { offeredPaymentOptions } from "@/domain/public-payment-options";
-import type { PaymentMethodKind, PaymentMethodSetting } from "@/domain/types";
+import { offeredPaymentOptions, PAYMENT_METHOD_NAME, PUBLIC_PAYMENT_OPTIONS } from "@/domain/public-payment-options";
+import type { PaymentMethodSetting } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { getStoreAdminView, PAYMENT_METHODS, type StoredShift } from "@/server/store-admin";
 import styles from "../../admin.module.css";
-import { AdminForm, CheckboxField, SelectField, TextAreaField, TextField } from "../admin-form";
+import { AdminForm, CheckboxField, SelectField, TextField } from "../admin-form";
 import { pesos } from "../catalogo/product-props";
 import { addShiftAction, deleteShiftAction, savePaymentMethodAction, saveStoreContactAction, setStoreStatusAction } from "./actions";
 import { PublicStatusText } from "./public-status-text";
@@ -27,8 +27,6 @@ const OVERRIDE_OPTIONS = [
   { value: "paused", label: "Pausado" },
   { value: "closed", label: "Cerrado" }
 ] as const;
-
-const METHOD_LABEL: Record<PaymentMethodKind, string> = { cash: "Efectivo", bank_transfer: "Transferencia", mercado_pago: "Mercado Pago" };
 
 /** "miércoles 00:00" in the store's time zone. */
 function when(date: Date, timeZone: string) {
@@ -58,8 +56,6 @@ export default async function StoreAdminPage() {
     (method): PaymentMethodSetting =>
       store.paymentMethods.find((candidate) => candidate.method === method) ?? {
         method,
-        displayName: METHOD_LABEL[method],
-        instructions: "",
         enabled: false,
         sortOrder: (PAYMENT_METHODS.indexOf(method) + 1) * 10
       }
@@ -152,21 +148,16 @@ export default async function StoreAdminPage() {
         {methods.map((method) => (
           <article aria-labelledby={`method-${method.method}`} className={styles.categoryCard} key={method.method}>
             <header className={styles.cardHeader}>
-              <h3 id={`method-${method.method}`}>{METHOD_LABEL[method.method]}</h3>
+              <h3 id={`method-${method.method}`}>{PAYMENT_METHOD_NAME[method.method]}</h3>
               <span className={method.enabled ? styles.badge : styles.badgeMuted}>{method.enabled ? "Habilitado" : "Deshabilitado"}</span>
             </header>
-            <AdminForm action={savePaymentMethodAction} submitLabel={`Guardar ${METHOD_LABEL[method.method]}`}>
+            <p className={styles.hint}>
+              Los clientes ven: «{publicCopy(method.method)}». El texto es fijo
+              {method.method === "bank_transfer" ? ": los datos de la transferencia se piden por WhatsApp y nunca se publican." : "."}
+            </p>
+            <AdminForm action={savePaymentMethodAction} submitLabel={`Guardar ${PAYMENT_METHOD_NAME[method.method]}`}>
               <input name="method" type="hidden" value={method.method} />
               <CheckboxField defaultChecked={method.enabled} label="Habilitado" name="enabled" />
-              <TextField defaultValue={method.displayName} label="Nombre visible" maxLength={60} name="displayName" required />
-              <TextAreaField
-                defaultValue={method.instructions}
-                hint="Texto opcional y público, por ejemplo «Pedí los datos por WhatsApp». Nunca alias, CBU, CVU ni números de cuenta (se piden por WhatsApp), ni claves o tokens."
-                label="Instrucciones"
-                maxLength={500}
-                name="instructions"
-                rows={2}
-              />
               <TextField defaultValue={String(method.sortOrder)} label="Orden" max={1000} min={0} name="sortOrder" type="number" />
             </AdminForm>
           </article>
@@ -203,6 +194,11 @@ export default async function StoreAdminPage() {
       </section>
     </section>
   );
+}
+
+function publicCopy(method: PaymentMethodSetting["method"]) {
+  const option = PUBLIC_PAYMENT_OPTIONS.find((candidate) => candidate.method === method);
+  return option ? `${option.label} — ${option.note}` : PAYMENT_METHOD_NAME[method];
 }
 
 function describeMercadoPagoReason(reason: string) {

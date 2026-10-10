@@ -9,7 +9,7 @@ import { evaluateStoreStatus } from "@/domain/store-status";
 import { createAuthoritativeQuote } from "@/server/checkout/quote";
 import type { AuthoritativeProduct, PaymentQuotesPort, PricingRepository } from "@/server/payments/ports";
 import { parseRows, toCategories, toProducts, toPromotionRules, toStoreSettings } from "./adapters";
-import { categoryRowSchema, productRowSchema, promotionRowSchema, storeRowSchema } from "./rows";
+import { categoryRowSchema, productRowSchema, promotionRowSchema, STORE_SELECT, storeRowSchema } from "./rows";
 
 /** An open store (BB-08), so a rejected quote can only come from option validation. */
 const openStoreStatus = async () =>
@@ -106,6 +106,23 @@ function storeRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("store operating settings", () => {
+  it("never reads the payment methods' free text, so a stored alias cannot reach the public catalog", () => {
+    expect(STORE_SELECT).toContain("store_payment_methods(method, is_enabled, sort_order)");
+    expect(STORE_SELECT).not.toMatch(/display_name|public_instructions/);
+    // A row written before the fixed-copy check (or by an unexpected path) still carries no text.
+    const parsed = parseRows("stores", storeRowSchema, [
+      storeRow({
+        store_payment_methods: [
+          { method: "bank_transfer", display_name: "Alias: bunker.burger", public_instructions: "Mi alias bancoburger", is_enabled: true, sort_order: 20 }
+        ]
+      })
+    ]);
+    if (!parsed.ok || !parsed.value[0]) throw new Error("expected a parsed store row");
+    const settings = toStoreSettings(parsed.value[0]);
+    expect(settings.paymentMethods).toEqual([{ method: "bank_transfer", enabled: true, sortOrder: 20 }]);
+    expect(JSON.stringify(settings, (_key, value: unknown) => (typeof value === "bigint" ? value.toString() : value))).not.toMatch(/bunker\.burger|bancoburger/);
+  });
+
   it("maps the override, a missing fee as null, and the weekly hours in day/opening order", () => {
     const parsed = parseRows("stores", storeRowSchema, [
       storeRow({

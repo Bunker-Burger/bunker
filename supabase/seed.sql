@@ -193,7 +193,7 @@ on conflict (id) do update set day_of_week = excluded.day_of_week, starts_at = e
 insert into public.store_payment_methods (
   store_id, method, display_name, public_instructions, is_enabled, sort_order
 ) values
-  ('0199b2c8-40b0-7000-8000-000000000001', 'cash', 'Efectivo', 'Abonás al recibir o retirar.', true, 10),
-  ('0199b2c8-40b0-7000-8000-000000000001', 'bank_transfer', 'Transferencia', 'Solicitá el alias actualizado por WhatsApp.', false, 20),
-  ('0199b2c8-40b0-7000-8000-000000000001', 'mercado_pago', 'Mercado Pago', 'Disponible cuando la integración esté configurada.', false, 30)
+  ('0199b2c8-40b0-7000-8000-000000000001', 'cash', 'Efectivo', '', true, 10),
+  ('0199b2c8-40b0-7000-8000-000000000001', 'bank_transfer', 'Transferencia', '', false, 20),
+  ('0199b2c8-40b0-7000-8000-000000000001', 'mercado_pago', 'Mercado Pago', '', false, 30)
 on conflict (store_id, method) do nothing;

@@ -41,8 +41,8 @@ function store(overrides: Partial<StoreSettings> = {}): StoreSettings {
       { dayOfWeek: 5, opensAt: "19:30", closesAt: "01:30" }
     ],
     paymentMethods: [
-      { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
-      { method: "bank_transfer", displayName: "Transferencia", instructions: "Alias bunker.burger", enabled: false, sortOrder: 20 }
+      { method: "cash", enabled: true, sortOrder: 10 },
+      { method: "bank_transfer", enabled: false, sortOrder: 20 }
     ],
     ...overrides
   };
@@ -122,8 +122,8 @@ describe("/bunker/admin/tienda", () => {
   ])("lists Mercado Pago to customers only while it is available (available: %s), keeping the saved preference", async (available, offered) => {
     const settings = store({
       paymentMethods: [
-        { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
-        { method: "mercado_pago", displayName: "Mercado Pago", instructions: "", enabled: true, sortOrder: 30 }
+        { method: "cash", enabled: true, sortOrder: 10 },
+        { method: "mercado_pago", enabled: true, sortOrder: 30 }
       ]
     });
     viewMock.mockResolvedValue(viewFor(settings, available ? { available: true, reasons: [] } : { available: false, reasons: ["config"] }));
@@ -134,27 +134,26 @@ describe("/bunker/admin/tienda", () => {
     expect(within(method).getByRole("checkbox", { name: "Habilitado" })).toBeChecked();
   });
 
-  it("shows transfers as the checkout does: ask for the details on WhatsApp, never the stored text", async () => {
-    viewMock.mockResolvedValue(
-      viewFor(
-        store({
-          paymentMethods: [{ method: "bank_transfer", displayName: "Transferencia", instructions: "Alias bunker.burger", enabled: true, sortOrder: 20 }]
-        })
-      )
-    );
+  it("shows transfers as the checkout does: ask for the details on WhatsApp", async () => {
+    viewMock.mockResolvedValue(viewFor(store({ paymentMethods: [{ method: "bank_transfer", enabled: true, sortOrder: 20 }] })));
     render(await StoreAdminPage());
     const publicView = screen.getByRole("region", { name: "Lo que ve el cliente" });
     expect(publicView).toHaveTextContent("Transferencia — Pedí el alias por WhatsApp y enviá el comprobante por ese chat");
-    expect(publicView).not.toHaveTextContent("bunker.burger");
   });
 
-  it("does not suggest writing an alias or CBU in the instructions", async () => {
+  it("offers no free text for any payment method: only enabled and order, with the fixed customer copy", async () => {
     viewMock.mockResolvedValue(viewFor(store()));
     render(await StoreAdminPage());
-    const transfer = screen.getByRole("article", { name: "Transferencia" });
-    const hint = within(transfer).getByText(/Texto opcional y público/);
-    expect(hint).toHaveTextContent("Nunca alias, CBU, CVU ni números de cuenta");
-    expect(hint.textContent).not.toMatch(/por ejemplo alias|alias o CBU/);
+    for (const name of ["Efectivo", "Transferencia", "Mercado Pago"]) {
+      const article = screen.getByRole("article", { name });
+      expect(within(article).queryAllByRole("textbox")).toEqual([]);
+      expect(within(article).getByRole("checkbox", { name: "Habilitado" })).toBeInTheDocument();
+      expect(within(article).getByRole("spinbutton", { name: "Orden" })).toBeInTheDocument();
+      expect(article.querySelector("[name=displayName], [name=instructions]")).toBeNull();
+    }
+    expect(screen.getByRole("article", { name: "Transferencia" })).toHaveTextContent(
+      "Los clientes ven: «Transferencia — Pedí el alias por WhatsApp y enviá el comprobante por ese chat». El texto es fijo: los datos de la transferencia se piden por WhatsApp y nunca se publican."
+    );
   });
 
   it("never puts server secrets in the HTML", async () => {

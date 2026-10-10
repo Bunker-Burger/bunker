@@ -20,10 +20,9 @@ export interface StoredShift {
   closesAt: string;
 }
 
+/** What the admin decides about a method. Its name and customer copy are fixed (no free text). */
 export interface StoredPaymentMethod {
   method: PaymentMethodKind;
-  displayName: string;
-  instructions: string;
   enabled: boolean;
   sortOrder: number;
 }
@@ -70,7 +69,6 @@ export interface StoreAdminRepository {
   addShift(storeId: string, shift: Omit<StoredShift, "id">): Promise<AdminResult<void>>;
   deleteShift(storeId: string, shiftId: string): Promise<AdminResult<void>>;
 
-  listPaymentMethods(storeId: string): Promise<AdminResult<StoredPaymentMethod[]>>;
   savePaymentMethod(storeId: string, method: StoredPaymentMethod): Promise<AdminResult<void>>;
 
   listProductIds(storeId: string): Promise<AdminResult<string[]>>;

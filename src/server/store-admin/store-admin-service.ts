@@ -1,3 +1,4 @@
+import { PAYMENT_METHOD_NAME } from "@/domain/public-payment-options";
 import { findOverlappingShift } from "@/domain/store-admin";
 import { adminUseCases, type AdminUseCaseDependencies } from "@/server/admin/use-case";
 import { parseDirection, parseId } from "@/server/catalog-admin/input";
@@ -107,7 +108,7 @@ export function savePaymentMethod(deps: StoreAdminDependencies, form: FormData) 
     if (method.value.method === "mercado_pago" && method.value.enabled && !deps.mercadoPagoConfigured()) {
       return success("Guardado. Mercado Pago no se ofrece a los clientes hasta completar su configuración en el servidor.", undefined);
     }
-    return success(`${method.value.displayName}: ${method.value.enabled ? "habilitado" : "deshabilitado"}.`, undefined);
+    return success(`${PAYMENT_METHOD_NAME[method.value.method]}: ${method.value.enabled ? "habilitado" : "deshabilitado"}.`, undefined);
   });
 }
 

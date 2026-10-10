@@ -168,10 +168,9 @@ export interface Category {
 
 export type PaymentMethodKind = "cash" | "bank_transfer" | "mercado_pago";
 
+/** No free text: names and customer copy are fixed per method (see public-payment-options). */
 export interface PaymentMethodSetting {
   method: PaymentMethodKind;
-  displayName: string;
-  instructions: string;
   enabled: boolean;
   sortOrder: number;
 }

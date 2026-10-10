@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { PAYMENT_METHOD_NAME } from "@/domain/public-payment-options";
 import { err, ok } from "@/lib/result";
 import { write, writeOne } from "@/server/admin/supabase-writes";
 import type { AdminResult } from "@/server/admin/use-case";
@@ -7,7 +8,7 @@ import { parseRows } from "@/server/catalog/adapters";
 import { catalogError } from "@/server/catalog/errors";
 import type { QueryResponse } from "@/server/catalog/supabase-catalog-repository";
 import type { Database } from "@/server/supabase/database.types";
-import { PAYMENT_METHODS, STATUS_OVERRIDES, type PromotionFields, type StoreAdminRepository } from "./ports";
+import { STATUS_OVERRIDES, type PromotionFields, type StoreAdminRepository } from "./ports";
 
 /*
  * Store and promotion writes through the signed-in admin's session client (RLS decides; no
@@ -26,13 +27,6 @@ const storeRow = z.object({
   whatsapp_e164: z.string()
 });
 const shiftRow = z.object({ id: z.string(), day_of_week: z.number().int(), opens_at: z.string(), closes_at: z.string() });
-const paymentRow = z.object({
-  method: z.enum(PAYMENT_METHODS),
-  display_name: z.string(),
-  public_instructions: z.string(),
-  is_enabled: z.boolean(),
-  sort_order: z.number().int()
-});
 
 const hhmm = (time: string) => time.slice(0, 5);
 
@@ -148,21 +142,6 @@ export function createSupabaseStoreAdminRepository(client: SupabaseClient<Databa
       return writeOne("store_business_hours.delete", q(client.from("store_business_hours").delete().eq("store_id", storeId).eq("id", shiftId).select("id")));
     },
 
-    async listPaymentMethods(storeId) {
-      const found = await rows(
-        "store_payment_methods.select",
-        "store_payment_methods",
-        paymentRow,
-        q(client.from("store_payment_methods").select("method, display_name, public_instructions, is_enabled, sort_order").eq("store_id", storeId))
-      );
-      if (!found.ok) return found;
-      return ok(
-        found.value
-          .map((row) => ({ method: row.method, displayName: row.display_name, instructions: row.public_instructions, enabled: row.is_enabled, sortOrder: row.sort_order }))
-          .sort((a, b) => a.sortOrder - b.sortOrder || a.method.localeCompare(b.method))
-      );
-    },
-
     savePaymentMethod(storeId, method) {
       return writeOne(
         "store_payment_methods.upsert",
@@ -173,8 +152,9 @@ export function createSupabaseStoreAdminRepository(client: SupabaseClient<Databa
               {
                 store_id: storeId,
                 method: method.method,
-                display_name: method.displayName,
-                public_instructions: method.instructions,
+                // Fixed copy: the row is public once enabled (store_payment_methods_fixed_public_copy).
+                display_name: PAYMENT_METHOD_NAME[method.method],
+                public_instructions: "",
                 is_enabled: method.enabled,
                 sort_order: method.sortOrder
               },

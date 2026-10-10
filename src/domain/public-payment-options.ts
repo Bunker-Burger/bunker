@@ -4,7 +4,18 @@ import type { PaymentMethodKind } from "./types";
  * How the checkout presents each payment method. Fixed copy, never the store's free text: a
  * transfer never shows an alias or bank details; the customer asks for them on WhatsApp and sends
  * the receipt there (BB-10). The admin's "what customers see" preview uses the same list.
+ *
+ * store_payment_methods is publicly readable once a method is enabled, so it stores no
+ * configurable text either: `display_name` is always PAYMENT_METHOD_NAME and
+ * `public_instructions` is always empty (check store_payment_methods_fixed_public_copy).
  */
+
+/** The only `display_name` each method can have (mirrored by the database check). */
+export const PAYMENT_METHOD_NAME: Record<PaymentMethodKind, string> = {
+  cash: "Efectivo",
+  bank_transfer: "Transferencia",
+  mercado_pago: "Mercado Pago"
+};
 
 export interface PublicPaymentOption {
   method: PaymentMethodKind;

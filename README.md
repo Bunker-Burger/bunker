@@ -65,7 +65,7 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
   - Override `auto`/`open`/`paused`/`closed`: `auto` y `open` exigen tarifa de delivery, en el caso de uso y en el check `stores_delivery_fee_required_to_accept_orders`. Mientras el local toma pedidos, la tarifa no se puede quitar.
   - WhatsApp normalizado a E.164.
   - Turnos semanales: se rechazan los solapados (`findOverlappingShift`), incluidos los que cruzan medianoche o la semana.
-  - Medios de pago con nombre, instrucciones, orden y habilitación. Las instrucciones quedan en una columna de lectura pública: el servidor rechaza alias, CBU/CVU y números de cuenta (`containsBankDetails`), porque la transferencia se coordina por WhatsApp.
+  - Medios de pago: sólo habilitación y orden. Ningún medio tiene texto configurable, porque la fila de un medio habilitado la lee cualquiera y una transferencia nunca publica alias ni datos bancarios (se piden por WhatsApp, BB-10). El nombre es fijo por medio (`PAYMENT_METHOD_NAME`) y `public_instructions` siempre está vacía; lo impone el check `store_payment_methods_fixed_public_copy` (migración `20261010220000`, que además normaliza las filas existentes). El catálogo público ni siquiera lee esas dos columnas.
   - "Lo que ve el cliente": la misma frase de estado que el storefront, la tarifa, el WhatsApp y los medios que ofrece el checkout, con su mismo texto (`src/domain/public-payment-options.ts`): Mercado Pago sólo si está disponible ahora, sin cambiar la preferencia guardada.
 - **Promociones (`/bunker/admin/promociones`).**
   - Listado en el orden en que se prueban (mayor prioridad primero), con fase: en vigencia, fuera de franja, programada, vencida o pausada.
