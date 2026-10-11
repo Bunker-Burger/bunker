@@ -53,6 +53,24 @@ test("keyboard users can skip to content and operate overlays", async ({ page })
   await expect(page.getByText("Smash Búnker Doble se agregó al carrito.")).toBeVisible();
 });
 
+test("a populated drawer and checkout stay accessible and announce cart changes", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Ver Smash Búnker Doble" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+  await expect(drawer.getByRole("button", { name: "Cerrar personalizador" })).toBeFocused();
+  const drawerAudit = await new AxeBuilder({ page }).include("[role=dialog]").withTags(WCAG_AA).analyze();
+  expect(drawerAudit.violations).toEqual([]);
+
+  await drawer.getByRole("button", { name: /Agregar 1 al carrito/ }).click();
+  await expect(page.getByRole("status")).toHaveText("Smash Búnker Doble se agregó al carrito.");
+
+  const checkout = page.locator("#checkout");
+  await checkout.getByRole("radio", { name: /Delivery/ }).check();
+  const checkoutAudit = await new AxeBuilder({ page }).include("#checkout").withTags(WCAG_AA).analyze();
+  expect(checkoutAudit.violations).toEqual([]);
+});
+
 test("interactive targets in the shell are at least 44px", async ({ page }) => {
   await page.goto("/design-system");
   const targets = page.locator("nav a, main button:visible, [role=tab], [role=combobox]");

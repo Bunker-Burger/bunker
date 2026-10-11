@@ -89,6 +89,26 @@ test("search and section filters narrow the menu; the card's Agregar uses defaul
   await expect(menu.getByRole("heading", { level: 3 })).toHaveText(["Papas Búnker", "Aros de Cebolla"]);
 });
 
+test("one orderable product of every public type reaches the same cart", async ({ page }) => {
+  await page.goto("/");
+  const products = [
+    "Smash Búnker Doble",
+    "Crispy Chicken Búnker",
+    "Papas Búnker",
+    "Limonada de la Casa"
+  ];
+
+  for (const name of products) {
+    await page.getByRole("button", { name: `Agregar ${name}` }).click();
+  }
+
+  await expect(page.getByLabel("Carrito, 4 productos")).toBeVisible();
+  const cart = page.locator("#carrito");
+  for (const name of products) {
+    await expect(cart.getByText(name, { exact: true })).toBeVisible();
+  }
+});
+
 test("the section chips stay pinned while scrolling and jump back to the results", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Ver Limonada de la Casa" }).scrollIntoViewIfNeeded();
