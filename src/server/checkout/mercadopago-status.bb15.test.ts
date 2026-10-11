@@ -50,9 +50,12 @@ const mpPayment = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
-async function check(payments: Array<Record<string, unknown>>, options: { paymentId?: string; quoteTotal?: bigint; now?: Date } = {}) {
+async function check(
+  payments: Array<Record<string, unknown>>,
+  options: { paymentId?: string; quoteTotal?: bigint; now?: Date; withoutQuote?: boolean } = {}
+) {
   const repository = createInMemoryPaymentRepository();
-  await repository.quotes.save(quote(options.quoteTotal));
+  if (!options.withoutQuote) await repository.quotes.save(quote(options.quoteTotal));
   await repository.attempts.save({
     id: "attempt-1",
     quoteId: "quote-1",
@@ -125,6 +128,18 @@ describe("checkMercadoPagoPaymentStatus with the provider's real amounts (BB-15 
     expect(result).toEqual({ status: "pending", verifying: true });
     expect(apply).not.toHaveBeenCalled();
     expect(attempt?.status).toBe("pending");
+  });
+
+  it.each([
+    ["searched by reference", {}],
+    ["read by the payment id of the return", { paymentId: "1001" }]
+  ])("without the frozen quote, a matching approved payment (%s) is not credited and no WhatsApp is built (R2 H4)", async (_case, options) => {
+    const { result, apply, attempt } = await check([mpPayment()], { ...options, withoutQuote: true });
+    expect(result).toEqual({ status: "pending", verifying: true });
+    expect(result).not.toHaveProperty("whatsappUrl");
+    expect(apply).not.toHaveBeenCalled();
+    expect(attempt?.status).toBe("pending");
+    expect(attempt?.providerPaymentId).toBeUndefined();
   });
 
   it("does not choose between two approved payments of the same order", async () => {

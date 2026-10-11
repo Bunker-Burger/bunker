@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(52);
+select plan(54);
 
 insert into public.stores (id, name, slug, whatsapp_e164, is_public)
 values ('99151000-0000-0000-0000-000000000001', 'BB15 Pay', 'bb15-pay', '+5491100000151', true);
@@ -110,6 +110,22 @@ select is(public.apply_mercado_pago_payment('bb15-ref-none', 'mp-1', 'approved',
 select is(public.apply_mercado_pago_payment('bb15-ref-0001', 'mp-1', 'approved', 150000, 'USD'), 'currency_mismatch', 'another currency credits nothing');
 select is(public.apply_mercado_pago_payment('bb15-ref-0001', 'mp-1', 'approved', 149999, 'ARS'), 'amount_mismatch', 'a different amount credits nothing');
 select is(public.apply_mercado_pago_payment('bb15-ref-0002', 'mp-2', 'approved', 95000, 'ARS'), 'amount_mismatch', 'the frozen quote total is checked too');
+-- R2 H4: an attempt without a frozen quote (pre-BB-03 rows) is never credited. Such a row cannot be
+-- inserted here without DDL on payment_attempts (its quote check rejects new rows), which this test
+-- must not run on the single cloud project: the guard is asserted on the function itself, and the
+-- behaviour is covered by the domain rule tests (payment-application.test.ts).
+select ok(
+  pg_get_functiondef('public.apply_mercado_pago_payment(text, text, text, bigint, text)'::regprocedure)
+    ~ 'if quote_total is null\s+or target_amount_cents is distinct from attempt\.amount_cents\s+or target_amount_cents <> quote_total then\s+return ''amount_mismatch'';',
+  'a missing frozen quote credits nothing (guard present in apply_mercado_pago_payment)'
+);
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.payment_attempts'::regclass and conname = 'payment_attempts_quote_required_for_new_rows'
+  ),
+  'BB-15 keeps the quote requirement for new attempts untouched'
+);
 select is(
   (select string_agg(status::text || ':' || coalesce(provider_payment_id, '-'), ',' order by external_reference)
    from public.payment_attempts where external_reference in ('bb15-ref-0001', 'bb15-ref-0002')),

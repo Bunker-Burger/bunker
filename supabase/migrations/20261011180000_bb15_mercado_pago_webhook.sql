@@ -101,7 +101,7 @@ comment on function public.finish_payment_webhook_event(text, uuid, text) is
   'BB-15: completes (null error code) or fails a webhook event, only for the delivery holding its current claim token.';
 
 -- Outcomes: approved, refunded, rejected, cancelled, pending, unchanged, unknown_reference,
--- currency_mismatch, amount_mismatch, conflicting_payment.
+-- currency_mismatch, amount_mismatch (also when the attempt has no frozen quote), conflicting_payment.
 create function public.apply_mercado_pago_payment(
   target_external_reference text,
   target_provider_payment_id text,
@@ -141,8 +141,11 @@ begin
   from public.payment_quotes q
   where q.id = attempt.quote_id and q.store_id = attempt.store_id;
 
-  if target_amount_cents is distinct from attempt.amount_cents
-    or (quote_total is not null and target_amount_cents <> quote_total) then
+  -- Both the attempt and its frozen quote must match. Without a quote (attempts older than BB-03
+  -- may lack one) there is no authoritative snapshot to check: nothing is credited.
+  if quote_total is null
+    or target_amount_cents is distinct from attempt.amount_cents
+    or target_amount_cents <> quote_total then
     return 'amount_mismatch';
   end if;
 

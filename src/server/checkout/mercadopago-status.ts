@@ -197,7 +197,13 @@ export async function checkMercadoPagoPaymentStatus(
 
   // 2. Reconciliación server-to-server con Mercado Pago
   const quote = await dependencies.quotes.findById(attempt.quoteId);
-  const quoteExpired = Boolean(quote && now > quote.expiresAt);
+  if (!quote) {
+    // BB-15 R2 H4: without the frozen quote there is no authoritative total to check the payment
+    // against, so the return never credits, never declares success and never builds the WhatsApp
+    // message: the order stays in review.
+    return { status: "pending", verifying: true };
+  }
+  const quoteExpired = now > quote.expiresAt;
 
   const detectConfig = dependencies.detectConfig ?? detectMercadoPagoConfig;
   const configDetection = detectConfig();
@@ -226,7 +232,7 @@ export async function checkMercadoPagoPaymentStatus(
       const matchesSnapshot =
         payment.currency === "ARS" &&
         payment.amountCents === attempt.expectedAmountCents &&
-        (quote === null || payment.amountCents === quote.totalCents);
+        payment.amountCents === quote.totalCents;
       if (!matchesSnapshot) {
         suspicious = true;
         return null;

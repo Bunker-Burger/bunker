@@ -35,6 +35,18 @@ const approved = (overrides: Partial<ProviderPayment> = {}): ProviderPayment => 
 /** Creates a preference while `meanwhile` runs inside the Mercado Pago call (a payment landing). */
 async function createWhile(meanwhile: (repository: ReturnType<typeof createInMemoryPaymentRepository>) => Promise<void>) {
   const repository = createInMemoryPaymentRepository();
+  // The frozen quote the checkout saved before creating the preference (BB-15 R2 H4 needs it).
+  await repository.quotes.save({
+    id: "quote-1",
+    lines: [{ productId: "p1", productName: "Smash", quantity: 1, unitPriceCents: 150000n, basePriceCents: 150000n, selectedOptions: [], notes: "" }],
+    subtotalCents: 150000n,
+    discountCents: 0n,
+    deliveryCents: 0n,
+    totalCents: 150000n,
+    promotion: null,
+    fulfillmentChannel: "pickup",
+    expiresAt: new Date("2026-10-11T12:15:00Z")
+  });
   const fetcher = vi.fn(async () => {
     await meanwhile(repository);
     return new Response(JSON.stringify({ id: "pref-1", init_point: "https://mp.example/pay" }), { status: 201 });

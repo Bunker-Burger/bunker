@@ -4,8 +4,8 @@ import type { PaymentAttempt, ProviderPayment, ProviderPaymentOutcome } from "./
  * BB-15: what a payment read from Mercado Pago does to its attempt. The database applies the same
  * rules atomically (`public.apply_mercado_pago_payment`, under a row lock); this pure copy serves
  * the in-memory repository and documents them:
- * - nothing is credited when the currency is not ARS or the amount differs from the attempt or its
- *   frozen quote;
+ * - nothing is credited when the currency is not ARS, the amount differs from the attempt or its
+ *   frozen quote, or there is no frozen quote at all (attempts older than BB-03): both must match;
  * - pending-like statuses (pending, in_process, authorized, in_mediation) only record the status;
  * - an approved attempt never goes back; only a refund (or chargeback) of that same payment moves it;
  * - a second approved payment for the same reference is reported (`conflicting_payment`, money to
@@ -38,7 +38,7 @@ export function applyProviderPaymentToAttempt(
   }
   if (!attempt) return { outcome: "unknown_reference" };
   if (payment.currency !== "ARS") return { outcome: "currency_mismatch" };
-  if (payment.amountCents !== attempt.expectedAmountCents || (quoteTotalCents !== null && payment.amountCents !== quoteTotalCents)) {
+  if (quoteTotalCents === null || payment.amountCents !== attempt.expectedAmountCents || payment.amountCents !== quoteTotalCents) {
     return { outcome: "amount_mismatch" };
   }
 

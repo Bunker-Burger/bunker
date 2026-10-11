@@ -37,6 +37,21 @@ describe("applyProviderPaymentToAttempt", () => {
     expect(applyProviderPaymentToAttempt(attempt(), 150000n, payment({ amountCents: 149999n }))).toEqual({ outcome: "amount_mismatch" });
   });
 
+  it("credits nothing when the attempt has no frozen quote, even with an exact amount (R2 H4)", () => {
+    expect(applyProviderPaymentToAttempt(attempt(), null, payment())).toEqual({ outcome: "amount_mismatch" });
+    for (const status of ["approved", "refunded", "rejected", "pending"]) {
+      expect(applyProviderPaymentToAttempt(attempt(), null, payment({ status }))).toEqual({ outcome: "amount_mismatch" });
+    }
+  });
+
+  it("credits only when attempt and quote both match the exact amount (R2 H4)", () => {
+    expect(applyProviderPaymentToAttempt(attempt(), 150000n, payment()).outcome).toBe("approved");
+    // Quote inconsistent with the attempt: the payment cannot match both.
+    expect(applyProviderPaymentToAttempt(attempt(), 150001n, payment())).toEqual({ outcome: "amount_mismatch" });
+    expect(applyProviderPaymentToAttempt(attempt(), 149999n, payment({ amountCents: 149999n }))).toEqual({ outcome: "amount_mismatch" });
+    expect(applyProviderPaymentToAttempt(attempt(), 0n, payment())).toEqual({ outcome: "amount_mismatch" });
+  });
+
   it("checks the frozen quote total too", () => {
     expect(applyProviderPaymentToAttempt(attempt({ expectedAmountCents: 95000n }), 90000n, payment({ amountCents: 95000n }))).toEqual({
       outcome: "amount_mismatch"

@@ -22,8 +22,22 @@ function request(options: { dataId?: string; body?: unknown; rawBody?: string; s
   });
 }
 
-async function dependencies(getPayment: () => Promise<ProviderPayment> = async () => payment) {
+async function dependencies(getPayment: () => Promise<ProviderPayment> = async () => payment, options: { withQuote?: boolean } = {}) {
   const repository = createInMemoryPaymentRepository();
+  if (options.withQuote ?? true) {
+    // The frozen quote of the attempt: crediting needs both to match (BB-15 R2 H4).
+    await repository.quotes.save({
+      id: "quote-1",
+      lines: [{ productId: "p1", productName: "Smash", quantity: 1, unitPriceCents: 150000n, basePriceCents: 150000n, selectedOptions: [], notes: "" }],
+      subtotalCents: 150000n,
+      discountCents: 0n,
+      deliveryCents: 0n,
+      totalCents: 150000n,
+      promotion: null,
+      fulfillmentChannel: "pickup",
+      expiresAt: new Date(Date.now() + 15 * 60_000)
+    });
+  }
   await repository.attempts.save({
     id: "attempt-1",
     quoteId: "quote-1",
@@ -45,6 +59,18 @@ describe("handleMercadoPagoWebhookRequest", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({ received: true });
     expect((await repository.attempts.findByExternalReference("ref-00000001"))?.status).toBe("approved");
+  });
+
+  it("does not credit an attempt without a frozen quote, even with a matching approved payment (R2 H4)", async () => {
+    const { deps, repository, log } = await dependencies(async () => payment, { withQuote: false });
+    const response = await handleMercadoPagoWebhookRequest(request(), deps);
+    // Settled for Mercado Pago (retrying would not change it), not credited, recorded for review.
+    expect(response.status).toBe(200);
+    const attempt = await repository.attempts.findByExternalReference("ref-00000001");
+    expect(attempt?.status).toBe("pending");
+    expect(attempt?.providerPaymentId).toBeUndefined();
+    expect(repository.webhookEvent("12345")).toEqual({ status: "failed", errorCode: "amount_mismatch", deliveries: 1 });
+    expect(log).toHaveBeenCalledWith("warn", expect.objectContaining({ result: "not_applied", reason: "amount_mismatch" }));
   });
 
   it("answers 200 to a replay, without new effects", async () => {
