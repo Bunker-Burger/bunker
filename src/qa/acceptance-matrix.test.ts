@@ -240,6 +240,23 @@ describe("validateAcceptanceMatrix", () => {
     expect(errors).toEqual([]);
   });
 
+  it("resolves fragments in real test titles, including a parameterized template", async () => {
+    const matrix = completeMatrix();
+    const source = [
+      `test("${TEST_TITLE}", () => {});`,
+      "const name = \"paused\";",
+      "test(`a ${name} store cannot receive an order from the app, but the menu and cart keep working`, async () => {});",
+      'it("follows the form live: changing the percentage changes the prices", async () => {});',
+      'it("TC-SEC-01 (authoritative): calcula autoritativamente con la base de datos sin recibir precios del navegador", async () => {});',
+      'it("TC-ZERO-TRUST: nunca acredita por parámetros de URL arbitrarios sin validación con MP (P2-06)", async () => {});'
+    ].join("\n");
+    await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
+    matrix.requirements[0]!.evidence[0]!.test = "store cannot receive an order from the app, but the menu and cart keep working";
+    matrix.requirements[1]!.evidence[0]!.test = "changing the percentage changes the prices";
+    matrix.requirements[2]!.evidence[0]!.test = "calcula autoritativamente con la base de datos sin recibir precios del navegador";
+    matrix.requirements[3]!.evidence[0]!.test = "TC-ZERO-TRUST: nunca acredita por parámetros de URL arbitrarios sin validación con MP";
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+  });
   it("keeps every BB-07 through BB-17 requirement mapped to resolvable evidence", async () => {
     expect(repositoryMatrix.version).toBe(1);
     expect(repositoryMatrix.requirements).toHaveLength(44);
