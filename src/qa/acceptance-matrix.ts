@@ -31,6 +31,16 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function markdownAnchor(heading: string): string {
+  return heading
+    .trim()
+    .toLocaleLowerCase("es")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 _-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
 export async function validateAcceptanceMatrix(matrix: unknown, rootDir: string): Promise<string[]> {
   const document = object(matrix);
   if (!document || !Array.isArray(document.requirements)) {
@@ -56,7 +66,28 @@ export async function validateAcceptanceMatrix(matrix: unknown, rootDir: string)
       const kind = text(evidence?.kind);
       if (kind === "manual") {
         if (!text(evidence?.reason)) errors.push(`${id}: manual evidence requires a reason`);
-        if (!text(evidence?.checklist)) errors.push(`${id}: manual evidence requires a checklist anchor`);
+        const checklist = text(evidence?.checklist);
+        if (!checklist) {
+          errors.push(`${id}: manual evidence requires a checklist anchor`);
+          continue;
+        }
+        const [file = "", anchor = ""] = checklist.split("#", 2);
+        let source: string;
+        try {
+          source = await readFile(path.resolve(rootDir, file), "utf8");
+        } catch {
+          errors.push(`${id}: checklist file does not exist: ${file || "<missing>"}`);
+          continue;
+        }
+        const anchors = source
+          .split(/\r?\n/)
+          .flatMap((line) => {
+            const match = /^#{1,6}\s+(.+?)\s*$/.exec(line);
+            return match ? [markdownAnchor(match[1]!)] : [];
+          });
+        if (!anchor || !anchors.includes(anchor)) {
+          errors.push(`${id}: checklist anchor not found in ${file}: ${anchor || "<missing>"}`);
+        }
         continue;
       }
 
