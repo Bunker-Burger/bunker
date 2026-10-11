@@ -10,11 +10,11 @@ export default defineConfig({
   retries: 0,
   reporter: "line",
   outputDir: "test-results/admin-auth",
-  preserveOutput: "failures-only",
+  preserveOutput: "never",
   use: {
     baseURL,
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
+    trace: "off",
+    screenshot: "off",
     video: "off"
   },
   projects: [{ name: "admin-auth", use: { ...devices["Desktop Chrome"] } }],

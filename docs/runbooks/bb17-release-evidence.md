@@ -10,7 +10,7 @@ Para cada PR, el SHA actual debe tener éxito en:
 - `CI / e2e`: build de producción y Playwright en Chromium;
 - el deployment Vercel Preview correspondiente exactamente al mismo SHA.
 
-Si Playwright falla, el job sube un artifact `playwright-evidence-<run>-<attempt>` que contiene `playwright-report/` y `test-results/`. La configuración conserva screenshot y trace de cada fallo final, incluidos los recorridos de Auth protegidos cuando se ejecutan con su configuración dedicada.
+Si Playwright público falla, el job sube un artifact `playwright-evidence-<run>-<attempt>` que contiene `playwright-report/` y `test-results/`. La configuración conserva screenshot y trace de cada fallo final. Los recorridos de Auth protegidos mantienen artifacts desactivados para no persistir datos administrativos ni credenciales en el runner.
 
 ## Vercel Preview y branch protection
 
