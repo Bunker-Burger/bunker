@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ALLERGEN_NOTICE, LEGAL_NAV_VISIBLE } from "@/content/legal";
+import { ALLERGEN_NOTICE } from "@/content/legal";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { Category } from "@/domain/types";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
@@ -141,14 +141,18 @@ describe("sin carta leída y sin menú demo (BB-18)", () => {
 
 describe("pie legal (BB-18)", () => {
   it("avisa que la carta no informa alérgenos y, con los textos en revisión, no enlaza las páginas legales", () => {
-    expect(LEGAL_NAV_VISIBLE).toBe(false);
     renderStorefront();
 
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent(ALLERGEN_NOTICE);
+    const hiddenContainer = footer.querySelector("div[hidden]");
+    expect(hiddenContainer).not.toBeNull();
+    expect(hiddenContainer).not.toBeVisible();
     expect(within(footer).queryByRole("navigation", { name: "Textos legales" })).toBeNull();
     expect(within(footer).queryAllByRole("link")).toEqual([]);
-    expect(document.querySelector('a[href^="/legal/"]')).toBeNull();
+    expect([...footer.querySelectorAll('a[href^="/legal/"]')].map((link) => link.getAttribute("href"))).toEqual([
+      "/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"
+    ]);
   });
 });
 

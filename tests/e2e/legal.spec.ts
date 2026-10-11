@@ -1,15 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-/* BB-18: while the texts are under review, the menu does not link them, but each URL still answers. */
+/* BB-18: los enlaces existen en el HTML pero quedan ocultos; las rutas siguen respondiendo. */
 
-test("the menu footer keeps the allergen notice and links no legal page", async ({ page }) => {
+test("the menu footer keeps the allergen notice and hides the legal links", async ({ page }) => {
   await page.goto("/");
 
   // Inside <main>, so not a contentinfo landmark in a real browser: found by its notice.
   const footer = page.locator("footer", { hasText: "La carta no informa alérgenos." });
   await expect(footer).toBeVisible();
   await expect(footer.getByRole("navigation", { name: "Textos legales" })).toHaveCount(0);
-  await expect(page.locator('a[href^="/legal/"]')).toHaveCount(0);
+  const nav = footer.locator('div[hidden] > nav[aria-label="Textos legales"]');
+  await expect(nav).toBeHidden();
+  const links = nav.locator('a[href^="/legal/"]');
+  await expect(links).toHaveCount(3);
+  for (const link of await links.all()) await expect(link).toBeHidden();
 });
 
 for (const [path, heading] of [

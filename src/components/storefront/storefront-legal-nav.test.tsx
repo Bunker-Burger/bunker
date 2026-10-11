@@ -5,14 +5,7 @@ import { resetCartStoreForTesting } from "@/lib/cart-store";
 import { serializePublicCatalog } from "@/server/catalog/public-products";
 import { Storefront } from "./storefront";
 
-/*
- * BB-18: the footer links come back by flipping LEGAL_NAV_VISIBLE once the owner approves the texts.
- * The flag is only overridden here; storefront-menu.test.tsx covers the shipped value (hidden).
- */
-vi.mock("@/content/legal", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/content/legal")>()),
-  LEGAL_NAV_VISIBLE: true
-}));
+/* BB-18: los enlaces permanecen en el HTML y se muestran quitando `hidden`. */
 
 beforeEach(() => {
   localStorage.clear();
@@ -27,13 +20,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("pie legal con LEGAL_NAV_VISIBLE activado", () => {
-  it("enlaza términos, privacidad y cancelaciones, junto al aviso de alérgenos", () => {
+describe("pie legal con atributo hidden", () => {
+  it("permanece oculto y queda visible al quitar hidden del contenedor", () => {
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent("La carta no informa alérgenos.");
-    const links = within(within(footer).getByRole("navigation", { name: "Textos legales" })).getAllByRole("link");
+    const container = footer.querySelector("div[hidden]");
+    expect(container).not.toBeNull();
+    expect(container).not.toBeVisible();
+    expect(within(footer).queryByRole("navigation", { name: "Textos legales" })).toBeNull();
+
+    container!.removeAttribute("hidden");
+
+    const nav = within(footer).getByRole("navigation", { name: "Textos legales" });
+    expect(nav).toBeVisible();
+    const links = within(nav).getAllByRole("link");
     expect(links.map((link) => link.getAttribute("href"))).toEqual(["/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"]);
   });
 });

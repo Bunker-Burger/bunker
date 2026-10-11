@@ -8,7 +8,6 @@ import CancellationsPage, { dynamic as cancellationsDynamic, metadata as cancell
 import LegalLayout from "./layout";
 import {
   ALLERGEN_NOTICE,
-  LEGAL_NAV_VISIBLE,
   LEGAL_PAGES,
   LEGAL_REVIEW,
   PAYMENT_DATA_RETENTION_DAYS,
@@ -217,8 +216,7 @@ describe("términos y cancelaciones", () => {
 });
 
 describe("en revisión: fuera del pie de la carta y de los buscadores", () => {
-  it("the menu footer does not link them and the review is not approved", () => {
-    expect(LEGAL_NAV_VISIBLE).toBe(false);
+  it("the legal texts are not approved", () => {
     expect(LEGAL_REVIEW.approved).toBe(false);
   });
 
