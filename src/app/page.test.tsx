@@ -71,6 +71,11 @@ const initialCatalogOf = async () => {
   return element.props.initialCatalog;
 };
 
+const catalogFallbackOf = async () => {
+  const element = (await Home({ searchParams: Promise.resolve({}) })) as { props: { catalogFallback: string } };
+  return element.props.catalogFallback;
+};
+
 const showAdminNavOf = async () => {
   const element = (await Home({ searchParams: Promise.resolve({}) })) as { props: { showAdminNav: boolean } };
   return element.props.showAdminNav;
@@ -87,6 +92,22 @@ describe("/ (server render)", () => {
   it("passes no snapshot (null) when the catalog cannot be read", async () => {
     tables = "down";
     expect(await initialCatalogOf()).toBeNull();
+  });
+
+  it("never falls back to the demo menu when a configured project fails to answer (BB-18)", async () => {
+    tables = "down";
+    expect(await catalogFallbackOf()).toBe("empty");
+  });
+
+  it("never falls back to the demo menu on a Vercel deployment, even without Supabase (BB-18)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(await catalogFallbackOf()).toBe("empty");
+  });
+
+  it("keeps the demo menu for local work and CI without Supabase", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    expect(await catalogFallbackOf()).toBe("demo");
   });
 
   it("shows admin navigation only for a valid active store membership", async () => {

@@ -205,3 +205,11 @@ body.drawer-open { overflow: hidden; }
 .return-modal-instruction span { color: var(--color-muted); }
 .return-modal-actions { display: flex; gap: .75rem; }
 
+
+/* BB-18: allergen notice and legal links, at the end of the page above the bottom nav. */
+.store-legal { display: grid; gap: .5rem; margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); color: var(--color-muted); font-size: var(--text-body-sm); }
+.store-legal p { margin: 0; }
+.store-legal nav { display: flex; flex-wrap: wrap; gap: 0 1.25rem; }
+.store-legal a { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); font-weight: 700; text-underline-offset: 3px; }
+.store-legal a:focus-visible { outline: 2px solid var(--color-primary-hover); outline-offset: 3px; }
+.checkout-whatsapp-note a { color: var(--color-primary); font-weight: 700; }

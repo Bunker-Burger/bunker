@@ -116,6 +116,13 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
 - **Cerrar sesión purga** la copia de la carta, que pudo quedar con la pestaña Admin, y cualquier entrada bajo `/bunker` o `/api` (`purgeSessionCaches`). Admin nunca se cachea.
 - **Aviso de instalación discreto:** sólo después de agregar un producto en esa visita, nunca si ya está instalada, y no vuelve por 30 días si se descarta. En iOS, que no tiene diálogo de instalación, muestra los pasos de Safari (Compartir → "Agregar a inicio").
 
+## Textos legales y privacidad (BB-18)
+
+- `/legal/terminos`, `/legal/privacidad` y `/legal/cancelaciones`, accesibles por URL. En la carta, los enlaces están dentro de un contenedor HTML con `hidden` en `src/components/storefront/storefront.tsx`: para mostrarlos, basta quitar ese atributo. El aviso de alérgenos queda visible; las páginas piden `noindex, nofollow` (`LEGAL_ROBOTS`). El enlace a Privacidad junto a nombre y teléfono de Mercado Pago no depende de esa bandera. Los hechos que repiten (retención de 90 días, aviso de alérgenos, titular, estado de revisión) viven en `src/content/legal.ts`.
+- **Contacto de privacidad:** el WhatsApp del local (de la carta) o, si la base no responde, `PRIVACY_CONTACT_WHATSAPP` / `PRIVACY_CONTACT_EMAIL` del servidor, que da el dueño. Sin ninguno, la página dice que el canal está pendiente.
+- **Sin aprobar todavía:** las páginas muestran "Texto en revisión" y el titular como pendiente hasta que el dueño apruebe por escrito. Aprobaciones, preguntas legales y para el contador, e inventario de activos: `docs/legal/bb-18-lanzamiento.md`.
+- **Menú demo sólo sin Supabase y fuera de Vercel** (`allowsDemoCatalog`): un despliegue que no puede leer la carta muestra "No pudimos cargar la carta", nunca productos ni fotos de ejemplo. El menú demo no tiene fotos (las de Stitch no estaban autorizadas).
+
 ## UI
 
 Tailwind CSS 4.3 se carga desde `src/app/globals.css`, que es la única fuente de tokens (colores, tipografía, radios, sombras, `tap` de 44 px y ancho `content` de 1280 px). La paleta por defecto de Tailwind está deshabilitada: usar solo utilidades de tokens (`bg-surface`, `text-primary`, `text-headline-md`, `rounded-lg`, `min-h-tap`…) o `var(--color-*)` en CSS. Oswald (títulos y precios) y Space Grotesk (cuerpo y controles) se cargan con `next/font`.
