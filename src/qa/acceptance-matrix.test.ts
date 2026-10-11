@@ -140,6 +140,22 @@ describe("validateAcceptanceMatrix", () => {
     expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
   });
 
+  it("rejects automated evidence where a test declaration is nested inside a string literal", async () => {
+    await writeFile(path.join(rootDir, "sample.test.ts"), `const fake = 'test("${TEST_TITLE}", () => {});';\n`, "utf8");
+
+    const errors = await validateAcceptanceMatrix(completeMatrix(), rootDir);
+
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("rejects automated evidence where a test declaration is nested inside a template literal", async () => {
+    await writeFile(path.join(rootDir, "sample.test.ts"), `const fake = \`test("${TEST_TITLE}", () => {});\`;\n`, "utf8");
+
+    const errors = await validateAcceptanceMatrix(completeMatrix(), rootDir);
+
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
   it("rejects automated evidence in SQL where the assertion only appears in a comment", async () => {
     const matrix = completeMatrix();
     matrix.requirements[0]!.evidence[0]!.file = "sample.sql";

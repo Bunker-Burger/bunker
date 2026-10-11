@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import ts from "typescript";
 
 const REQUIRED_TICKETS = [
   "BB-07",
@@ -43,50 +44,70 @@ function expectedTicketForId(id: string): string {
   return match ? `${match[1]}-${match[2]}` : "";
 }
 
-function stripJsComments(source: string): string {
-  let result = "";
-  let i = 0;
-  const n = source.length;
-  while (i < n) {
-    if (source[i] === '"' || source[i] === "'" || source[i] === "`") {
-      const quote = source[i];
-      result += quote;
-      i++;
-      while (i < n) {
-        if (source[i] === "\\") {
-          result += source[i];
-          if (i + 1 < n) {
-            result += source[i + 1];
-            i += 2;
-          } else {
-            i++;
+function getTestDeclarationRoot(expr: ts.Expression): string | null {
+  if (ts.isIdentifier(expr)) {
+    return expr.text;
+  }
+  if (ts.isPropertyAccessExpression(expr)) {
+    return getTestDeclarationRoot(expr.expression);
+  }
+  if (ts.isCallExpression(expr)) {
+    return getTestDeclarationRoot(expr.expression);
+  }
+  if (ts.isTaggedTemplateExpression(expr)) {
+    return getTestDeclarationRoot(expr.tag);
+  }
+  return null;
+}
+
+const JS_TEST_ROOTS = new Set(["it", "test"]);
+
+function checkJsTestDeclaration(source: string, testTitle: string, fileName: string): boolean {
+  const scriptKind = fileName.endsWith("x")
+    ? ts.ScriptKind.TSX
+    : fileName.endsWith(".js") || fileName.endsWith(".mjs")
+      ? ts.ScriptKind.JS
+      : ts.ScriptKind.TS;
+
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKind
+  );
+
+  let found = false;
+
+  function visit(node: ts.Node): void {
+    if (found) return;
+
+    if (ts.isCallExpression(node)) {
+      const root = getTestDeclarationRoot(node.expression);
+      if (root && JS_TEST_ROOTS.has(root)) {
+        const firstArg = node.arguments[0];
+        if (firstArg) {
+          if (ts.isStringLiteral(firstArg) || ts.isNoSubstitutionTemplateLiteral(firstArg)) {
+            if (firstArg.text.includes(testTitle)) {
+              found = true;
+              return;
+            }
+          } else if (ts.isTemplateExpression(firstArg)) {
+            const raw = firstArg.getText(sourceFile);
+            if (raw.includes(testTitle)) {
+              found = true;
+              return;
+            }
           }
-        } else if (source[i] === quote) {
-          result += quote;
-          i++;
-          break;
-        } else {
-          result += source[i];
-          i++;
         }
       }
-    } else if (source[i] === "/" && source[i + 1] === "/") {
-      i += 2;
-      while (i < n && source[i] !== "\n" && source[i] !== "\r") {
-        i++;
-      }
-    } else if (source[i] === "/" && source[i + 1] === "*") {
-      i += 2;
-      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
-        i++;
-      }
-      i += 2;
-    } else {
-      result += source[i];
-      i++;
     }
+
+    ts.forEachChild(node, visit);
   }
-  return result;
+
+  visit(sourceFile);
+  return found;
 }
 
 function stripSqlComments(source: string): string {
@@ -127,110 +148,6 @@ function stripSqlComments(source: string): string {
     }
   }
   return result;
-}
-
-function isJsIdentifierChar(ch: string): boolean {
-  return /[a-zA-Z0-9_$]/.test(ch);
-}
-
-function findMatchingOpenParen(source: string, closePos: number): number {
-  let depth = 1;
-  let i = closePos - 1;
-  while (i >= 0) {
-    if (source[i] === ")") {
-      depth++;
-    } else if (source[i] === "(") {
-      depth--;
-      if (depth === 0) return i;
-    }
-    i--;
-  }
-  return -1;
-}
-
-function findMatchingOpenBacktick(source: string, closePos: number): number {
-  let i = closePos - 1;
-  while (i >= 0) {
-    if (source[i] === "`" && (i === 0 || source[i - 1] !== "\\")) {
-      return i;
-    }
-    i--;
-  }
-  return -1;
-}
-
-const JS_TEST_ROOTS = new Set(["it", "test"]);
-
-function checkJsTestDeclaration(cleanSource: string, testTitle: string): boolean {
-  let searchPos = 0;
-  while (true) {
-    const idx = cleanSource.indexOf(testTitle, searchPos);
-    if (idx === -1) return false;
-    searchPos = idx + 1;
-
-    let quotePos = idx - 1;
-    let quoteChar = "";
-    while (quotePos >= 0) {
-      const ch = cleanSource[quotePos];
-      if (ch === '"' || ch === "'" || ch === "`") {
-        let backslashes = 0;
-        let k = quotePos - 1;
-        while (k >= 0 && cleanSource[k] === "\\") {
-          backslashes++;
-          k--;
-        }
-        if (backslashes % 2 === 0) {
-          quoteChar = ch;
-          break;
-        }
-      }
-      quotePos--;
-    }
-    if (quotePos < 0 || !quoteChar) continue;
-
-    let parenPos = quotePos - 1;
-    while (parenPos >= 0 && /\s/.test(cleanSource[parenPos]!)) {
-      parenPos--;
-    }
-    if (parenPos < 0 || cleanSource[parenPos] !== "(") continue;
-
-    let beforeParen = parenPos - 1;
-    while (beforeParen >= 0 && /\s/.test(cleanSource[beforeParen]!)) {
-      beforeParen--;
-    }
-    if (beforeParen < 0) continue;
-
-    if (cleanSource[beforeParen] === ")") {
-      const openParen = findMatchingOpenParen(cleanSource, beforeParen);
-      if (openParen <= 0) continue;
-      beforeParen = openParen - 1;
-      while (beforeParen >= 0 && /\s/.test(cleanSource[beforeParen]!)) {
-        beforeParen--;
-      }
-    } else if (cleanSource[beforeParen] === "`") {
-      const openTick = findMatchingOpenBacktick(cleanSource, beforeParen);
-      if (openTick <= 0) continue;
-      beforeParen = openTick - 1;
-      while (beforeParen >= 0 && /\s/.test(cleanSource[beforeParen]!)) {
-        beforeParen--;
-      }
-    }
-
-    let chainStart = beforeParen;
-    while (
-      chainStart >= 0 &&
-      (isJsIdentifierChar(cleanSource[chainStart]!) || cleanSource[chainStart] === ".")
-    ) {
-      chainStart--;
-    }
-    const chain = cleanSource.slice(chainStart + 1, beforeParen + 1);
-    const root = chain.split(".")[0];
-
-    const beforeRoot = chainStart >= 0 ? cleanSource[chainStart]! : "";
-    if (root && JS_TEST_ROOTS.has(root) && !isJsIdentifierChar(beforeRoot) && beforeRoot !== ".") {
-      return true;
-    }
-  }
 }
 
 const PGTAP_ASSERTIONS = new Set([
@@ -291,8 +208,7 @@ function isValidTestEvidence(source: string, testTitle: string, file: string): b
     const clean = stripSqlComments(source);
     return checkPgTapAssertion(clean, testTitle);
   }
-  const clean = stripJsComments(source);
-  return checkJsTestDeclaration(clean, testTitle);
+  return checkJsTestDeclaration(source, testTitle, file);
 }
 
 export async function validateAcceptanceMatrix(matrix: unknown, rootDir: string): Promise<string[]> {
