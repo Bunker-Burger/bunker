@@ -18,6 +18,8 @@ Un mantenedor debe abrir la configuración de la rama principal y comprobar que 
 
 La comprobación se registra en la PR con captura o enlace de la regla, nombre exacto de los checks, SHA y URL del Preview. Si el nombre del check de Vercel cambia, se actualiza la regla; no se codifica aquí un nombre supuesto.
 
+Si el plan del repositorio (e.g. repositorio privado sin GitHub Pro) o los permisos de la organización devuelven HTTP 403 al consultar branch protection o rulesets, o si la integración de Vercel no emite checks en la PR, esto debe reportarse como BLOQUEO EXTERNO explícito. No se deben inventar checks, ni declarar completado el gate, ni desactivar protecciones. El gate sólo se cierra cuando el mantenedor con permisos demuestre que un fallo en cualquiera de estos checks bloquea efectivamente el merge.
+
 ## Prueba de artefactos de fallo
 
 Antes de declarar BB-17 listo, seguir `docs/qa/bb17-manual-checklist.md#artefactos-de-fallo`. El run fallido controlado debe contener al menos:
