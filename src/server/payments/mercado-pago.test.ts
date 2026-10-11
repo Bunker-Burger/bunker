@@ -74,8 +74,12 @@ describe("createCheckoutProPreference", () => {
       return new Response(JSON.stringify({ id: "pref-1", init_point: "https://mp.example/pay" }), { status: 201 });
     };
     const attempts = new Map();
+    const savedBeforeContactingMercadoPago: PaymentAttempt[] = [];
     const port: PaymentAttemptsPort = {
-      async save(attempt) { attempts.set(attempt.id, attempt); },
+      async save(attempt) {
+        if (requests.length === 0) savedBeforeContactingMercadoPago.push(attempt);
+        attempts.set(attempt.id, attempt);
+      },
       async findByExternalReference() { return null; },
       async markApproved() {}
     };
@@ -112,6 +116,8 @@ describe("createCheckoutProPreference", () => {
       // BB-15: minimal contact kept with the attempt for the 90-day retention.
       customer: { name: "Ana Pérez", phone: "+5491155551234" }
     });
+    // Already with the contact before the payment can exist: a timeout after paying keeps it reachable.
+    expect(savedBeforeContactingMercadoPago).toEqual([expect.objectContaining({ customer: { name: "Ana Pérez", phone: "+5491155551234" } })]);
   });
 
   it("does not send a notification_url Mercado Pago would refuse (http APP_URL in development)", async () => {
