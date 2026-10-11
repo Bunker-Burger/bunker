@@ -106,6 +106,16 @@ function isTestCall(expression: ts.LeftHandSideExpression): boolean {
   return false;
 }
 
+/** Registry titles may be distinctive static fragments of an actual parameterized test. */
+function hasTitleFragment(title: ts.Expression, fragment: string): boolean {
+  if (ts.isStringLiteralLike(title)) return title.text.includes(fragment);
+  if (ts.isTemplateExpression(title)) {
+    return [title.head.text, ...title.templateSpans.map((span) => span.literal.text)]
+      .some((part) => part.includes(fragment));
+  }
+  return false;
+}
+
 function checkJsTestDeclaration(source: string, testTitle: string, file: string): boolean {
   const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   let found = false;
@@ -114,7 +124,7 @@ function checkJsTestDeclaration(source: string, testTitle: string, file: string)
     if (found) return;
     if (ts.isCallExpression(node) && isTestCall(node.expression)) {
       const [title, implementation] = node.arguments;
-      if (title && ts.isStringLiteralLike(title) && title.text === testTitle
+      if (title && hasTitleFragment(title, testTitle)
         && implementation && (ts.isArrowFunction(implementation) || ts.isFunctionExpression(implementation))) {
         found = true;
         return;
