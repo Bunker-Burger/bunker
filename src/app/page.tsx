@@ -1,6 +1,7 @@
 import { Storefront } from "@/components/storefront/storefront";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { getPublicCatalog } from "@/server/catalog";
+import { allowsDemoCatalog } from "@/server/catalog/demo-catalog";
 import { getMercadoPagoAvailability } from "@/server/payments/mercado-pago-availability";
 
 interface HomeProps {
@@ -43,6 +44,7 @@ export default async function Home({ searchParams }: HomeProps) {
           : undefined
       }
       initialCatalog={initialCatalog}
+      catalogFallback={allowsDemoCatalog(catalogResult, process.env.VERCEL_ENV) ? "demo" : "empty"}
       initialReturnReference={refParam ?? null}
       initialReturnPaymentId={paymentIdParam ?? null}
     />

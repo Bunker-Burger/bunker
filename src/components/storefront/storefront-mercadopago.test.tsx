@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
@@ -150,6 +150,9 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
     expect(
       screen.getByText(/Solo te pedimos nombre y teléfono para identificar tu pago/i)
     ).toBeInTheDocument();
+    // BB-18: how long they are kept and where the privacy policy is.
+    const contactNote = screen.getByText(/Se borran a los 90 días/);
+    expect(within(contactNote).getByRole("link", { name: "Privacidad" })).toHaveAttribute("href", "/legal/privacidad");
 
     // With inputs empty, button is disabled
     const submitBtn = screen.getByTestId("mp-submit-button");

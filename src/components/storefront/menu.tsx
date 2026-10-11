@@ -22,10 +22,12 @@ interface MenuProps {
   promotionFor: (product: Product) => PromotionalPrice | null;
   onOpen: (product: Product) => void;
   onAdd: (product: Product) => void;
+  /** No snapshot could be read yet (and no demo menu is allowed): not the same as an empty menu. */
+  unavailable?: boolean;
 }
 
 /** The public menu: search, section filters and the sections in the configured order. */
-export function Menu({ products, categories, promotionFor, onOpen, onAdd }: MenuProps) {
+export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavailable = false }: MenuProps) {
   const [filter, setFilter] = useState<MenuFilter>("all");
   const [query, setQuery] = useState("");
   const searchId = useId();
@@ -47,6 +49,16 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd }: Menu
   const shown = sections.reduce((total, section) => total + section.products.length, 0);
   const published = products.some((product) => product.published);
   const narrowed = activeFilter !== "all" || query.trim() !== "";
+
+  if (unavailable && !published) {
+    return (
+      <div className="empty-state menu-empty menu-unavailable" role="status">
+        <UtensilsCrossed aria-hidden="true" />
+        <h2>No pudimos cargar la carta</h2>
+        <p>Reintentamos en un momento. Si no aparece, revisá tu conexión.</p>
+      </div>
+    );
+  }
 
   // Nothing published is a real state of the store, not a failed search: no tools, no cards.
   if (!published) {

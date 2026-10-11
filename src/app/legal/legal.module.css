@@ -1,0 +1,128 @@
+.legal {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 100dvh;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: calc(1.5rem + env(safe-area-inset-top)) 1rem calc(2rem + env(safe-area-inset-bottom));
+  color: var(--color-foreground);
+  background: var(--color-canvas);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back,
+.footer a,
+.content a {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.back:focus-visible,
+.footer a:focus-visible,
+.content a:focus-visible {
+  outline: 2px solid var(--color-primary-hover);
+  outline-offset: 3px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: var(--tracking-eyebrow);
+  color: var(--color-primary);
+}
+
+.review {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  line-height: 1.6;
+}
+
+.content h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  line-height: var(--text-hero--line-height);
+  text-transform: uppercase;
+}
+
+.content h2 {
+  margin: 1rem 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  text-transform: uppercase;
+}
+
+.content p,
+.content ul {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.content ul {
+  padding-left: 1.25rem;
+}
+
+.content li + li {
+  margin-top: 0.4rem;
+}
+
+.content strong {
+  color: var(--color-foreground);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}

@@ -111,6 +111,44 @@ describe("carta pública", () => {
   });
 });
 
+describe("sin carta leída y sin menú demo (BB-18)", () => {
+  it("no inventa productos: avisa que no pudo cargar y muestra la carta real cuando el servidor responde", async () => {
+    renderStorefront({ catalogFallback: "empty" });
+
+    expect(menu().getByRole("heading", { level: 2, name: "No pudimos cargar la carta" })).toBeTruthy();
+    expect(menu().queryByRole("heading", { level: 3 })).toBeNull();
+    expect(await menu().findByRole("heading", { level: 3, name: "Smash Búnker Doble" })).toBeTruthy();
+    expect(menu().queryByText("No pudimos cargar la carta")).toBeNull();
+  });
+
+  it("si el servidor tampoco responde, sigue sin productos y no dice que la carta está vacía", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
+    renderStorefront({ catalogFallback: "empty" });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(menu().getByText("No pudimos cargar la carta")).toBeTruthy();
+    expect(menu().queryByText("La carta está vacía por ahora")).toBeNull();
+    expect(menu().queryByRole("heading", { level: 3 })).toBeNull();
+  });
+
+  it("una carta real vacía sigue diciendo que el local no publicó productos", () => {
+    renderStorefront({ catalogFallback: "empty", initialCatalog: { products: [], categories: fixtureCategories } });
+
+    expect(menu().getByText("La carta está vacía por ahora")).toBeTruthy();
+  });
+});
+
+describe("pie legal (BB-18)", () => {
+  it("avisa que la carta no informa alérgenos y enlaza términos, privacidad y cancelaciones", () => {
+    renderStorefront();
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("La carta no informa alérgenos.");
+    const links = within(within(footer).getByRole("navigation", { name: "Textos legales" })).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"]);
+  });
+});
+
 describe("drawer de producto", () => {
   it("la tarjeta abre /?producto=<slug>; Escape cierra, limpia la URL y devuelve el foco a la tarjeta", async () => {
     const user = userEvent.setup();
