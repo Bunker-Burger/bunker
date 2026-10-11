@@ -124,7 +124,107 @@ describe("validateAcceptanceMatrix", () => {
     );
   });
 
+  it("rejects automated evidence where the test title only appears in a comment", async () => {
+    await writeFile(path.join(rootDir, "sample.test.ts"), `// test("${TEST_TITLE}", () => {});\n/* ${TEST_TITLE} */\n`, "utf8");
+
+    const errors = await validateAcceptanceMatrix(completeMatrix(), rootDir);
+
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("rejects automated evidence where the test title only appears in an arbitrary string", async () => {
+    await writeFile(path.join(rootDir, "sample.test.ts"), `const message = "${TEST_TITLE}";\nconsole.log(message);\n`, "utf8");
+
+    const errors = await validateAcceptanceMatrix(completeMatrix(), rootDir);
+
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("rejects automated evidence in SQL where the assertion only appears in a comment", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
+    await writeFile(path.join(rootDir, "sample.sql"), `-- select ok(1, '${TEST_TITLE}');\nselect 1;\n`, "utf8");
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.sql: ${TEST_TITLE}`);
+  });
+
+  it("rejects incorrect matrix version", async () => {
+    const matrix = { ...completeMatrix(), version: 2 };
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+
+    expect(errors).toContain("matrix.version must be 1");
+  });
+
+  it("rejects mismatched requirement tickets (ticket cruzado)", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.ticket = "BB-08"; // ID is BB07-AC1
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+
+    expect(errors).toContain(`${matrix.requirements[0]!.id}: ticket does not match id: BB-08`);
+  });
+
+  it("rejects empty requirement criterion", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.criterion = "   ";
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+
+    expect(errors).toContain(`${matrix.requirements[0]!.id}: criterion must be a non-empty string`);
+  });
+
+  it("rejects extra requirement ids", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements.push({
+      id: "BB07-AC5",
+      ticket: "BB-07",
+      criterion: "Extra requirement criterion",
+      evidence: [{
+        kind: "unit",
+        environment: "local",
+        file: "sample.test.ts",
+        test: TEST_TITLE
+      }]
+    });
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+
+    expect(errors).toContain("extra requirement id: BB07-AC5");
+  });
+
+  it("accepts valid test declarations across Vitest it, test, it.each, test.each, and pgTAP", async () => {
+    const matrix = completeMatrix();
+    await writeFile(path.join(rootDir, "sample.test.ts"), `
+      test("${TEST_TITLE}", () => {});
+      it("BB07-AC1 test", () => {});
+      test("BB07-AC2 test", async () => {});
+      it.each([["a"], ["b"]])("BB07-AC3 %s test", () => {});
+      test.each([1, 2])("BB07-AC4 %i test", () => {});
+    `, "utf8");
+    matrix.requirements[0]!.evidence[0]!.test = "BB07-AC1 test";
+    matrix.requirements[1]!.evidence[0]!.test = "BB07-AC2 test";
+    matrix.requirements[2]!.evidence[0]!.test = "BB07-AC3 %s test";
+    matrix.requirements[3]!.evidence[0]!.test = "BB07-AC4 %i test";
+
+    await writeFile(path.join(rootDir, "sample.sql"), `
+      select ok(1 = 1, 'BB08-AC1 sql test');
+      select is(2, 2, 'BB08-AC2 sql test');
+    `, "utf8");
+    matrix.requirements[4]!.evidence[0]!.file = "sample.sql";
+    matrix.requirements[4]!.evidence[0]!.test = "BB08-AC1 sql test";
+    matrix.requirements[5]!.evidence[0]!.file = "sample.sql";
+    matrix.requirements[5]!.evidence[0]!.test = "BB08-AC2 sql test";
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toEqual([]);
+  });
+
   it("keeps every BB-07 through BB-17 requirement mapped to resolvable evidence", async () => {
+    expect(repositoryMatrix.version).toBe(1);
+    expect(repositoryMatrix.requirements).toHaveLength(44);
     const tickets = new Set(repositoryMatrix.requirements.map(({ ticket }) => ticket));
     expect(tickets).toEqual(new Set([
       "BB-07", "BB-08", "BB-09", "BB-10", "BB-11", "BB-12",
