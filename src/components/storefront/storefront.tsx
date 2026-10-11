@@ -35,8 +35,10 @@ import { toPromotionRule } from "@/domain/public-promotions";
 import { PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
 import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { useOnlineStatus } from "@/lib/use-online-status";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
 import { STORE_TIMEZONE } from "@/data/catalog";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
@@ -272,6 +274,9 @@ export function Storefront({
     setEditingLine(null);
   };
 
+  // The install suggestion waits for a real interaction in this visit, not a cart restored from storage.
+  const [addedThisVisit, setAddedThisVisit] = useState(false);
+
   const addDirect = (product: Product) => {
     if (!product.inStock) return;
     const defaults = getDefaultSelection(product);
@@ -283,6 +288,7 @@ export function Storefront({
     setCart((current) => addCartLine(current, makeCartLine(product, defaults, 1, "")));
     setRevalidationNotice("");
     setNotice(`${product.name} se agregó al carrito.`);
+    setAddedThisVisit(true);
   };
 
   const keyboardOpen = useVirtualKeyboardOpen();
@@ -316,6 +322,7 @@ export function Storefront({
       {revalidationNotice || notice || linkNotice ? (
         <div className="toast" role="status">{revalidationNotice || notice || linkNotice}</div>
       ) : null}
+      <InstallPrompt engaged={addedThisVisit} />
 
       <section className="menu-section" id="menu" aria-labelledby="menu-title">
         <div className="menu-intro">
@@ -385,6 +392,7 @@ export function Storefront({
             } else {
               setCart((current) => addCartLine(current, submittedLine));
               setNotice(`${submittedLine.productName} se agregó al carrito.`);
+              setAddedThisVisit(true);
             }
             closeProduct();
           }}
@@ -744,6 +752,8 @@ function CheckoutSection({
   }, [cart, fulfilment]);
 
   const isCustomerValid = customerName.trim().length >= 2 && customerPhone.trim().length >= 6;
+  // Offline the menu can still be browsed from the cache, but nothing is sent or paid (BB-16).
+  const online = useOnlineStatus();
   const nowMs = now?.getTime() ?? null;
   // Display-only estimate with the same engine the server quote uses; the server recomputes it.
   const estimate = useMemo(
@@ -761,6 +771,7 @@ function CheckoutSection({
   const isVerified = verificationStatus === "verified";
 
   const canSubmitMp =
+    online &&
     acceptingOrders &&
     isVerified &&
     hasValidLines &&
@@ -873,7 +884,9 @@ function CheckoutSection({
 
   const totals = confirmed ?? estimate;
   const promotion = confirmed ? confirmed.promotion : estimate.promotion;
-  const blockedLabel = storeStatus.kind === "ready" && storeStatus.checking
+  const blockedLabel = !online
+    ? "Sin conexión"
+    : storeStatus.kind === "ready" && storeStatus.checking
     ? "Verificando el local…"
     : !acceptingOrders
       ? "No se pueden enviar pedidos ahora"
@@ -883,7 +896,9 @@ function CheckoutSection({
 
   const mpButtonLabel = isSubmittingMp
     ? "Conectando con Mercado Pago…"
-    : storeStatus.kind === "ready" && storeStatus.checking
+    : !online
+      ? "Sin conexión"
+      : storeStatus.kind === "ready" && storeStatus.checking
       ? "Verificando el local…"
       : !acceptingOrders
         ? "No se pueden enviar pedidos ahora"
@@ -969,6 +984,11 @@ function CheckoutSection({
           ) : null}
           <div className="summary-total" data-testid="checkout-total"><span>{confirmed ? "Total" : "Total estimado"}</span><strong>{formatArs(totals.totalCents)}</strong></div>
           <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
+          {!online ? (
+            <p aria-live="polite" className="store-status-note text-warning" data-testid="offline-note">
+              Sin conexión: podés ver la carta y armar el carrito, pero para enviar o pagar el pedido necesitás internet.
+            </p>
+          ) : null}
           {!hasValidLines ? (
             <p aria-live="polite" className="store-status-note text-muted">
               El carrito está vacío. Agregá productos para finalizar el pedido.
@@ -1002,7 +1022,7 @@ function CheckoutSection({
             >
               {mpButtonLabel}
             </button>
-          ) : confirmed ? (
+          ) : confirmed && online ? (
             <a className="whatsapp-button" href={confirmed.url} rel="noopener noreferrer" target="_blank">
               Enviar pedido por WhatsApp
             </a>

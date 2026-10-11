@@ -3,9 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
-import { logout } from "../actions";
 import { ADMIN_LOGIN_PATH } from "../paths";
 import { AdminNav } from "./admin-nav";
+import { LogoutForm } from "./logout-form";
 import styles from "../admin.module.css";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -23,9 +23,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </Link>
         <div className={styles.adminActions}>
           <span className={styles.role}>{role}</span>
-          <form action={logout}>
-            <button className={styles.secondaryAction} type="submit">Cerrar sesión</button>
-          </form>
+          <LogoutForm buttonClassName={styles.secondaryAction} />
         </div>
       </header>
       <div className={styles.adminContent}>

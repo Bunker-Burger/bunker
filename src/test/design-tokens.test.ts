@@ -20,9 +20,9 @@ interface Allowance {
 
 const ALLOWED: Allowance[] = [
   {
-    file: "app/layout.tsx",
-    match: /themeColor: "#[0-9a-f]{6}"/,
-    reason: "Viewport metadata cannot read CSS variables; equality with --color-canvas is asserted below."
+    file: "app/manifest.ts",
+    match: /THEME_COLOR = "#[0-9a-f]{6}"/,
+    reason: "The web manifest and viewport metadata cannot read CSS variables; equality with --color-canvas is asserted below."
   },
   {
     file: "components/storefront/storefront.css",
@@ -125,10 +125,13 @@ describe("design token guard", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps the browser theme color equal to the canvas token", () => {
+  it("keeps the browser and installed-app theme color equal to the canvas token", () => {
     const canvas = /--color-canvas:\s*(#[0-9a-f]{6})/.exec(readFileSync(TOKENS_FILE, "utf8"))?.[1];
-    const themeColor = /themeColor: "(#[0-9a-f]{6})"/.exec(readFileSync(path.join(SRC, "app", "layout.tsx"), "utf8"))?.[1];
+    const themeColor = /THEME_COLOR = "(#[0-9a-f]{6})"/.exec(readFileSync(path.join(SRC, "app", "manifest.ts"), "utf8"))?.[1];
     expect(canvas).toBeDefined();
     expect(themeColor).toBe(canvas);
+    // The viewport and the manifest read that single constant.
+    expect(readFileSync(path.join(SRC, "app", "layout.tsx"), "utf8")).toMatch(/themeColor: THEME_COLOR/);
+    expect(readFileSync(path.join(SRC, "app", "manifest.ts"), "utf8")).toMatch(/background_color: THEME_COLOR,\s*theme_color: THEME_COLOR/);
   });
 });
