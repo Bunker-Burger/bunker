@@ -37,6 +37,7 @@ function fakeContainer({ controlled, waiting = null }: { controlled: boolean; wa
       for (const listener of updateFound) listener();
     },
     takeOver() {
+      container.controller = {};
       for (const listener of controllerChange) listener();
     }
   };
@@ -99,5 +100,25 @@ describe("registerServiceWorker", () => {
     fake.takeOver();
     expect(handlers.onUpdateReady).not.toHaveBeenCalled();
     expect(handlers.onControllerChange).not.toHaveBeenCalled();
+  });
+
+  it("still offers later versions in the tab where the first install happened", async () => {
+    const fake = fakeContainer({ controlled: false });
+    const handlers = callbacks();
+    await registerServiceWorker(fake.container, handlers);
+    const first = fakeWorker();
+    fake.foundUpdate(first);
+    first.become("installed");
+    fake.takeOver(); // clientsClaim: the first worker now controls this tab
+
+    const next = fakeWorker();
+    fake.foundUpdate(next);
+    next.become("installed");
+    expect(handlers.onUpdateReady).toHaveBeenCalledTimes(1);
+    handlers.onUpdateReady.mock.calls[0]![0]();
+    expect(next.postMessage).toHaveBeenCalledWith(SKIP_WAITING);
+    fake.takeOver();
+    expect(handlers.onControllerChange).toHaveBeenCalledTimes(1);
+    expect(handlers.onControllerChange).toHaveBeenCalledWith(true);
   });
 });

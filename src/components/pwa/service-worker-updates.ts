@@ -28,12 +28,14 @@ export interface UpdateCallbacks {
 }
 
 export async function registerServiceWorker(container: WorkerContainer, callbacks: UpdateCallbacks) {
-  // Without a controller this is the first install: there is no older shell to protect.
-  const hadController = Boolean(container.controller);
+  // Decided per event, not once at registration: the tab where the first install happened is
+  // claimed by that worker and must still be offered every later version.
+  let controlled = Boolean(container.controller);
   let acceptedHere = false;
 
   const offer = (worker: Worker) => {
-    if (!hadController) return;
+    // Without a controller this is the first install: there is no older shell to protect.
+    if (!container.controller) return;
     callbacks.onUpdateReady(() => {
       acceptedHere = true;
       worker.postMessage(SKIP_WAITING);
@@ -41,7 +43,9 @@ export async function registerServiceWorker(container: WorkerContainer, callback
   };
 
   container.addEventListener("controllerchange", () => {
-    if (hadController) callbacks.onControllerChange(acceptedHere);
+    // The first install claiming an uncontrolled page is not an update.
+    if (controlled) callbacks.onControllerChange(acceptedHere);
+    controlled = true;
   });
 
   const registration = await container.register("/sw.js", { scope: "/", updateViaCache: "none" });
