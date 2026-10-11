@@ -8,7 +8,7 @@ export default defineConfig({
   fullyParallel: true,
   outputDir: "test-results/playwright",
   preserveOutput: "failures-only",
-  retries: process.env.CI ? 2 : 0,
+  retries: 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
   use: {
     baseURL,
