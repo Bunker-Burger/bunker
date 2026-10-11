@@ -140,6 +140,24 @@ describe("validateAcceptanceMatrix", () => {
     expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
   });
 
+  it.each([
+    ["single-quoted source string", `const fake = 'test("${TEST_TITLE}", () => {});';\n`],
+    ["backtick source string", "const fake = `test(\"" + TEST_TITLE + "\", () => {});`;\n"],
+    ["multiline source string", `const fake = 'it("${TEST_TITLE}", () => { return true; });';\n`]
+  ])("rejects a %s containing a fake executable test", async (_kind, source) => {
+    const matrix = completeMatrix();
+    await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("detects a removed executable test even if a source literal retains its title", async () => {
+    const matrix = completeMatrix();
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+    await writeFile(path.join(rootDir, "sample.test.ts"), `const former = 'test("${TEST_TITLE}", () => {});';\n`, "utf8");
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
   it("rejects automated evidence in SQL where the assertion only appears in a comment", async () => {
     const matrix = completeMatrix();
     matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
