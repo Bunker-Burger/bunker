@@ -163,6 +163,10 @@ export async function createCheckoutProPreference(
     return inFlight;
   }
 
+  // Minimal contact kept with the attempt (BB-15): a paid order is reachable even if the customer
+  // never sends the WhatsApp message. Removed with the attempt by the 90-day purge.
+  const customer = { name: input.customer.name.trim(), phone: input.customer.phone.trim() };
+
   const creationPromise = (async () => {
     assertAcceptingOrders(await dependencies.storeStatus());
 
@@ -206,7 +210,8 @@ export async function createCheckoutProPreference(
         externalReference: finalExternalReference,
         expectedAmountCents: input.quote.totalCents,
         status: "pending",
-        createdAt: dependencies.now()
+        createdAt: dependencies.now(),
+        customer
       });
     } catch (saveError) {
       const isUniqueConflict =
@@ -295,6 +300,11 @@ export async function createCheckoutProPreference(
           failure: `${dependencies.config.appUrl}/?payment=failure&ref=${finalExternalReference}`
         },
         auto_return: "approved",
+        // BB-15: where Mercado Pago notifies payment changes. Only a public https URL is accepted
+        // there; a local http APP_URL relies on the panel's webhook URL and the return check.
+        ...(dependencies.config.appUrl.startsWith("https://")
+          ? { notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook` }
+          : {}),
         expires: true,
         expiration_date_to: input.quote.expiresAt.toISOString()
       })
@@ -314,7 +324,8 @@ export async function createCheckoutProPreference(
         expectedAmountCents: input.quote.totalCents,
         status: "pending",
         createdAt: dependencies.now(),
-        providerPreferenceId: parsed.id
+        providerPreferenceId: parsed.id,
+        customer
       });
     }
 

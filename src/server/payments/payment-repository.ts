@@ -2,15 +2,44 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { FulfilmentMethod } from "@/domain/types";
 import { readSupabaseConfig } from "@/server/supabase/config";
 import type { Database, Json } from "@/server/supabase/database.types";
+import { applyProviderPaymentToAttempt } from "./payment-application";
 import type {
   PaymentAttempt,
   PaymentAttemptsPort,
   PaymentQuote,
   PaymentQuotesPort,
-  QuoteLine
+  ProviderPayment,
+  ProviderPaymentOutcome,
+  QuoteLine,
+  WebhookEventsPort
 } from "./ports";
 
 const DEFAULT_STORE_ID = "0199b2c8-40b0-7000-8000-000000000001";
+
+/** Statuses a payment can still approve (BB-15); approved and refunded attempts are settled. */
+const OPEN_ATTEMPT_STATUSES = ["created", "pending", "expired", "rejected", "cancelled"] as const;
+
+const PROVIDER_PAYMENT_OUTCOMES = new Set<ProviderPaymentOutcome>([
+  "approved",
+  "refunded",
+  "rejected",
+  "cancelled",
+  "pending",
+  "unchanged",
+  "unknown_reference",
+  "currency_mismatch",
+  "amount_mismatch",
+  "conflicting_payment"
+]);
+
+/** An unexpected webhook claim in-flight longer than this is taken over by the next delivery. */
+export const WEBHOOK_CLAIM_STALE_MS = 60_000;
+
+export interface PaymentPersistencePorts {
+  quotes: PaymentQuotesPort;
+  attempts: PaymentAttemptsPort & Required<Pick<PaymentAttemptsPort, "applyProviderPayment">>;
+  events: WebhookEventsPort;
+}
 
 function serializeLines(lines: QuoteLine[]): Json {
   return lines.map((line) => ({
@@ -42,10 +71,28 @@ function deserializeLines(json: unknown): QuoteLine[] {
   });
 }
 
+type AttemptRow = Database["public"]["Tables"]["payment_attempts"]["Row"];
+
+function toAttempt(data: AttemptRow): PaymentAttempt {
+  return {
+    id: data.id,
+    quoteId: data.quote_id ?? "",
+    idempotencyKey: data.idempotency_key ?? undefined,
+    externalReference: data.external_reference,
+    expectedAmountCents: BigInt(data.amount_cents),
+    status: data.status as PaymentAttempt["status"],
+    createdAt: new Date(data.created_at),
+    providerPaymentId: data.provider_payment_id ?? undefined,
+    providerPreferenceId: data.provider_preference_id ?? undefined,
+    providerStatus: data.provider_status ?? undefined,
+    customer: data.customer_name && data.customer_phone ? { name: data.customer_name, phone: data.customer_phone } : undefined
+  };
+}
+
 export function createSupabasePaymentRepository(
   client: SupabaseClient<Database>,
   options?: { storeId?: string }
-): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } {
+): PaymentPersistencePorts {
   const storeId = options?.storeId ?? DEFAULT_STORE_ID;
 
   const quotes: PaymentQuotesPort = {
@@ -89,7 +136,7 @@ export function createSupabasePaymentRepository(
     }
   };
 
-  const attempts: PaymentAttemptsPort = {
+  const attempts: PersistencePortsAttempts = {
     async save(attempt: PaymentAttempt): Promise<void> {
       const { error } = await client.from("payment_attempts").upsert({
         id: attempt.id,
@@ -103,6 +150,8 @@ export function createSupabasePaymentRepository(
         provider_preference_id: attempt.providerPreferenceId ?? null,
         provider_payment_id: attempt.providerPaymentId ?? null,
         status: attempt.status,
+        customer_name: attempt.customer?.name ?? null,
+        customer_phone: attempt.customer?.phone ?? null,
         expires_at: new Date(attempt.createdAt.getTime() + 15 * 60_000).toISOString()
       }, { onConflict: "external_reference" });
       if (error) {
@@ -133,17 +182,7 @@ export function createSupabasePaymentRepository(
         .maybeSingle();
 
       if (error || !data) return null;
-      return {
-        id: data.id,
-        quoteId: data.quote_id ?? "",
-        idempotencyKey: data.idempotency_key ?? undefined,
-        externalReference: data.external_reference,
-        expectedAmountCents: BigInt(data.amount_cents),
-        status: data.status as PaymentAttempt["status"],
-        createdAt: new Date(data.created_at),
-        providerPaymentId: data.provider_payment_id ?? undefined,
-        providerPreferenceId: data.provider_preference_id ?? undefined
-      };
+      return toAttempt(data);
     },
 
     async findByIdempotencyKey(key: string): Promise<PaymentAttempt | null> {
@@ -154,20 +193,11 @@ export function createSupabasePaymentRepository(
         .maybeSingle();
 
       if (error || !data) return null;
-      return {
-        id: data.id,
-        quoteId: data.quote_id ?? "",
-        idempotencyKey: data.idempotency_key ?? undefined,
-        externalReference: data.external_reference,
-        expectedAmountCents: BigInt(data.amount_cents),
-        status: data.status as PaymentAttempt["status"],
-        createdAt: new Date(data.created_at),
-        providerPaymentId: data.provider_payment_id ?? undefined,
-        providerPreferenceId: data.provider_preference_id ?? undefined
-      };
+      return toAttempt(data);
     },
 
     async markApproved(reference: string, providerPaymentId: string): Promise<void> {
+      // Never over a settled attempt: another payment must not replace the approved one (BB-15).
       const { error } = await client
         .from("payment_attempts")
         .update({
@@ -175,23 +205,67 @@ export function createSupabasePaymentRepository(
           provider_payment_id: providerPaymentId,
           updated_at: new Date().toISOString()
         })
-        .eq("external_reference", reference);
+        .eq("external_reference", reference)
+        .in("status", [...OPEN_ATTEMPT_STATUSES]);
 
       if (error) {
         throw new Error(`Error al actualizar attempt: ${error.message}`);
       }
+    },
+
+    async applyProviderPayment(payment: ProviderPayment): Promise<ProviderPaymentOutcome> {
+      if (!payment.externalReference) return "unknown_reference";
+      const { data, error } = await client.rpc("apply_mercado_pago_payment", {
+        target_external_reference: payment.externalReference,
+        target_provider_payment_id: payment.id,
+        target_provider_status: payment.status,
+        target_amount_cents: Number(payment.amountCents),
+        target_currency: payment.currency
+      });
+      if (error) throw new Error(`Error al aplicar el pago: ${error.message}`);
+      if (!PROVIDER_PAYMENT_OUTCOMES.has(data as ProviderPaymentOutcome)) throw new Error("Resultado de pago inesperado");
+      return data as ProviderPaymentOutcome;
     }
   };
 
-  return { quotes, attempts };
+  const events: WebhookEventsPort = {
+    async begin(eventId: string, providerPaymentId: string) {
+      const { data, error } = await client.rpc("claim_payment_webhook_event", {
+        target_event_id: eventId,
+        target_provider_payment_id: providerPaymentId
+      });
+      if (error) throw new Error(`Error al registrar el evento: ${error.message}`);
+      if (data !== "started" && data !== "duplicate") throw new Error("Resultado de evento inesperado");
+      return data;
+    },
+
+    async complete(eventId: string) {
+      const { error } = await client
+        .from("payment_webhook_events")
+        .update({ processing_status: "completed", completed_at: new Date().toISOString(), last_error_code: null })
+        .eq("event_id", eventId);
+      if (error) throw new Error(`Error al completar el evento: ${error.message}`);
+    },
+
+    async fail(eventId: string, errorCode: string) {
+      const { error } = await client
+        .from("payment_webhook_events")
+        .update({ processing_status: "failed", completed_at: null, last_error_code: errorCode.slice(0, 80) })
+        .eq("event_id", eventId);
+      if (error) throw new Error(`Error al marcar el evento: ${error.message}`);
+    }
+  };
+
+  return { quotes, attempts, events };
 }
 
-export function createInMemoryPaymentRepository(): {
-  quotes: PaymentQuotesPort;
-  attempts: PaymentAttemptsPort;
-} {
+type PersistencePortsAttempts = PaymentPersistencePorts["attempts"];
+
+export function createInMemoryPaymentRepository(options: { now?: () => Date } = {}): PaymentPersistencePorts {
+  const now = options.now ?? (() => new Date());
   const quotesMap = new Map<string, PaymentQuote>();
   const attemptsMap = new Map<string, PaymentAttempt>();
+  const eventsMap = new Map<string, { providerPaymentId: string; status: "processing" | "completed" | "failed"; claimedAt: number; errorCode: string | null; deliveries: number }>();
 
   const quotes: PaymentQuotesPort = {
     async save(quote: PaymentQuote): Promise<void> {
@@ -203,7 +277,7 @@ export function createInMemoryPaymentRepository(): {
     }
   };
 
-  const attempts: PaymentAttemptsPort = {
+  const attempts: PersistencePortsAttempts = {
     async save(attempt: PaymentAttempt): Promise<void> {
       // P1-10: Simular la restricción UNIQUE de PostgreSQL sobre idempotency_key
       if (attempt.idempotencyKey) {
@@ -246,17 +320,48 @@ export function createInMemoryPaymentRepository(): {
     },
     async markApproved(reference: string, providerPaymentId: string): Promise<void> {
       const found = attemptsMap.get(reference);
-      if (found) {
+      if (found && (OPEN_ATTEMPT_STATUSES as readonly string[]).includes(found.status)) {
         attemptsMap.set(reference, {
           ...found,
           status: "approved",
           providerPaymentId
         });
       }
+    },
+    async applyProviderPayment(payment: ProviderPayment): Promise<ProviderPaymentOutcome> {
+      // Synchronous read-decide-write: no await in between, like the row lock of the database.
+      const attempt = payment.externalReference ? attemptsMap.get(payment.externalReference) ?? null : null;
+      const quoteTotal = attempt ? quotesMap.get(attempt.quoteId)?.totalCents ?? null : null;
+      const { outcome, next } = applyProviderPaymentToAttempt(attempt, quoteTotal, payment);
+      if (next) attemptsMap.set(next.externalReference, next);
+      return outcome;
     }
   };
 
-  return { quotes, attempts };
+  const events: WebhookEventsPort = {
+    async begin(eventId: string, providerPaymentId: string) {
+      const existing = eventsMap.get(eventId);
+      const at = now().getTime();
+      if (!existing) {
+        eventsMap.set(eventId, { providerPaymentId, status: "processing", claimedAt: at, errorCode: null, deliveries: 1 });
+        return "started";
+      }
+      const retryable = existing.status === "failed" || (existing.status === "processing" && at - existing.claimedAt > WEBHOOK_CLAIM_STALE_MS);
+      if (existing.providerPaymentId !== providerPaymentId || !retryable) return "duplicate";
+      eventsMap.set(eventId, { ...existing, status: "processing", claimedAt: at, errorCode: null, deliveries: existing.deliveries + 1 });
+      return "started";
+    },
+    async complete(eventId: string) {
+      const existing = eventsMap.get(eventId);
+      if (existing) eventsMap.set(eventId, { ...existing, status: "completed", errorCode: null });
+    },
+    async fail(eventId: string, errorCode: string) {
+      const existing = eventsMap.get(eventId);
+      if (existing) eventsMap.set(eventId, { ...existing, status: "failed", errorCode });
+    }
+  };
+
+  return { quotes, attempts, events };
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -278,7 +383,7 @@ export function isPaymentPersistenceConfigured(environment: Environment = proces
 
 export function getPaymentPersistencePorts(options?: {
   storeId?: string;
-}): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } | null {
+}): PaymentPersistencePorts | null {
   const settings = persistenceSettings(process.env);
   if (!settings) return null;
 

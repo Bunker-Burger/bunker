@@ -189,6 +189,8 @@ export type Database = {
           amount_cents: number
           created_at: string
           currency: string
+          customer_name: string | null
+          customer_phone: string | null
           expires_at: string | null
           external_reference: string
           id: string
@@ -196,6 +198,7 @@ export type Database = {
           provider: string
           provider_payment_id: string | null
           provider_preference_id: string | null
+          provider_status: string | null
           quote_id: string | null
           status: Database["public"]["Enums"]["payment_attempt_status"]
           store_id: string
@@ -205,6 +208,8 @@ export type Database = {
           amount_cents: number
           created_at?: string
           currency: string
+          customer_name?: string | null
+          customer_phone?: string | null
           expires_at?: string | null
           external_reference: string
           id?: string
@@ -212,6 +217,7 @@ export type Database = {
           provider?: string
           provider_payment_id?: string | null
           provider_preference_id?: string | null
+          provider_status?: string | null
           quote_id?: string | null
           status?: Database["public"]["Enums"]["payment_attempt_status"]
           store_id: string
@@ -221,6 +227,8 @@ export type Database = {
           amount_cents?: number
           created_at?: string
           currency?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           expires_at?: string | null
           external_reference?: string
           id?: string
@@ -228,6 +236,7 @@ export type Database = {
           provider?: string
           provider_payment_id?: string | null
           provider_preference_id?: string | null
+          provider_status?: string | null
           quote_id?: string | null
           status?: Database["public"]["Enums"]["payment_attempt_status"]
           store_id?: string
@@ -302,7 +311,9 @@ export type Database = {
       }
       payment_webhook_events: {
         Row: {
+          claimed_at: string
           completed_at: string | null
+          delivery_count: number
           event_id: string
           last_error_code: string | null
           processing_status: Database["public"]["Enums"]["payment_webhook_processing_status"]
@@ -311,7 +322,9 @@ export type Database = {
           received_at: string
         }
         Insert: {
+          claimed_at?: string
           completed_at?: string | null
+          delivery_count?: number
           event_id: string
           last_error_code?: string | null
           processing_status?: Database["public"]["Enums"]["payment_webhook_processing_status"]
@@ -320,7 +333,9 @@ export type Database = {
           received_at?: string
         }
         Update: {
+          claimed_at?: string
           completed_at?: string | null
+          delivery_count?: number
           event_id?: string
           last_error_code?: string | null
           processing_status?: Database["public"]["Enums"]["payment_webhook_processing_status"]
@@ -793,6 +808,20 @@ export type Database = {
           target_promotion_id: string
           target_store_id: string
         }
+        Returns: string
+      }
+      apply_mercado_pago_payment: {
+        Args: {
+          target_amount_cents: number
+          target_currency: string
+          target_external_reference: string
+          target_provider_payment_id: string
+          target_provider_status: string
+        }
+        Returns: string
+      }
+      claim_payment_webhook_event: {
+        Args: { target_event_id: string; target_provider_payment_id: string }
         Returns: string
       }
     }

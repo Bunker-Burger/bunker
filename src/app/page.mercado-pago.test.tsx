@@ -77,6 +77,7 @@ function stubEnvironment(overrides: Record<string, string | undefined> = {}) {
     SUPABASE_PRODUCTION_PROJECT_REF: "",
     SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
     MERCADO_PAGO_ACCESS_TOKEN: "TEST-access-token",
+    MERCADO_PAGO_WEBHOOK_SECRET: "webhook-secret-test",
     APP_URL: "https://bunker.example",
     RATE_LIMIT_UPSTREAM_URL: "https://quota.example/increment",
     ...overrides

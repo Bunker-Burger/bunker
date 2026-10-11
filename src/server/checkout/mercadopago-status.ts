@@ -182,6 +182,13 @@ export async function checkMercadoPagoPaymentStatus(
     };
   }
 
+  if (attempt.status === "refunded") {
+    return {
+      status: "rejected",
+      message: "El pago fue devuelto."
+    };
+  }
+
   if (attempt.status === "expired") {
     return { status: "expired" };
   }
@@ -281,7 +288,24 @@ export async function checkMercadoPagoPaymentStatus(
         }
 
         const approvedPayment = approvedCandidates[0]!;
-        await dependencies.attempts.markApproved(attempt.externalReference, String(approvedPayment.id));
+        if (dependencies.attempts.applyProviderPayment) {
+          // BB-15: same atomic rule as the webhook (row lock, amount against the frozen quote, a
+          // settled attempt never replaced); racing the webhook for the same payment is harmless.
+          await dependencies.attempts.applyProviderPayment({
+            id: String(approvedPayment.id),
+            externalReference: attempt.externalReference,
+            status: "approved",
+            amountCents: attempt.expectedAmountCents,
+            currency: "ARS"
+          });
+          const current = await dependencies.attempts.findByExternalReference(attempt.externalReference);
+          if (current?.status !== "approved" || current.providerPaymentId !== String(approvedPayment.id)) {
+            // Another payment owns this reference (or it was refunded): a person has to look.
+            return { status: "pending", verifying: true };
+          }
+        } else {
+          await dependencies.attempts.markApproved(attempt.externalReference, String(approvedPayment.id));
+        }
         const whatsappUrl = quote
           ? await getWhatsAppUrlForApprovedQuote(quote, String(approvedPayment.id), dependencies.loadCatalog)
           : null;
