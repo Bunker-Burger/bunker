@@ -5,10 +5,12 @@ import {
   detectMercadoPagoConfig,
   type MercadoPagoConfigDetection
 } from "@/server/payments/mercado-pago";
+import { parseMercadoPagoPayment } from "@/server/payments/mercado-pago-gateway";
 import type {
   PaymentAttemptsPort,
   PaymentQuote,
-  PaymentQuotesPort
+  PaymentQuotesPort,
+  ProviderPayment
 } from "@/server/payments/ports";
 import { buildApprovedMercadoPagoWhatsAppUrl } from "./whatsapp";
 
@@ -203,8 +205,34 @@ export async function checkMercadoPagoPaymentStatus(
   if (configDetection.enabled) {
     const fetcher = dependencies.fetcher ?? fetch;
     let providerError = false;
-    const candidateList: Array<Record<string, unknown>> = [];
+    const candidateList: ProviderPayment[] = [];
     let searchNeeded = true;
+    // BB-15 R1 H2: a payment of THIS reference that cannot be trusted (fractions of a cent,
+    // malformed fields, another currency or amount than the attempt and its frozen quote). The
+    // return then fails closed: it neither approves, nor rejects, nor expires the attempt.
+    let suspicious = false;
+
+    /** The payment as Mercado Pago reports it, when it is a valid one for this attempt. */
+    const accept = (raw: unknown): ProviderPayment | null => {
+      const parsed = parseMercadoPagoPayment(raw);
+      const reference = raw && typeof raw === "object" ? (raw as Record<string, unknown>).external_reference : undefined;
+      const ours = reference === attempt.externalReference;
+      if (!parsed.ok) {
+        if (ours) suspicious = true;
+        return null;
+      }
+      if (!ours) return null;
+      const payment = parsed.payment;
+      const matchesSnapshot =
+        payment.currency === "ARS" &&
+        payment.amountCents === attempt.expectedAmountCents &&
+        (quote === null || payment.amountCents === quote.totalCents);
+      if (!matchesSnapshot) {
+        suspicious = true;
+        return null;
+      }
+      return payment;
+    };
 
     // Caso A: El cliente proveyó payment_id numérico
     if (paymentId && /^\d+$/.test(paymentId.trim())) {
@@ -217,15 +245,11 @@ export async function checkMercadoPagoPaymentStatus(
           }
         );
         if (mpRes.ok) {
-          const single = (await mpRes.json()) as Record<string, unknown>;
+          const single: unknown = await mpRes.json();
           if (single && typeof single === "object") {
-            const matchesRef = single.external_reference === attempt.externalReference;
-            const matchesCurrency = single.currency_id === "ARS";
-            const amountCents = BigInt(Math.round(Number(single.transaction_amount) * 100));
-            const matchesAmount = amountCents === attempt.expectedAmountCents;
-
-            if (matchesRef && matchesCurrency && matchesAmount) {
-              candidateList.push(single);
+            const payment = accept(single);
+            if (payment) {
+              candidateList.push(payment);
               searchNeeded = false;
             } else {
               // P2-06D: payment_id ajeno o discrepante (otra ref, moneda o monto).
@@ -258,18 +282,21 @@ export async function checkMercadoPagoPaymentStatus(
         // Retornar estado indeterminado pending de verificación.
         return { status: "pending", verifying: true };
       }
-      candidateList.push(...searchRes.results);
+      for (const raw of searchRes.results) {
+        const payment = accept(raw);
+        if (payment) candidateList.push(payment);
+      }
+    }
+
+    if (!providerError && suspicious) {
+      // A person has to look (the webhook records the same case as a mismatch).
+      return { status: "pending", verifying: true };
     }
 
     if (!providerError && candidateList.length > 0) {
-      // P2-06A: Filtrar y validar candidatos estrictamente por external_reference, currency_id ARS y transaction_amount
-      const validMatching = candidateList.filter((candidate) => {
-        const matchesRef = candidate.external_reference === attempt.externalReference;
-        const matchesCurrency = candidate.currency_id === "ARS";
-        const amountCents = BigInt(Math.round(Number(candidate.transaction_amount) * 100));
-        const matchesAmount = amountCents === attempt.expectedAmountCents;
-        return matchesRef && matchesCurrency && matchesAmount;
-      });
+      // P2-06A + BB-15 R1 H2: only payments parsed strictly and matching reference, ARS and the
+      // amount of the attempt and its frozen quote reach this point.
+      const validMatching = candidateList;
 
       const approvedCandidates = validMatching.filter((c) => c.status === "approved");
       const pendingCandidates = validMatching.filter((c) =>
@@ -290,14 +317,9 @@ export async function checkMercadoPagoPaymentStatus(
         const approvedPayment = approvedCandidates[0]!;
         if (dependencies.attempts.applyProviderPayment) {
           // BB-15: same atomic rule as the webhook (row lock, amount against the frozen quote, a
-          // settled attempt never replaced); racing the webhook for the same payment is harmless.
-          await dependencies.attempts.applyProviderPayment({
-            id: String(approvedPayment.id),
-            externalReference: attempt.externalReference,
-            status: "approved",
-            amountCents: attempt.expectedAmountCents,
-            currency: "ARS"
-          });
+          // settled attempt never replaced), with the payment exactly as Mercado Pago reported it;
+          // racing the webhook for the same payment is harmless.
+          await dependencies.attempts.applyProviderPayment(approvedPayment);
           const current = await dependencies.attempts.findByExternalReference(attempt.externalReference);
           if (current?.status !== "approved" || current.providerPaymentId !== String(approvedPayment.id)) {
             // Another payment owns this reference (or it was refunded): a person has to look.

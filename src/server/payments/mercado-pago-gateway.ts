@@ -45,6 +45,31 @@ export function providerAmountToCents(amount: number): bigint | null {
   return BigInt(cents);
 }
 
+/**
+ * A payment object of the Mercado Pago API (`/v1/payments/{id}` or a `/v1/payments/search`
+ * result), checked strictly: numeric id, known status shape, a finite positive amount with at most
+ * two decimals, a currency code. The webhook and the customer's return both read payments through
+ * this, so they credit exactly the same data (BB-15 round 1, H2).
+ */
+export function parseMercadoPagoPayment(
+  raw: unknown
+): { ok: true; payment: ProviderPayment } | { ok: false; reason: "shape" | "amount" } {
+  const parsed = paymentSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, reason: "shape" };
+  const amountCents = providerAmountToCents(parsed.data.transaction_amount);
+  if (amountCents === null) return { ok: false, reason: "amount" };
+  return {
+    ok: true,
+    payment: {
+      id: String(parsed.data.id),
+      externalReference: parsed.data.external_reference ?? null,
+      status: parsed.data.status,
+      amountCents,
+      currency: parsed.data.currency_id
+    }
+  };
+}
+
 export function createMercadoPagoPaymentGateway(options: {
   accessToken: string;
   fetcher?: typeof fetch;
@@ -67,19 +92,11 @@ export function createMercadoPagoPaymentGateway(options: {
       if (response.status === 404) throw new PaymentNotFoundError();
       if (!response.ok) throw new PaymentProviderUnavailableError(`Mercado Pago respondió ${response.status}`);
 
-      const parsed = paymentSchema.safeParse(await response.json().catch(() => null));
-      if (!parsed.success) throw new PaymentProviderUnavailableError("Respuesta de pago inesperada");
-      const amountCents = providerAmountToCents(parsed.data.transaction_amount);
-      if (amountCents === null) throw new UnusablePaymentAmountError();
-      if (String(parsed.data.id) !== paymentId) throw new PaymentProviderUnavailableError("Mercado Pago devolvió otro pago");
-
-      return {
-        id: String(parsed.data.id),
-        externalReference: parsed.data.external_reference ?? null,
-        status: parsed.data.status,
-        amountCents,
-        currency: parsed.data.currency_id
-      };
+      const parsed = parseMercadoPagoPayment(await response.json().catch(() => null));
+      if (!parsed.ok && parsed.reason === "amount") throw new UnusablePaymentAmountError();
+      if (!parsed.ok) throw new PaymentProviderUnavailableError("Respuesta de pago inesperada");
+      if (parsed.payment.id !== paymentId) throw new PaymentProviderUnavailableError("Mercado Pago devolvió otro pago");
+      return parsed.payment;
     }
   };
 }
