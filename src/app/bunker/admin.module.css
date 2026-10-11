@@ -672,3 +672,116 @@
     margin-left: 0;
   }
 }
+
+/* BB-13 — store, hours, payments and promotions */
+
+.adminNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sectionLinks {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sectionLinks > li {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+}
+
+.sectionLinks .primaryLink {
+  margin-top: 0;
+}
+
+.statusLine {
+  margin: 0;
+}
+
+.publicView {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.publicView dt {
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.publicView dd {
+  margin: 0;
+}
+
+.publicView ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.promotionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.promotionRow > .disclosure {
+  grid-column: 1 / -1;
+}
+
+.rowFields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.preview {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-sm);
+}
+
+.preview th,
+.preview td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.preview td {
+  white-space: nowrap;
+}
+
+@media (max-width: 35rem) {
+  .promotionRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .publicView {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -21,8 +21,8 @@ const completeProduction = {
 } as const;
 
 const methods = (mercadoPagoEnabled: boolean): PaymentMethodSetting[] => [
-  { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
-  { method: "mercado_pago", displayName: "Mercado Pago", instructions: "", enabled: mercadoPagoEnabled, sortOrder: 30 }
+  { method: "cash", enabled: true, sortOrder: 10 },
+  { method: "mercado_pago", enabled: mercadoPagoEnabled, sortOrder: 30 }
 ];
 
 function without<T extends Record<string, string>>(environment: T, ...keys: Array<keyof T>) {

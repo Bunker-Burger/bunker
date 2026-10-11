@@ -3,7 +3,7 @@
 import { useState } from "react";
 import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
-import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "./admin-form";
+import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "../admin-form";
 
 export interface ProductFormCategory {
   id: string;

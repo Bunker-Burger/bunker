@@ -7,7 +7,8 @@ import { ADMIN_CATEGORY_KINDS, type AdminCategoryKind, type CategoryFields, type
  * value is re-validated, ids must be UUIDs and the store is never taken from the form.
  */
 
-export type FieldErrors = Record<string, string>;
+export type { FieldErrors } from "@/server/admin/use-case";
+import type { FieldErrors } from "@/server/admin/use-case";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

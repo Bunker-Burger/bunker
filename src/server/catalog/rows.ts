@@ -20,7 +20,7 @@ const wallClock = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "invalid time of da
 
 export const STORE_SELECT =
   "id, name, slug, whatsapp_e164, timezone, currency, status_override, is_public, delivery_fee_cents:delivery_fee_cents::text, " +
-  "store_business_hours(day_of_week, opens_at, closes_at), store_payment_methods(method, display_name, public_instructions, is_enabled, sort_order)";
+  "store_business_hours(day_of_week, opens_at, closes_at), store_payment_methods(method, is_enabled, sort_order)";
 
 export const storeRowSchema = z.object({
   id: z.string(),
@@ -38,8 +38,6 @@ export const storeRowSchema = z.object({
   store_payment_methods: z.array(
     z.object({
       method: z.enum(enums.payment_method_kind),
-      display_name: z.string(),
-      public_instructions: z.string(),
       is_enabled: z.boolean(),
       sort_order: smallInt
     })

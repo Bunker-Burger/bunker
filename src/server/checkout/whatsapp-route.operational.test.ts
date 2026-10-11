@@ -49,9 +49,9 @@ const storeRow = () => ({
   delivery_fee_cents: db.deliveryFeeCents,
   store_business_hours: db.businessHours,
   store_payment_methods: [
-    { method: "cash", display_name: "Efectivo", public_instructions: "", is_enabled: db.cashEnabled, sort_order: 10 },
-    { method: "bank_transfer", display_name: "Transferencia", public_instructions: "", is_enabled: db.transferEnabled, sort_order: 20 },
-    { method: "mercado_pago", display_name: "Mercado Pago", public_instructions: "", is_enabled: false, sort_order: 30 }
+    { method: "cash", is_enabled: db.cashEnabled, sort_order: 10 },
+    { method: "bank_transfer", is_enabled: db.transferEnabled, sort_order: 20 },
+    { method: "mercado_pago", is_enabled: false, sort_order: 30 }
   ]
 });
 

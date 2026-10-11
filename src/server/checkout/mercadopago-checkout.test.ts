@@ -26,9 +26,9 @@ function mockCatalog(options?: { mpEnabled?: boolean }): Catalog {
       deliveryFeeCents: 150000n,
       businessHours: [],
       paymentMethods: [
-        { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
-        { method: "bank_transfer", displayName: "Transferencia", instructions: "", enabled: true, sortOrder: 20 },
-        { method: "mercado_pago", displayName: "Mercado Pago", instructions: "", enabled: options?.mpEnabled ?? true, sortOrder: 30 }
+        { method: "cash", enabled: true, sortOrder: 10 },
+        { method: "bank_transfer", enabled: true, sortOrder: 20 },
+        { method: "mercado_pago", enabled: options?.mpEnabled ?? true, sortOrder: 30 }
       ]
     },
     categories: [],

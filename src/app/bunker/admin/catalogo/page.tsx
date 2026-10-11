@@ -11,7 +11,7 @@ import {
   moveProductAction,
   updateCategoryAction
 } from "./actions";
-import { AdminForm, CheckboxField, TextField } from "./admin-form";
+import { AdminForm, CheckboxField, TextField } from "../admin-form";
 import { ADMIN_CATALOG_PATH, CATALOG_TABS, productEditPath, tabFor, tabForType, type CatalogTab } from "./form-state";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;

@@ -30,8 +30,8 @@ const storeRow = () => ({
   delivery_fee_cents: "120000",
   store_business_hours: [],
   store_payment_methods: [
-    { method: "cash", display_name: "Efectivo", public_instructions: "", is_enabled: true, sort_order: 10 },
-    { method: "mercado_pago", display_name: "Mercado Pago", public_instructions: "", is_enabled: mercadoPagoMethodEnabled, sort_order: 30 }
+    { method: "cash", is_enabled: true, sort_order: 10 },
+    { method: "mercado_pago", is_enabled: mercadoPagoMethodEnabled, sort_order: 30 }
   ]
 });
 

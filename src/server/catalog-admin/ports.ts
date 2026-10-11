@@ -1,6 +1,4 @@
 import type { Category, ConfigurableOptionGroup, ProductType } from "@/domain/types";
-import type { Result } from "@/lib/result";
-import type { CatalogError, CatalogErrorCode } from "@/server/catalog/errors";
 
 /** The four product types the admin manages, as stored in `categories.kind`. */
 export const ADMIN_CATEGORY_KINDS = ["burger", "sandwich", "side", "drink"] as const;
@@ -13,20 +11,8 @@ export const PRODUCT_TYPE_BY_KIND: Record<AdminCategoryKind, ProductType> = {
   drink: "beverage"
 };
 
-export type AdminErrorCode =
-  | CatalogErrorCode
-  /** A unique slug is taken, or the row is still referenced (products in a category, a product in a promotion). */
-  | "conflict"
-  /** The database rejected the values (check constraint, publication or drink rules). */
-  | "rejected";
-
-export interface AdminError {
-  code: AdminErrorCode;
-  message: string;
-  cause?: unknown;
-}
-
-export type AdminResult<T> = Result<T, AdminError | CatalogError>;
+export type { AdminError, AdminErrorCode, AdminResult } from "@/server/admin/use-case";
+import type { AdminResult } from "@/server/admin/use-case";
 
 export interface CategoryFields {
   name: string;

@@ -11,9 +11,9 @@ const NOW = new Date("2026-10-08T20:00:00Z");
 const TIMEZONE = "America/Argentina/Tucuman";
 
 const paymentMethods: PaymentMethodSetting[] = [
-  { method: "cash", displayName: "Efectivo", instructions: "", enabled: true, sortOrder: 10 },
-  { method: "bank_transfer", displayName: "Transferencia", instructions: "", enabled: true, sortOrder: 20 },
-  { method: "mercado_pago", displayName: "Mercado Pago", instructions: "", enabled: false, sortOrder: 30 }
+  { method: "cash", enabled: true, sortOrder: 10 },
+  { method: "bank_transfer", enabled: true, sortOrder: 20 },
+  { method: "mercado_pago", enabled: false, sortOrder: 30 }
 ];
 
 function catalog(overrides: Partial<Catalog> = {}): Catalog {

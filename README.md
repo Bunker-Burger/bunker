@@ -55,7 +55,31 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
 - **Bebidas sin alcohol.** La app guarda siempre `contains_alcohol = false` y el trigger `products_drinks_without_alcohol` (BB-12) rechaza cualquier producto alcohólico en una categoría `drink`.
 - **Fotos.** `inspectImage` (`src/server/catalog-admin/image.ts`) decide el formato por los bytes (magic numbers), no por el nombre ni el tipo declarado, y lee las dimensiones del encabezado: sólo JPEG, PNG, WebP o AVIF, hasta 5 MB y entre 320 y 4096 px por lado. Recién entonces la decodifica completa con libvips (`sharp`, warnings como error): un archivo sin datos de imagen, truncado o con datos dañados se rechaza, y el formato y tamaño decodificados deben coincidir con el encabezado. SVG, GIF, animadas y renombrados también se rechazan. Límite conocido: JPEG y WebP lossy no tienen checksum, así que unos pocos bytes alterados que igual decodifican no se distinguen de una foto real. El objeto se guarda como `<store_id>/<product_id>-<uuid>.<ext>` sin sobrescribir. Un reemplazo sube el archivo nuevo, apunta la fila y recién después borra el viejo; un borrado quita la fila antes que el archivo. `serverActions.bodySizeLimit` es `6mb` para admitir 5 MB más el overhead multipart.
 - **Orden y punto focal.** La migración `20261010150000_bb12_catalog_admin.sql` agrega `products.sort_order` (orden manual dentro de la categoría; desempata destacado y nombre) y `product_images.focal_x/focal_y` (0–100, centrado por defecto), que el menú aplica como `object-position`. **El código lee estas columnas: la migración tiene que estar aplicada antes de desplegarlo** (ver `docs/runbooks/cloud-evidence.md` §2.1).
-- **Caché.** Cada escritura exitosa llama `updateTag(CATALOG_CACHE_TAG)`, así el menú público lee el cambio en la próxima request.
+- **Caché.** Cada escritura exitosa llama `updateTag(CATALOG_CACHE_TAG)`, así el menú público lee el cambio en la próxima request. En tienda y promociones también la llama una escritura que falló después de enviarse (`mayHaveWritten`); no la llaman una validación o un permiso que frenan antes de escribir.
+
+## Administración de tienda y promociones
+
+- **Pantallas.** El layout admin tiene navegación Catálogo / Tienda / Promociones / Ver menú. La carta pública (`/`) es la misma con sesión admin, y suma la pestaña Admin.
+- **Tienda (`/bunker/admin/tienda`).**
+  - Estado calculado por el servidor (`evaluateStoreStatus`), con cierre del turno o próximo turno.
+  - Override `auto`/`open`/`paused`/`closed`: `auto` y `open` exigen tarifa de delivery, en el caso de uso y en el check `stores_delivery_fee_required_to_accept_orders`. Mientras el local toma pedidos, la tarifa no se puede quitar.
+  - WhatsApp normalizado a E.164.
+  - Turnos semanales: se rechazan los solapados (`findOverlappingShift`), incluidos los que cruzan medianoche o la semana.
+  - Medios de pago: sólo habilitación y orden. Ningún medio tiene texto configurable, porque la fila de un medio habilitado la lee cualquiera y una transferencia nunca publica alias ni datos bancarios (se piden por WhatsApp, BB-10). El nombre es fijo por medio (`PAYMENT_METHOD_NAME`) y `public_instructions` siempre está vacía; lo impone el check `store_payment_methods_fixed_public_copy` (migración `20261010220000`, que además normaliza las filas existentes). El catálogo público ni siquiera lee esas dos columnas.
+  - "Lo que ve el cliente": la misma frase de estado que el storefront, la tarifa, el WhatsApp y los medios que ofrece el checkout, con su mismo texto (`src/domain/public-payment-options.ts`): Mercado Pago sólo si está disponible ahora, sin cambiar la preferencia guardada.
+- **Promociones (`/bunker/admin/promociones`).**
+  - Listado en el orden en que se prueban (mayor prioridad primero), con fase: en vigencia, fuera de franja, programada, vencida o pausada.
+  - Pausar y reanudar.
+  - Reordenar: `admin_move_promotion` intercambia prioridades con la vecina en una sola transacción (pasando por un valor libre, porque `(store_id, priority)` es único); nadie ve el estado intermedio y un fallo no deja nada a medias.
+  - Alta, edición y baja con productos, canales, fechas en la zona del local y franjas semanales. `admin_save_promotion` guarda la fila, sus productos y sus franjas en una sola transacción: o queda todo o nada, y una promoción activa no se pausa al editarla.
+  - Las dos funciones son `SECURITY INVOKER` (RLS decide cada fila), exigen que la sesión administre la tienda (`catalog_rls.is_store_admin`) y toman un lock por tienda, así dos admins no calculan la misma prioridad. Sólo `authenticated` puede ejecutarlas.
+  - La vista previa calcula los precios derivados con `promotionDiscount`, el mismo motor del checkout. Hay tests que comparan su resultado con `quoteCart`.
+- **Secretos.** Las pantallas y respuestas admin nunca leen ni devuelven credenciales. De Mercado Pago solo llega si está disponible y por qué no (motivos como "falta configurarlo en el servidor"), nunca su configuración. Lo cubren los tests de página y el e2e admin-auth, que busca los valores reales del entorno en el HTML.
+- **Código compartido.**
+  - `src/server/admin/use-case.ts`: gate, `store_id` de la membresía, mensajes y log.
+  - `src/server/admin/supabase-writes.ts`: escrituras con filas afectadas y mapeo de errores.
+
+  Los usan catálogo, tienda y promociones, y cada escritura invalida `CATALOG_CACHE_TAG`. No hay migraciones: BB-08 y BB-09 ya crearon el esquema y las policies.
 
 ## Estado del local, horarios y delivery
 
