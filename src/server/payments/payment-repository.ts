@@ -20,6 +20,9 @@ const DEFAULT_STORE_ID = "0199b2c8-40b0-7000-8000-000000000001";
 /** Statuses a payment can still approve (BB-15); approved and refunded attempts are settled. */
 const OPEN_ATTEMPT_STATUSES = ["created", "pending", "expired", "rejected", "cancelled"] as const;
 
+/** Statuses in which the checkout may still record the preference it just created (BB-15 R1 H3). */
+const PREFERENCE_STATUSES = ["created", "pending"] as const;
+
 const PROVIDER_PAYMENT_OUTCOMES = new Set<ProviderPaymentOutcome>([
   "approved",
   "refunded",
@@ -156,25 +159,31 @@ export function createSupabasePaymentRepository(
         customer_name: attempt.customer?.name ?? null,
         customer_phone: attempt.customer?.phone ?? null,
         expires_at: new Date(attempt.createdAt.getTime() + 15 * 60_000).toISOString()
-      }, { onConflict: "external_reference" });
+        // ON CONFLICT (external_reference) DO NOTHING: a retry never rewrites an attempt that a
+        // payment may have settled meanwhile (status, provider_payment_id). A clash on the
+        // idempotency key of another reference still raises 23505 (BB-14 race coordination).
+      }, { onConflict: "external_reference", ignoreDuplicates: true });
       if (error) {
         throw new Error(`Error al persistir attempt: ${error.message}`);
       }
     },
 
-    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
-      const { error } = await client
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<boolean> {
+      // Only the preference id, only on an open attempt: a late write never undoes an approval.
+      const { data, error } = await client
         .from("payment_attempts")
         .update({
           provider_preference_id: providerPreferenceId,
-          status: "pending",
           updated_at: new Date().toISOString()
         })
-        .eq("external_reference", reference);
+        .eq("external_reference", reference)
+        .in("status", [...PREFERENCE_STATUSES])
+        .select("external_reference");
 
       if (error) {
         throw new Error(`Error al actualizar preference_id: ${error.message}`);
       }
+      return (data?.length ?? 0) > 0;
     },
 
     async findByExternalReference(reference: string): Promise<PaymentAttempt | null> {
@@ -303,17 +312,15 @@ export function createInMemoryPaymentRepository(options: { now?: () => Date } = 
           }
         }
       }
+      // Same as ON CONFLICT (external_reference) DO NOTHING: an existing attempt is never rewritten.
+      if (attemptsMap.has(attempt.externalReference)) return;
       attemptsMap.set(attempt.externalReference, { ...attempt });
     },
-    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<boolean> {
       const found = attemptsMap.get(reference);
-      if (found) {
-        attemptsMap.set(reference, {
-          ...found,
-          providerPreferenceId,
-          status: "pending"
-        });
-      }
+      if (!found || !(PREFERENCE_STATUSES as readonly string[]).includes(found.status)) return false;
+      attemptsMap.set(reference, { ...found, providerPreferenceId });
+      return true;
     },
     async findByExternalReference(reference: string): Promise<PaymentAttempt | null> {
       const found = attemptsMap.get(reference);

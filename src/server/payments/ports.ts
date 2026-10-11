@@ -102,8 +102,14 @@ export type ProviderPaymentOutcome =
   | "conflicting_payment";
 
 export interface PaymentAttemptsPort {
+  /** Records a new attempt; never overwrites an existing one with the same reference (BB-15 R1 H3). */
   save(attempt: PaymentAttempt): Promise<void>;
-  updatePreferenceId?(reference: string, providerPreferenceId: string): Promise<void>;
+  /**
+   * Records the preference id on an attempt that is still open (`created`/`pending`), without
+   * touching its status or payment. `false` when the attempt was settled meanwhile (approved,
+   * refunded…) or does not exist: nothing was written.
+   */
+  updatePreferenceId?(reference: string, providerPreferenceId: string): Promise<boolean | void>;
   findByExternalReference(reference: string): Promise<PaymentAttempt | null>;
   findByIdempotencyKey?(key: string): Promise<PaymentAttempt | null>;
   markApproved(reference: string, providerPaymentId: string): Promise<void>;

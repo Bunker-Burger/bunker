@@ -270,13 +270,30 @@ describe("createSupabasePaymentRepository adapter (P2-03)", () => {
             };
           },
           update(updates: Record<string, unknown>) {
-            return {
+            // Applies the update to the rows matching every filter (eq / in), like PostgREST.
+            const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+            const run = () => {
+              const matched = attemptsTable.filter((row) => filters.every((filter) => filter(row)));
+              for (const row of matched) Object.assign(row, updates);
+              return { data: matched, error: null };
+            };
+            const builder = {
               eq(col: string, val: unknown) {
-                const found = attemptsTable.find((r) => r[col] === val);
-                if (found) Object.assign(found, updates);
-                return Promise.resolve({ error: null });
+                filters.push((row) => row[col] === val);
+                return builder;
+              },
+              in(col: string, values: unknown[]) {
+                filters.push((row) => values.includes(row[col]));
+                return builder;
+              },
+              select() {
+                return Promise.resolve(run());
+              },
+              then(resolve: (value: { data: unknown; error: null }) => unknown) {
+                return Promise.resolve(run()).then(resolve);
               }
             };
+            return builder;
           }
         };
       }

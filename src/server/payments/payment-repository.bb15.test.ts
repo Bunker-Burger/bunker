@@ -14,7 +14,7 @@ interface Call {
   args: unknown[];
 }
 
-function recordingClient(rpcResult: unknown, error: { message: string } | null = null) {
+function recordingClient(rpcResult: unknown, error: { message: string } | null = null, updatedRows: unknown[] = []) {
   const calls: Call[] = [];
   const builder = (table: string) => {
     const chain = {
@@ -32,7 +32,11 @@ function recordingClient(rpcResult: unknown, error: { message: string } | null =
       },
       in: (...args: unknown[]) => {
         calls.push({ kind: `${table}.in`, args });
-        return Promise.resolve({ error: null });
+        return Object.assign(Promise.resolve({ error: null }), chain);
+      },
+      select: (...args: unknown[]) => {
+        calls.push({ kind: `${table}.select`, args });
+        return Promise.resolve({ data: updatedRows, error: null });
       }
     };
     return chain;
@@ -121,6 +125,35 @@ describe("Supabase payment repository (BB-15)", () => {
       customer: { name: "Ana Pérez", phone: "+54 9 11 5555-0001" }
     });
     expect(calls[0]?.args[0]).toMatchObject({ customer_name: "Ana Pérez", customer_phone: "+54 9 11 5555-0001" });
+  });
+
+  it("records a preference only on an open attempt, without touching its status (R1 H3)", async () => {
+    const { client, calls } = recordingClient(null, null, [{ external_reference: "ref-00000001" }]);
+    await expect(createSupabasePaymentRepository(client).attempts.updatePreferenceId!("ref-00000001", "pref-1")).resolves.toBe(true);
+    const update = calls.find((call) => call.kind === "payment_attempts.update")?.args[0] as Record<string, unknown>;
+    expect(update).toMatchObject({ provider_preference_id: "pref-1" });
+    expect(update).not.toHaveProperty("status");
+    expect(update).not.toHaveProperty("provider_payment_id");
+    expect(calls.find((call) => call.kind === "payment_attempts.in")?.args).toEqual(["status", ["created", "pending"]]);
+    expect(calls.some((call) => call.kind === "payment_attempts.select")).toBe(true);
+  });
+
+  it("reports a settled attempt when the preference write matched no row (R1 H3)", async () => {
+    const { client } = recordingClient(null, null, []);
+    await expect(createSupabasePaymentRepository(client).attempts.updatePreferenceId!("ref-00000001", "pref-1")).resolves.toBe(false);
+  });
+
+  it("saving an attempt never rewrites an existing one (ON CONFLICT DO NOTHING) (R1 H3)", async () => {
+    const { client, calls } = recordingClient(null);
+    await createSupabasePaymentRepository(client).attempts.save({
+      id: "attempt-1",
+      quoteId: "quote-1",
+      externalReference: "ref-00000001",
+      expectedAmountCents: 150000n,
+      status: "pending",
+      createdAt: new Date("2026-10-11T12:00:00Z")
+    });
+    expect(calls[0]?.args[1]).toEqual({ onConflict: "external_reference", ignoreDuplicates: true });
   });
 
   it("never marks a settled attempt as approved again", async () => {

@@ -125,6 +125,14 @@ export class ConcurrentAttemptPendingError extends Error {
   }
 }
 
+/** The attempt was approved, refunded or closed while its preference was being created (BB-15). */
+export class PaymentAttemptSettledError extends Error {
+  constructor(message = "El intento de pago ya no está abierto.") {
+    super(message);
+    this.name = "PaymentAttemptSettledError";
+  }
+}
+
 function waitFor(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -314,7 +322,11 @@ export async function createCheckoutProPreference(
 
     // P2-08: Completar provider_preference_id al volver exitosamente de Mercado Pago
     if (dependencies.attempts.updatePreferenceId) {
-      await dependencies.attempts.updatePreferenceId(finalExternalReference, parsed.id);
+      const recorded = await dependencies.attempts.updatePreferenceId(finalExternalReference, parsed.id);
+      // BB-15 R1 H3: a payment settled the attempt while the preference was being created (an
+      // earlier preference of the same reference was paid or refunded). Nothing is overwritten and
+      // no payment link is handed out for an order that is no longer open.
+      if (recorded === false) throw new PaymentAttemptSettledError();
     } else {
       await dependencies.attempts.save({
         id: finalAttemptId,
