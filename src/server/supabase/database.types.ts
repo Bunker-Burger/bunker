@@ -311,6 +311,7 @@ export type Database = {
       }
       payment_webhook_events: {
         Row: {
+          claim_token: string
           claimed_at: string
           completed_at: string | null
           delivery_count: number
@@ -322,6 +323,7 @@ export type Database = {
           received_at: string
         }
         Insert: {
+          claim_token?: string
           claimed_at?: string
           completed_at?: string | null
           delivery_count?: number
@@ -333,6 +335,7 @@ export type Database = {
           received_at?: string
         }
         Update: {
+          claim_token?: string
           claimed_at?: string
           completed_at?: string | null
           delivery_count?: number
@@ -823,6 +826,14 @@ export type Database = {
       claim_payment_webhook_event: {
         Args: { target_event_id: string; target_provider_payment_id: string }
         Returns: string
+      }
+      finish_payment_webhook_event: {
+        Args: {
+          target_claim_token: string
+          target_error_code?: string
+          target_event_id: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

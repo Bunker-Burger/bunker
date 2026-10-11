@@ -28,25 +28,29 @@ comment on column public.payment_attempts.provider_status is
 alter table public.payment_webhook_events
   add column claimed_at timestamptz not null default now(),
   add column delivery_count integer not null default 1
-    constraint payment_webhook_events_delivery_count_check check (delivery_count >= 1);
+    constraint payment_webhook_events_delivery_count_check check (delivery_count >= 1),
+  -- Lease of the delivery that currently owns the event: renewed on every claim or takeover, so a
+  -- delivery whose claim was taken over can no longer close the event.
+  add column claim_token uuid not null default gen_random_uuid();
 
--- Returns 'started' when this delivery owns the event, 'duplicate' otherwise.
+-- Returns the claim token when this delivery owns the event, null when it is a duplicate.
 create function public.claim_payment_webhook_event(target_event_id text, target_provider_payment_id text)
-returns text
+returns uuid
 language plpgsql
 security invoker
 set search_path = ''
 as $$
 declare
-  claimed text;
+  claimed uuid;
 begin
-  insert into public.payment_webhook_events (event_id, provider_payment_id)
-  values (target_event_id, target_provider_payment_id)
+  insert into public.payment_webhook_events (event_id, provider_payment_id, claim_token)
+  values (target_event_id, target_provider_payment_id, gen_random_uuid())
   on conflict (event_id) do update
     set processing_status = 'processing',
         last_error_code = null,
         completed_at = null,
         claimed_at = now(),
+        claim_token = gen_random_uuid(),
         delivery_count = public.payment_webhook_events.delivery_count + 1
     where public.payment_webhook_events.provider_payment_id = excluded.provider_payment_id
       and (
@@ -56,14 +60,45 @@ begin
           and public.payment_webhook_events.claimed_at < now() - interval '60 seconds'
         )
       )
-  returning event_id into claimed;
+  returning claim_token into claimed;
 
-  return case when claimed is null then 'duplicate' else 'started' end;
+  return claimed;
 end;
 $$;
 
 comment on function public.claim_payment_webhook_event(text, text) is
-  'BB-15: atomic claim of a Mercado Pago webhook event; failed or stale (60 s) claims can be retried.';
+  'BB-15: atomic claim of a Mercado Pago webhook event; failed or stale (60 s) claims can be retried. Returns the claim token, or null for a duplicate.';
+
+-- Closes the event only for the delivery that still owns it (same token, still processing):
+-- completed without error code, failed with one. False when the claim was taken over or closed.
+create function public.finish_payment_webhook_event(target_event_id text, target_claim_token uuid, target_error_code text default null)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  closed text;
+begin
+  if target_error_code is not null and length(target_error_code) not between 1 and 80 then
+    raise exception 'invalid error code' using errcode = '22023';
+  end if;
+
+  update public.payment_webhook_events
+  set processing_status = case when target_error_code is null then 'completed' else 'failed' end::public.payment_webhook_processing_status,
+      completed_at = case when target_error_code is null then now() else null end,
+      last_error_code = target_error_code
+  where event_id = target_event_id
+    and claim_token = target_claim_token
+    and processing_status = 'processing'
+  returning event_id into closed;
+
+  return closed is not null;
+end;
+$$;
+
+comment on function public.finish_payment_webhook_event(text, uuid, text) is
+  'BB-15: completes (null error code) or fails a webhook event, only for the delivery holding its current claim token.';
 
 -- Outcomes: approved, refunded, rejected, cancelled, pending, unchanged, unknown_reference,
 -- currency_mismatch, amount_mismatch, conflicting_payment.
@@ -161,8 +196,10 @@ comment on function public.apply_mercado_pago_payment(text, text, text, bigint, 
   'BB-15: applies a Mercado Pago payment read from the provider API to its attempt, under a row lock and only when amount and currency match the frozen quote.';
 
 revoke all on function public.claim_payment_webhook_event(text, text) from public, anon, authenticated;
+revoke all on function public.finish_payment_webhook_event(text, uuid, text) from public, anon, authenticated;
 revoke all on function public.apply_mercado_pago_payment(text, text, text, bigint, text) from public, anon, authenticated;
 grant execute on function public.claim_payment_webhook_event(text, text) to service_role;
+grant execute on function public.finish_payment_webhook_event(text, uuid, text) to service_role;
 grant execute on function public.apply_mercado_pago_payment(text, text, text, bigint, text) to service_role;
 
 -- 90-day retention, every day at 06:15 UTC (03:15 in Argentina; pg_cron runs in GMT by default).

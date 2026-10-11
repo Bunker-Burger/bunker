@@ -80,22 +80,33 @@ describe("Supabase payment repository (BB-15)", () => {
     await expect(createSupabasePaymentRepository(recordingClient("credited!").client).attempts.applyProviderPayment(payment)).rejects.toThrow();
   });
 
-  it("claims webhook events through claim_payment_webhook_event", async () => {
-    const { client, calls } = recordingClient("duplicate");
-    await expect(createSupabasePaymentRepository(client).events.begin("event-1", "1001")).resolves.toBe("duplicate");
+  it("claims webhook events through claim_payment_webhook_event and keeps the lease token", async () => {
+    const token = "0b0e2c3a-8f6d-4c1e-9a7b-5d4c3b2a1f00";
+    const { client, calls } = recordingClient(token);
+    await expect(createSupabasePaymentRepository(client).events.begin("event-1", "1001")).resolves.toEqual({ eventId: "event-1", token });
     expect(calls).toEqual([{ kind: "rpc.claim_payment_webhook_event", args: [{ target_event_id: "event-1", target_provider_payment_id: "1001" }] }]);
-    await expect(createSupabasePaymentRepository(recordingClient("maybe").client).events.begin("event-1", "1001")).rejects.toThrow();
+    await expect(createSupabasePaymentRepository(recordingClient(null).client).events.begin("event-1", "1001")).resolves.toBeNull();
+    await expect(createSupabasePaymentRepository(recordingClient("started").client).events.begin("event-1", "1001")).rejects.toThrow();
   });
 
-  it("closes events as completed or failed with a bounded error code", async () => {
-    const { client, calls } = recordingClient(null);
+  it("closes events only through finish_payment_webhook_event with the claim token (never a bare update)", async () => {
+    const claim = { eventId: "event-1", token: "0b0e2c3a-8f6d-4c1e-9a7b-5d4c3b2a1f00" };
+    const { client, calls } = recordingClient(true);
     const { events } = createSupabasePaymentRepository(client);
-    await events.complete("event-1");
-    await events.fail("event-2", "x".repeat(200));
-    const updates = calls.filter((call) => call.kind === "payment_webhook_events.update").map((call) => call.args[0] as Record<string, unknown>);
-    expect(updates[0]).toMatchObject({ processing_status: "completed", last_error_code: null });
-    expect(updates[1]).toMatchObject({ processing_status: "failed", completed_at: null });
-    expect(String(updates[1]?.last_error_code)).toHaveLength(80);
+    await expect(events.complete(claim)).resolves.toBe(true);
+    await expect(events.fail(claim, "x".repeat(200))).resolves.toBe(true);
+    expect(calls.filter((call) => call.kind.startsWith("payment_webhook_events."))).toEqual([]);
+    expect(calls.map((call) => call.args[0])).toEqual([
+      { target_event_id: "event-1", target_claim_token: claim.token },
+      { target_event_id: "event-1", target_claim_token: claim.token, target_error_code: "x".repeat(80) }
+    ]);
+    expect(calls.every((call) => call.kind === "rpc.finish_payment_webhook_event")).toBe(true);
+  });
+
+  it("reports a lost lease and fails on an unexpected answer", async () => {
+    const claim = { eventId: "event-1", token: "0b0e2c3a-8f6d-4c1e-9a7b-5d4c3b2a1f00" };
+    await expect(createSupabasePaymentRepository(recordingClient(false).client).events.complete(claim)).resolves.toBe(false);
+    await expect(createSupabasePaymentRepository(recordingClient("yes").client).events.fail(claim, "x")).rejects.toThrow();
   });
 
   it("writes the minimal contact with the attempt", async () => {

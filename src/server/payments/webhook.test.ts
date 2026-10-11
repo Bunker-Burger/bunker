@@ -126,11 +126,11 @@ describe("processMercadoPagoWebhook", () => {
     ["unknown_reference", { externalReference: "ref-of-someone-else" }],
     ["unknown_reference", { externalReference: null }]
   ] as const)("%s: nothing is credited and the event records why", async (reason, change) => {
-    const { deps, attempt } = await setup({ payment: { ...approvedPayment, ...change } });
+    const { repository, deps, attempt } = await setup({ payment: { ...approvedPayment, ...change } });
     await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toEqual({ kind: "not_applied", reason, paymentId: "1001" });
     expect((await attempt())?.status).toBe("pending");
     // Recorded as failed: a retry from Mercado Pago may look again, still without crediting.
-    await expect(deps.events.begin("event-1", "1001")).resolves.toBe("started");
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "failed", errorCode: reason, deliveries: 1 });
   });
 
   it("a payment Mercado Pago does not know, or with fractions of a cent, credits nothing and is not retried forever", async () => {
@@ -217,10 +217,79 @@ describe("processMercadoPagoWebhook", () => {
   it("an abandoned claim (crashed delivery) is taken over after 60 s, not before", async () => {
     let now = new Date("2026-10-11T12:00:00Z");
     const { deps } = await setup({ now: () => now });
-    await expect(deps.events.begin("event-1", "1001")).resolves.toBe("started"); // a delivery that died mid-way
+    await expect(deps.events.begin("event-1", "1001")).resolves.toMatchObject({ eventId: "event-1" }); // a delivery that died mid-way
     await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toEqual({ kind: "duplicate" });
     now = new Date("2026-10-11T12:01:01Z");
     await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toMatchObject({ kind: "processed", outcome: "approved" });
+  });
+
+  /** A delivery (A) that stalls inside the Mercado Pago read until the test lets it go. */
+  function stalledRead() {
+    let release!: (result: ProviderPayment | Error) => void;
+    const answer = new Promise<ProviderPayment | Error>((resolve) => { release = resolve; });
+    let calls = 0;
+    const read = async () => {
+      calls += 1;
+      if (calls > 1) return approvedPayment; // later deliveries (B) read normally
+      const result = await answer;
+      if (result instanceof Error) throw result;
+      return result;
+    };
+    return { read, release: (result: ProviderPayment | Error) => release(result) };
+  }
+
+  it("fencing: a delivery whose claim was taken over cannot fail the event the new owner completed", async () => {
+    let now = new Date("2026-10-11T12:00:00Z");
+    const stall = stalledRead();
+    const { repository, deps, attempt } = await setup({ now: () => now, payment: stall.read });
+    const a = processMercadoPagoWebhook(notification(), deps); // A claims and stalls on Mercado Pago
+    await vi.waitFor(() => expect(repository.webhookEvent("event-1")?.status).toBe("processing"));
+
+    now = new Date("2026-10-11T12:01:01Z"); // A is past its 60 s lease
+    await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toMatchObject({ kind: "processed", outcome: "approved" }); // B
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "completed", errorCode: null, deliveries: 2 });
+
+    stall.release(new PaymentProviderUnavailableError("timeout")); // A finally fails
+    await expect(a).rejects.toBeInstanceOf(WebhookRetryableError);
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "completed", errorCode: null, deliveries: 2 });
+    expect(await attempt()).toMatchObject({ status: "approved", providerPaymentId: "1001" });
+    // So a replay stays a duplicate instead of re-opening the event.
+    await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toEqual({ kind: "duplicate" });
+  });
+
+  it("fencing: a late failure of A does not release the claim B is still working on", async () => {
+    let now = new Date("2026-10-11T12:00:00Z");
+    const stall = stalledRead();
+    const { repository, deps } = await setup({ now: () => now, payment: stall.read });
+    const a = processMercadoPagoWebhook(notification(), deps);
+    await vi.waitFor(() => expect(repository.webhookEvent("event-1")?.status).toBe("processing"));
+
+    now = new Date("2026-10-11T12:01:01Z");
+    const bClaim = await deps.events.begin("event-1", "1001"); // B takes over and is still working
+    expect(bClaim).not.toBeNull();
+
+    stall.release(new PaymentProviderUnavailableError("timeout"));
+    await expect(a).rejects.toBeInstanceOf(WebhookRetryableError);
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "processing", errorCode: null, deliveries: 2 });
+    // A third delivery right now is still a duplicate: B owns the event.
+    await expect(processMercadoPagoWebhook(notification(), deps)).resolves.toEqual({ kind: "duplicate" });
+    await expect(deps.events.complete(bClaim!)).resolves.toBe(true);
+  });
+
+  it("fencing: a late completion of A does not close the claim B is still working on", async () => {
+    let now = new Date("2026-10-11T12:00:00Z");
+    const stall = stalledRead();
+    const { repository, deps } = await setup({ now: () => now, payment: stall.read });
+    const a = processMercadoPagoWebhook(notification(), deps);
+    await vi.waitFor(() => expect(repository.webhookEvent("event-1")?.status).toBe("processing"));
+
+    now = new Date("2026-10-11T12:01:01Z");
+    const bClaim = await deps.events.begin("event-1", "1001");
+    stall.release(approvedPayment); // A applies (idempotent) and tries to complete
+    await expect(a).resolves.toMatchObject({ kind: "processed", outcome: "approved" });
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "processing", errorCode: null, deliveries: 2 });
+    await expect(deps.events.fail(bClaim!, "storage_unavailable")).resolves.toBe(true);
+    expect(repository.webhookEvent("event-1")).toEqual({ status: "failed", errorCode: "storage_unavailable", deliveries: 2 });
   });
 
   it("a failed database write is retried by the next delivery", async () => {

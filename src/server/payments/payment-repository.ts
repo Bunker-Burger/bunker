@@ -11,6 +11,7 @@ import type {
   ProviderPayment,
   ProviderPaymentOutcome,
   QuoteLine,
+  WebhookClaim,
   WebhookEventsPort
 } from "./ports";
 
@@ -34,6 +35,8 @@ const PROVIDER_PAYMENT_OUTCOMES = new Set<ProviderPaymentOutcome>([
 
 /** An unexpected webhook claim in-flight longer than this is taken over by the next delivery. */
 export const WEBHOOK_CLAIM_STALE_MS = 60_000;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface PaymentPersistencePorts {
   quotes: PaymentQuotesPort;
@@ -228,6 +231,20 @@ export function createSupabasePaymentRepository(
     }
   };
 
+  // Closing goes through finish_payment_webhook_event: atomic and fenced by the claim token, so a
+  // delivery whose claim was taken over can never change the event (BB-15 round 1, H1).
+  const finish = async (claim: WebhookClaim, errorCode: string | null) => {
+    const { data, error } = await client.rpc("finish_payment_webhook_event", {
+      target_event_id: claim.eventId,
+      target_claim_token: claim.token,
+      // Without an error code the event is completed.
+      ...(errorCode === null ? {} : { target_error_code: errorCode.slice(0, 80) })
+    });
+    if (error) throw new Error(`Error al cerrar el evento: ${error.message}`);
+    if (typeof data !== "boolean") throw new Error("Resultado de evento inesperado");
+    return data;
+  };
+
   const events: WebhookEventsPort = {
     async begin(eventId: string, providerPaymentId: string) {
       const { data, error } = await client.rpc("claim_payment_webhook_event", {
@@ -235,25 +252,12 @@ export function createSupabasePaymentRepository(
         target_provider_payment_id: providerPaymentId
       });
       if (error) throw new Error(`Error al registrar el evento: ${error.message}`);
-      if (data !== "started" && data !== "duplicate") throw new Error("Resultado de evento inesperado");
-      return data;
+      if (data === null) return null;
+      if (typeof data !== "string" || !UUID.test(data)) throw new Error("Resultado de evento inesperado");
+      return { eventId, token: data };
     },
-
-    async complete(eventId: string) {
-      const { error } = await client
-        .from("payment_webhook_events")
-        .update({ processing_status: "completed", completed_at: new Date().toISOString(), last_error_code: null })
-        .eq("event_id", eventId);
-      if (error) throw new Error(`Error al completar el evento: ${error.message}`);
-    },
-
-    async fail(eventId: string, errorCode: string) {
-      const { error } = await client
-        .from("payment_webhook_events")
-        .update({ processing_status: "failed", completed_at: null, last_error_code: errorCode.slice(0, 80) })
-        .eq("event_id", eventId);
-      if (error) throw new Error(`Error al marcar el evento: ${error.message}`);
-    }
+    complete: (claim) => finish(claim, null),
+    fail: (claim, errorCode) => finish(claim, errorCode)
   };
 
   return { quotes, attempts, events };
@@ -261,11 +265,16 @@ export function createSupabasePaymentRepository(
 
 type PersistencePortsAttempts = PaymentPersistencePorts["attempts"];
 
-export function createInMemoryPaymentRepository(options: { now?: () => Date } = {}): PaymentPersistencePorts {
+export function createInMemoryPaymentRepository(options: { now?: () => Date } = {}): PaymentPersistencePorts & {
+  webhookEvent(eventId: string): { status: "processing" | "completed" | "failed"; errorCode: string | null; deliveries: number } | null;
+} {
   const now = options.now ?? (() => new Date());
   const quotesMap = new Map<string, PaymentQuote>();
   const attemptsMap = new Map<string, PaymentAttempt>();
-  const eventsMap = new Map<string, { providerPaymentId: string; status: "processing" | "completed" | "failed"; claimedAt: number; errorCode: string | null; deliveries: number }>();
+  const eventsMap = new Map<
+    string,
+    { providerPaymentId: string; status: "processing" | "completed" | "failed"; claimedAt: number; errorCode: string | null; deliveries: number; token: string }
+  >();
 
   const quotes: PaymentQuotesPort = {
     async save(quote: PaymentQuote): Promise<void> {
@@ -343,25 +352,38 @@ export function createInMemoryPaymentRepository(options: { now?: () => Date } = 
       const existing = eventsMap.get(eventId);
       const at = now().getTime();
       if (!existing) {
-        eventsMap.set(eventId, { providerPaymentId, status: "processing", claimedAt: at, errorCode: null, deliveries: 1 });
-        return "started";
+        const token = crypto.randomUUID();
+        eventsMap.set(eventId, { providerPaymentId, status: "processing", claimedAt: at, errorCode: null, deliveries: 1, token });
+        return { eventId, token };
       }
       const retryable = existing.status === "failed" || (existing.status === "processing" && at - existing.claimedAt > WEBHOOK_CLAIM_STALE_MS);
-      if (existing.providerPaymentId !== providerPaymentId || !retryable) return "duplicate";
-      eventsMap.set(eventId, { ...existing, status: "processing", claimedAt: at, errorCode: null, deliveries: existing.deliveries + 1 });
-      return "started";
+      if (existing.providerPaymentId !== providerPaymentId || !retryable) return null;
+      const token = crypto.randomUUID();
+      eventsMap.set(eventId, { ...existing, status: "processing", claimedAt: at, errorCode: null, deliveries: existing.deliveries + 1, token });
+      return { eventId, token };
     },
-    async complete(eventId: string) {
-      const existing = eventsMap.get(eventId);
-      if (existing) eventsMap.set(eventId, { ...existing, status: "completed", errorCode: null });
-    },
-    async fail(eventId: string, errorCode: string) {
-      const existing = eventsMap.get(eventId);
-      if (existing) eventsMap.set(eventId, { ...existing, status: "failed", errorCode });
-    }
+    complete: async (claim) => finish(claim, null),
+    fail: async (claim, errorCode) => finish(claim, errorCode)
   };
 
-  return { quotes, attempts, events };
+  // Same fencing as finish_payment_webhook_event: only the current lease, only while processing.
+  function finish(claim: WebhookClaim, errorCode: string | null) {
+    const existing = eventsMap.get(claim.eventId);
+    if (!existing || existing.token !== claim.token || existing.status !== "processing") return false;
+    eventsMap.set(claim.eventId, { ...existing, status: errorCode === null ? "completed" : "failed", errorCode });
+    return true;
+  }
+
+  return {
+    quotes,
+    attempts,
+    events,
+    /** Test helper: the stored state of a webhook event. */
+    webhookEvent(eventId: string) {
+      const found = eventsMap.get(eventId);
+      return found ? { status: found.status, errorCode: found.errorCode, deliveries: found.deliveries } : null;
+    }
+  };
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;

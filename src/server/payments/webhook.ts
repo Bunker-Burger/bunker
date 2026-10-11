@@ -58,11 +58,14 @@ export async function processMercadoPagoWebhook(
   if (notification.type !== "payment") return { kind: "ignored", type: notification.type };
 
   const { eventId, dataId: paymentId } = notification;
-  if ((await dependencies.events.begin(eventId, paymentId)) === "duplicate") return { kind: "duplicate" };
+  const claim = await dependencies.events.begin(eventId, paymentId);
+  if (!claim) return { kind: "duplicate" };
 
+  // Closing is fenced by this delivery's claim: if it was taken over (this delivery took more
+  // than 60 s), the close is a no-op and the current owner decides the event.
   const fail = async (code: string) => {
     try {
-      await dependencies.events.fail(eventId, code);
+      await dependencies.events.fail(claim, code);
     } catch {
       // The claim expires on its own (60 s) and the next delivery takes it again.
     }
@@ -93,7 +96,9 @@ export async function processMercadoPagoWebhook(
   if (NOT_APPLIED.has(outcome)) return notApplied(outcome as NotAppliedReason);
 
   try {
-    await dependencies.events.complete(eventId);
+    // False when another delivery owns the event now: the payment is applied idempotently either
+    // way, and that delivery closes the event.
+    await dependencies.events.complete(claim);
   } catch (error) {
     // The payment is applied; a retry re-reads it and changes nothing.
     throw new WebhookRetryableError("No se pudo cerrar el evento", { cause: error });

@@ -133,12 +133,22 @@ export interface WebhookSignatureVerifier {
   verify(notification: WebhookNotification): Promise<boolean>;
 }
 
+/** This delivery's lease on a webhook event; renewed by every claim or takeover. */
+export interface WebhookClaim {
+  eventId: string;
+  token: string;
+}
+
 export interface WebhookEventsPort {
-  /** `started` when this delivery owns the event; a failed or abandoned claim can be taken again. */
-  begin(eventId: string, providerPaymentId: string): Promise<"started" | "duplicate">;
-  complete(eventId: string): Promise<void>;
-  /** Records why the event was not applied (`amount_mismatch`, `provider_unavailable`…). */
-  fail(eventId: string, errorCode: string): Promise<void>;
+  /**
+   * The claim when this delivery owns the event, `null` for a duplicate. A failed claim, or one
+   * abandoned for more than 60 s, can be taken by the next delivery, which gets a new token.
+   */
+  begin(eventId: string, providerPaymentId: string): Promise<WebhookClaim | null>;
+  /** Closes the event only while `claim` is still its current lease; false when it was taken over. */
+  complete(claim: WebhookClaim): Promise<boolean>;
+  /** Records why the event was not applied (`amount_mismatch`, `provider_unavailable`…), same fencing. */
+  fail(claim: WebhookClaim, errorCode: string): Promise<boolean>;
 }
 
 export interface ProviderPayment {
