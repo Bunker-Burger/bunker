@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
@@ -304,5 +304,31 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
     const submitBtn = screen.getByTestId("mp-submit-button");
     expect(submitBtn).toBeDisabled();
     expect(submitBtn).toHaveTextContent("No se pueden enviar pedidos ahora");
+  });
+});
+
+describe("Mercado Pago without connection (BB-16)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cannot start a payment offline, even with every field complete", async () => {
+    const user = userEvent.setup();
+    setupFetch();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={true} paymentMethods={["cash", "bank_transfer", "mercado_pago"]} />);
+    await user.click(screen.getByRole("button", { name: /Agregar Smash Búnker Doble/i }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: /Mercado Pago/i })).toBeInTheDocument());
+    await user.click(screen.getByRole("radio", { name: /Mercado Pago/i }));
+    await user.type(screen.getByLabelText(/Nombre y apellido/i), "Martín Fierro");
+    await user.type(screen.getByLabelText(/Teléfono \/ WhatsApp/i), "3815551234");
+    const submitBtn = screen.getByTestId("mp-submit-button");
+    await waitFor(() => expect(submitBtn).not.toBeDisabled());
+
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Sin conexión");
+    await user.click(submitBtn);
+    expect(requests.filter((request) => request.url === "/api/checkout/mercado-pago")).toEqual([]);
   });
 });

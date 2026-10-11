@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
@@ -288,5 +288,35 @@ describe("WhatsApp checkout (BB-10)", () => {
 
     expect(await within(checkout).findByRole("alert")).toHaveTextContent("No pudimos calcular el total con el local.");
     expectNoSendAction(checkout);
+  });
+});
+
+describe("without connection (BB-16)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function setOnline(online: boolean) {
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(online);
+    act(() => {
+      window.dispatchEvent(new Event(online ? "online" : "offline"));
+    });
+  }
+
+  it("keeps the menu and cart, but removes the WhatsApp link until the connection is back", async () => {
+    serveOpenStore();
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const checkout = await fillCompleteOrder(user);
+    await within(checkout).findByRole("link", { name: "Enviar pedido por WhatsApp" });
+
+    setOnline(false);
+    expect(within(checkout).getByTestId("offline-note")).toHaveTextContent("para enviar o pagar el pedido necesitás internet");
+    expect(within(checkout).getByRole("button", { name: "Sin conexión" })).toBeDisabled();
+    expectNoSendAction(checkout);
+    // Browsing and the cart keep working offline.
+    expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
+
+    setOnline(true);
+    expect(await within(checkout).findByRole("link", { name: "Enviar pedido por WhatsApp" })).toHaveAttribute("href", SERVER_URL);
+    expect(within(checkout).queryByTestId("offline-note")).toBeNull();
   });
 });

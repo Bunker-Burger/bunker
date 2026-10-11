@@ -7,8 +7,9 @@ function Toaster(props: ToasterProps) {
     <Sonner
       theme="dark"
       position="top-center"
-      offset={{ top: "calc(var(--header-height) + 0.5rem)" }}
-      mobileOffset={{ top: "calc(var(--header-height) + 0.5rem)" }}
+      // Top: below the header. Bottom: above the bottom navigation and the cart tray.
+      offset={{ top: "calc(var(--header-height) + 0.5rem)", bottom: "calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + 5rem)" }}
+      mobileOffset={{ top: "calc(var(--header-height) + 0.5rem)", bottom: "calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + 5rem)" }}
       containerAriaLabel="Notificaciones"
       toastOptions={{
         unstyled: true,
@@ -17,7 +18,7 @@ function Toaster(props: ToasterProps) {
           toast: "flex w-full items-center gap-3 rounded-lg border border-accent-border bg-surface-raised p-4 text-body text-foreground shadow-overlay",
           title: "font-bold",
           description: "text-body-sm text-muted",
-          actionButton: "ml-auto min-h-tap rounded-full bg-primary px-4 text-body-sm font-bold uppercase text-on-primary",
+          actionButton: "ml-auto min-h-tap shrink-0 whitespace-nowrap rounded-full bg-primary px-4 text-body-sm font-bold uppercase text-on-primary",
           success: "border-success",
           error: "border-danger",
           icon: "text-primary"
