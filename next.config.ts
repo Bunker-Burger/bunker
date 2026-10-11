@@ -14,6 +14,23 @@ const withSerwist = withSerwistInit({
   additionalPrecacheEntries: [{ url: "/offline", revision: process.env.VERCEL_GIT_COMMIT_SHA ?? randomUUID() }]
 });
 
+/**
+ * The only other origin the worker may fetch: the Supabase project of this build, for the public
+ * product photos it caches. Same rule as `publicImageOrigin` in src/app/sw-routes.ts (kept here
+ * because next.config.ts cannot share app modules reliably across Node's TypeScript loaders).
+ */
+function workerImageOrigin() {
+  try {
+    const { origin } = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "");
+    return /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(origin) ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+const imageOrigin = workerImageOrigin();
+const workerConnectSrc = imageOrigin ? `'self' ${imageOrigin}` : "'self'";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: {
@@ -37,7 +54,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Content-Type", value: "application/javascript; charset=utf-8" },
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" }
+          { key: "Content-Security-Policy", value: `default-src 'self'; script-src 'self'; connect-src ${workerConnectSrc}` }
         ]
       }
     ];

@@ -81,7 +81,10 @@ describe("Storefront", () => {
     // The fallback copy cannot rule a product out; the server's answer can.
     expect(onInvalidProduct).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Ese producto ya no está disponible"));
-    expect(onInvalidProduct).toHaveBeenCalledOnce();
+    // The callback runs in a passive effect, which React may flush in a later task than the
+    // commit that painted the notice (slow runners), so wait for it instead of assuming it's there.
+    await waitFor(() => expect(onInvalidProduct).toHaveBeenCalledOnce());
+    expect(screen.getByRole("status")).toHaveTextContent("Ese producto ya no está disponible");
   });
 
   it("marks exactly the section being navigated to as current in the bottom bar", async () => {

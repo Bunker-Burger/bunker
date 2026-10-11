@@ -68,6 +68,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run build
+        env:
+          # Placeholder sin clave ni secreto: el catálogo sigue con su fallback (falta la publishable key,
+          # igual que antes). Sólo le da al service worker un origen de Supabase, que
+          # tests/e2e/pwa-photos.spec.ts apunta a un Storage local para probar la caché de fotos (BB-16).
+          NEXT_PUBLIC_SUPABASE_URL: https://e2epwafixture0000001.supabase.co
       - run: pnpm run test:e2e
       - if: failure()
         uses: actions/upload-artifact@v4

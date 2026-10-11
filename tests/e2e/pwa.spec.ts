@@ -5,6 +5,19 @@ import { expect, test, type Page } from "@playwright/test";
  * never stored), the offline fallback, and that offline nothing can be sent or paid.
  */
 
+/** Waits, without reloading, until this page's worker finished activating (activation stores the menu). */
+async function workerActivated(page: Page) {
+  await page.evaluate(async () => {
+    const worker = (await navigator.serviceWorker.ready).active;
+    if (!worker || worker.state === "activated") return;
+    await new Promise<void>((resolve) => {
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") resolve();
+      });
+    });
+  });
+}
+
 async function controlledByWorker(page: Page) {
   await page.goto("/");
   await page.evaluate(async () => {
@@ -80,6 +93,31 @@ test("offline the cached menu opens and the cart works, but nothing can be sent 
   await expect(checkout.getByTestId("offline-note")).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Sin conexión" })).toBeDisabled();
   await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  await context.setOffline(false);
+});
+
+test("a single online visit leaves the menu ready offline, without reloading the page", async ({ page, context }) => {
+  // Fresh context: no worker, no caches. The first document arrives before the worker exists.
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "LA CARTA DEL BÚNKER" })).toBeVisible();
+  await page.evaluate(() => {
+    (window as Window & { firstVisit?: boolean }).firstVisit = true;
+  });
+  await workerActivated(page);
+  // Still the same document: nothing reloaded it to get the menu cached.
+  expect(await page.evaluate(() => (window as Window & { firstVisit?: boolean }).firstVisit)).toBe(true);
+  expect(await page.evaluate(() => performance.getEntriesByType("navigation").length)).toBe(1);
+
+  await context.setOffline(true);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "LA CARTA DEL BÚNKER" })).toBeVisible();
+  await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
+  await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();
+  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
+  await expect(checkout.getByRole("button", { name: "Sin conexión" })).toBeDisabled();
+  // APIs stay network-only: offline they fail instead of answering from a cache.
+  expect(await page.evaluate(() => fetch("/api/store/products").then(() => "answered", () => "failed"))).toBe("failed");
+  expect(await page.evaluate(() => fetch("/api/store/status").then(() => "answered", () => "failed"))).toBe("failed");
   await context.setOffline(false);
 });
 

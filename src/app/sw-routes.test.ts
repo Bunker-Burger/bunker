@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isCacheKeptOnActivation, isSensitiveRuntimeRequest, RUNTIME_CACHES, runtimePolicy } from "./sw-routes";
+import {
+  isCacheableImage,
+  isCacheableMenuDocument,
+  isCacheKeptOnActivation,
+  isSensitiveRuntimeRequest,
+  publicImageOrigin,
+  RUNTIME_CACHES,
+  runtimePolicy
+} from "./sw-routes";
 
 function matches(url: string, sameOrigin = true) {
   return isSensitiveRuntimeRequest({ sameOrigin, url: new URL(url) });
@@ -11,20 +19,27 @@ interface RequestShape {
   destination?: string;
   headers?: Record<string, string>;
   sameOrigin?: boolean;
+  imageOrigin?: string | null;
 }
 
-function policy(url: string, { method = "GET", mode = "cors", destination = "", headers = {}, sameOrigin = true }: RequestShape = {}) {
+function policy(
+  url: string,
+  { method = "GET", mode = "cors", destination = "", headers = {}, sameOrigin = true, imageOrigin = null }: RequestShape = {}
+) {
   const lower = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
-  return runtimePolicy({
-    sameOrigin,
-    url: new URL(url),
-    request: {
-      method,
-      mode,
-      destination,
-      headers: { get: (name) => lower[name.toLowerCase()] ?? null, has: (name) => name.toLowerCase() in lower }
-    }
-  });
+  return runtimePolicy(
+    {
+      sameOrigin,
+      url: new URL(url),
+      request: {
+        method,
+        mode,
+        destination,
+        headers: { get: (name) => lower[name.toLowerCase()] ?? null, has: (name) => name.toLowerCase() in lower }
+      }
+    },
+    imageOrigin
+  );
 }
 
 const document = { mode: "navigate", destination: "document" } as const;
@@ -108,6 +123,94 @@ describe("runtime policy", () => {
   it("leaves other origins (Supabase, Mercado Pago) to the browser", () => {
     expect(policy("https://x.supabase.co/rest/v1/products", { sameOrigin: false })).toBeNull();
     expect(policy("https://x.supabase.co/storage/v1/object/public/a.webp", { sameOrigin: false, destination: "image" })).toBeNull();
+  });
+});
+
+describe("product photos from Supabase Storage", () => {
+  const imageOrigin = "https://abcdefghijklmnopqrst.supabase.co";
+  const photo = `${imageOrigin}/storage/v1/object/public/catalog/products/9b1f/smash-doble.webp`;
+  const remote = { sameOrigin: false, destination: "image", mode: "no-cors", imageOrigin } as const;
+
+  it("caches a public catalog photo of this deployment's project", () => {
+    expect(policy(photo, remote)).toBe("remote-image");
+    expect(policy(`${imageOrigin}/storage/v1/object/public/catalog/a%20b.jpg`, remote)).toBe("remote-image");
+  });
+
+  it("caches nothing remote when the build has no Supabase project", () => {
+    expect(policy(photo, { ...remote, imageOrigin: null })).toBeNull();
+  });
+
+  it.each([
+    ["Supabase Auth", `${imageOrigin}/auth/v1/user`],
+    ["the Auth token endpoint", `${imageOrigin}/auth/v1/token?grant_type=password`],
+    ["PostgREST", `${imageOrigin}/rest/v1/products?select=*`],
+    ["an RPC", `${imageOrigin}/rest/v1/rpc/admin_save_promotion`],
+    ["authenticated Storage", `${imageOrigin}/storage/v1/object/authenticated/catalog/a.webp`],
+    ["a signed Storage URL", `${imageOrigin}/storage/v1/object/sign/catalog/a.webp?token=abc`],
+    ["another bucket", `${imageOrigin}/storage/v1/object/public/private-orders/a.webp`],
+    ["a bucket named like catalog", `${imageOrigin}/storage/v1/object/public/catalog-private/a.webp`],
+    ["the bucket root", `${imageOrigin}/storage/v1/object/public/catalog/`],
+    ["a query (transform, cache-buster or token)", `${photo}?token=abc`],
+    ["an encoded separator", `${imageOrigin}/storage/v1/object/public/catalog/..%2Fprivate%2Fa.webp`],
+    ["a dot segment out of the bucket", `${imageOrigin}/storage/v1/object/public/catalog/%2e%2e/private-orders/a.webp`],
+    ["an encoded dot", `${imageOrigin}/storage/v1/object/public/catalog/a%2Ewebp`],
+    ["image transforms", `${imageOrigin}/storage/v1/render/image/public/catalog/a.webp?width=200`],
+    ["another Supabase project", "https://zzzzzzzzzzzzzzzzzzzz.supabase.co/storage/v1/object/public/catalog/a.webp"],
+    ["a look-alike host", "https://abcdefghijklmnopqrst.supabase.co.evil.test/storage/v1/object/public/catalog/a.webp"],
+    ["plain http", "http://abcdefghijklmnopqrst.supabase.co/storage/v1/object/public/catalog/a.webp"],
+    ["any other image host", "https://lh3.googleusercontent.com/aida-public/a.webp"]
+  ])("never caches %s", (_case, url) => {
+    expect(policy(url, remote)).toBeNull();
+  });
+
+  it("only for images: a fetch, a document or a mutation of the same photo URL stays with the browser", () => {
+    expect(policy(photo, { ...remote, destination: "", mode: "cors" })).toBeNull();
+    expect(policy(photo, { ...remote, destination: "document", mode: "navigate" })).toBeNull();
+    expect(policy(photo, { ...remote, method: "POST" })).toBeNull();
+    expect(policy(photo, { ...remote, method: "DELETE" })).toBeNull();
+  });
+
+  it("reads the project origin only from a https://<project-ref>.supabase.co URL", () => {
+    expect(publicImageOrigin("https://abcdefghijklmnopqrst.supabase.co")).toBe(imageOrigin);
+    expect(publicImageOrigin(" https://abcdefghijklmnopqrst.supabase.co/ ")).toBe(imageOrigin);
+    expect(publicImageOrigin(undefined)).toBeNull();
+    expect(publicImageOrigin("")).toBeNull();
+    expect(publicImageOrigin("not a url")).toBeNull();
+    expect(publicImageOrigin("http://abcdefghijklmnopqrst.supabase.co")).toBeNull();
+    expect(publicImageOrigin("https://abcdefghijklmnopqrst.supabase.co:8443")).toBeNull();
+    expect(publicImageOrigin("https://example.com")).toBeNull();
+    expect(publicImageOrigin("https://short.supabase.co")).toBeNull();
+  });
+});
+
+function response({ status = 200, type = "basic", redirected = false, contentType = null as string | null } = {}) {
+  return { status, type, redirected, headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null) } };
+}
+
+describe("what the worker stores", () => {
+  const html = "text/html; charset=utf-8";
+
+  it("keeps the menu document only as a complete same-origin HTML answer", () => {
+    expect(isCacheableMenuDocument(response({ contentType: html }))).toBe(true);
+    expect(isCacheableMenuDocument(response({ contentType: html, status: 500 }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: html, status: 404 }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: html, status: 206 }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: html, redirected: true }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: html, type: "opaque", status: 0 }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: html, type: "cors" }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: "text/x-component" }))).toBe(false);
+    expect(isCacheableMenuDocument(response({ contentType: "application/json" }))).toBe(false);
+    expect(isCacheableMenuDocument(response())).toBe(false);
+  });
+
+  it("keeps images only when they are readable 200 images, never opaque", () => {
+    expect(isCacheableImage(response({ contentType: "image/webp" }))).toBe(true);
+    expect(isCacheableImage(response({ contentType: "image/jpeg", type: "cors" }))).toBe(true);
+    expect(isCacheableImage(response({ type: "opaque", status: 0 }))).toBe(false);
+    expect(isCacheableImage(response({ contentType: "image/webp", type: "opaque", status: 0 }))).toBe(false);
+    expect(isCacheableImage(response({ contentType: "image/webp", type: "cors", status: 400 }))).toBe(false);
+    expect(isCacheableImage(response({ contentType: "application/json", type: "cors" }))).toBe(false);
+    expect(isCacheableImage(response({ contentType: "text/html" }))).toBe(false);
   });
 });
 

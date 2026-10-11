@@ -11,7 +11,7 @@ interface RuntimeRequestMatch {
 
 export interface RuntimeRequest {
   sameOrigin: boolean;
-  url: Pick<URL, "pathname" | "searchParams">;
+  url: Pick<URL, "origin" | "pathname" | "searchParams">;
   request: {
     method: string;
     mode: string;
@@ -27,6 +27,8 @@ export type RuntimePolicy =
   | "public-page"
   /** Product photos and public images: served at once, refreshed in the background. */
   | "image"
+  /** Product photos from the public `catalog` bucket of this deployment's Supabase project. */
+  | "remote-image"
   /** Build assets whose URL changes with their content (`/_next/static`). */
   | "hashed-asset";
 
@@ -54,10 +56,46 @@ export function isSensitiveRuntimeRequest({ sameOrigin, url: { pathname } }: Run
   return sameOrigin && (pathname === "/bunker" || pathname.startsWith("/bunker/") || pathname === "/api" || pathname.startsWith("/api/"));
 }
 
-/** `null`: not the worker's business (other origins). */
-export function runtimePolicy(candidate: RuntimeRequest): RuntimePolicy | null {
+/** Public path of the `catalog` bucket, where product photos live (BB-06: `catalogImageBaseUrl`). */
+const PUBLIC_CATALOG_IMAGES_PATH = "/storage/v1/object/public/catalog/";
+
+/**
+ * Origin of the Supabase project whose public photos the worker may cache, from the build's
+ * `NEXT_PUBLIC_SUPABASE_URL`. Anything but `https://<project-ref>.supabase.co` turns it off.
+ */
+export function publicImageOrigin(supabaseUrl: string | undefined): string | null {
+  const value = supabaseUrl?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.port === "" && /^[a-z0-9]{20}\.supabase\.co$/.test(url.hostname) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A photo the menu shows from the public `catalog` bucket: an image GET on exactly that origin and
+ * path, with no query (signed URLs, transforms) and no encoded separators. Supabase Auth, PostgREST,
+ * authenticated or signed Storage URLs and other buckets never match.
+ */
+function isPublicCatalogImage({ url, request }: RuntimeRequest, imageOrigin: string | null) {
+  return (
+    imageOrigin !== null &&
+    url.origin === imageOrigin &&
+    request.method === "GET" &&
+    request.destination === "image" &&
+    url.pathname.startsWith(PUBLIC_CATALOG_IMAGES_PATH) &&
+    url.pathname.length > PUBLIC_CATALOG_IMAGES_PATH.length &&
+    !/%(?:2f|5c|2e)/i.test(url.pathname) &&
+    [...url.searchParams.keys()].length === 0
+  );
+}
+
+/** `null`: not the worker's business (other origins, except the public product photos). */
+export function runtimePolicy(candidate: RuntimeRequest, imageOrigin: string | null = null): RuntimePolicy | null {
   const { sameOrigin, url, request } = candidate;
-  if (!sameOrigin) return null;
+  if (!sameOrigin) return isPublicCatalogImage(candidate, imageOrigin) ? "remote-image" : null;
   // Mutations (checkout, Server Actions, login, logout) never go through a cache.
   if (request.method !== "GET") return "network-only";
   if (isSensitiveRuntimeRequest(candidate)) return "network-only";
@@ -71,6 +109,38 @@ export function runtimePolicy(candidate: RuntimeRequest): RuntimePolicy | null {
   // Everything else, including RSC payloads (`RSC: 1`, `?_rsc`) and router fetches, which are not
   // navigations: the server's current answer.
   return "network-only";
+}
+
+interface ResponseShape {
+  status: number;
+  type: string;
+  redirected: boolean;
+  headers: { get(name: string): string | null };
+}
+
+/**
+ * The public menu document worth keeping for offline use: a complete same-origin HTML answer,
+ * never an error page, a redirect (login, Mercado Pago) or anything that is not a document.
+ */
+export function isCacheableMenuDocument(response: ResponseShape) {
+  return (
+    response.status === 200 &&
+    response.type === "basic" &&
+    !response.redirected &&
+    (response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")
+  );
+}
+
+/**
+ * A photo worth keeping: a readable (same-origin or CORS) 200 image. Opaque answers (status 0)
+ * cannot be checked, so they are never stored.
+ */
+export function isCacheableImage(response: ResponseShape) {
+  return (
+    response.status === 200 &&
+    (response.type === "basic" || response.type === "cors") &&
+    (response.headers.get("content-type") ?? "").toLowerCase().startsWith("image/")
+  );
 }
 
 /** Caches a new worker keeps at activation: its precache, images and hashed assets. */
