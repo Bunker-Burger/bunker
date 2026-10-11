@@ -27,6 +27,16 @@ export const LEGAL_TEXTS_UPDATED_AT = "11 de octubre de 2026";
 export const LEGAL_REVIEW = { approved: false } as const;
 
 /**
+ * Whether the menu footer links the legal pages. Off while the texts are under review (owner's
+ * decision): the pages stay reachable by their URL, the allergen notice stays in the footer, and the
+ * privacy link next to the Mercado Pago contact fields is not affected.
+ */
+export const LEGAL_NAV_VISIBLE = false;
+
+/** Search engines skip the legal pages until the texts are approved. */
+export const LEGAL_ROBOTS = LEGAL_REVIEW.approved ? { index: true, follow: true } : { index: false, follow: false };
+
+/**
  * Legal identity of the business (Ley 24.240 and Res. 104/2005 for online sales). Only the owner
  * can provide it; null is shown as pending, never invented.
  */

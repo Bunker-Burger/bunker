@@ -38,7 +38,7 @@ import { formatArs } from "@/lib/money";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
 import { STORE_TIMEZONE } from "@/data/catalog";
-import { ALLERGEN_NOTICE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
+import { ALLERGEN_NOTICE, LEGAL_NAV_VISIBLE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
@@ -371,11 +371,13 @@ export function Storefront({
 
       <footer className="store-legal">
         <p>{ALLERGEN_NOTICE}</p>
-        <nav aria-label="Textos legales">
-          {LEGAL_PAGES.map((page) => (
-            <a href={page.href} key={page.href}>{page.label}</a>
-          ))}
-        </nav>
+        {LEGAL_NAV_VISIBLE ? (
+          <nav aria-label="Textos legales">
+            {LEGAL_PAGES.map((page) => (
+              <a href={page.href} key={page.href}>{page.label}</a>
+            ))}
+          </nav>
+        ) : null}
       </footer>
 
       {itemCount > 0 && !keyboardOpen ? (

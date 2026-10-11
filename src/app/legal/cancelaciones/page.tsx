@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { LEGAL_ROBOTS } from "@/content/legal";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = { title: "Cancelaciones y devoluciones | Búnker Burger" };
+export const metadata: Metadata = { title: "Cancelaciones y devoluciones | Búnker Burger", robots: LEGAL_ROBOTS };
 
 /* Mirrors the manual refund procedure of docs/runbooks/mercado-pago-webhook.md (§5): total refunds, no promised term. */
 

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { getPublicCatalog } from "@/server/catalog";
 import { resolvePrivacyContact, type PrivacyContact } from "@/server/legal/privacy-contact";
-import { PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
+import { LEGAL_ROBOTS, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 
-export const metadata: Metadata = { title: "Privacidad | Búnker Burger" };
+export const metadata: Metadata = { title: "Privacidad | Búnker Burger", robots: LEGAL_ROBOTS };
 
 /*
  * Rendered on every request: the contact must not be frozen with whatever the catalog answered at

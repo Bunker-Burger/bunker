@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ALLERGEN_NOTICE } from "@/content/legal";
+import { ALLERGEN_NOTICE, LEGAL_ROBOTS } from "@/content/legal";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = { title: "Términos | Búnker Burger" };
+export const metadata: Metadata = { title: "Términos | Búnker Burger", robots: LEGAL_ROBOTS };
 
 export default function TermsPage() {
   return (

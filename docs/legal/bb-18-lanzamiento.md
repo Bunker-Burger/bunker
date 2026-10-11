@@ -14,7 +14,8 @@ en el issue #18, con fecha). El código no puede aprobar nada.
 | Aviso de revisión | `src/content/legal.ts` (`LEGAL_REVIEW`) | Mientras `approved` sea `false`, las tres páginas muestran "Texto en revisión" |
 | Titular | `src/content/legal.ts` (`LEGAL_OWNER`) | Razón social, CUIT y domicilio se muestran como "pendiente de carga por el titular" hasta que el dueño los dé |
 | Alérgenos | Pie de la carta y términos | "La carta no informa alérgenos. Si tenés alguna alergia o intolerancia, consultá al local por WhatsApp antes de pedir." |
-| Pie legal | Carta (`/`) | Enlaces a los tres textos |
+| Pie legal | Carta (`/`) | Aviso de alérgenos. Los enlaces a los tres textos están **ocultos** mientras siguen en revisión (`LEGAL_NAV_VISIBLE = false`, decisión del dueño); las páginas siguen accesibles por URL |
+| Buscadores | Las tres páginas | `noindex, nofollow` mientras `LEGAL_REVIEW.approved` sea `false` (`LEGAL_ROBOTS`) |
 | Checkout MP | Formulario de nombre y teléfono | La misma frase de retención que Privacidad (`PAYMENT_DATA_RETENTION_NOTICE`) y enlace a Privacidad |
 | Menú demo | `allowsDemoCatalog` | El menú de ejemplo sólo aparece sin Supabase y fuera de Vercel (local y CI). En un despliegue, si la carta no se puede leer, se muestra "No pudimos cargar la carta", nunca productos inventados. **Límite:** la detección usa `VERCEL_ENV`; un servidor de producción fuera de Vercel y sin Supabase mostraría el menú demo. El destino previsto (BB-19) es Vercel; si cambia, pasar a un opt-in explícito para local/CI |
 | Fotos de Stitch | `src/data/catalog.ts`, `next.config.ts` | El menú demo ya no tiene fotos; se quitaron `lh3.googleusercontent.com` (mock-ups de Stitch) y `images.unsplash.com` de los orígenes de imagen permitidos |
@@ -40,7 +41,7 @@ Los tests (`src/app/legal/legal-pages.test.tsx`) comprueban que:
 | A8 | Lo que los textos dicen del local: cómo cancela, que no usa el número para publicidad, cuánto conserva los chats de WhatsApp | Dueño | Pendiente |
 | A9 | **Bloqueante:** contacto de privacidad autorizado (WhatsApp E.164 o email) para `PRIVACY_CONTACT_WHATSAPP` / `PRIVACY_CONTACT_EMAIL` en Vercel. Sin él, si la base no responde, Privacidad dice que el canal está pendiente | Dueño | Pendiente |
 
-Al aprobar: cargar `LEGAL_OWNER`, poner `LEGAL_REVIEW.approved = true` y actualizar `LEGAL_TEXTS_UPDATED_AT` en
+Al aprobar: cargar `LEGAL_OWNER`, poner `LEGAL_REVIEW.approved = true`, `LEGAL_NAV_VISIBLE = true` y actualizar `LEGAL_TEXTS_UPDATED_AT` en
 `src/content/legal.ts`, en un PR que enlace la aprobación.
 
 ## 3. Comprobantes (para el contador)

@@ -1,14 +1,21 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPublicCatalog } from "@/server/catalog";
-import CancellationsPage, { dynamic as cancellationsDynamic } from "./cancelaciones/page";
+import CancellationsPage, { dynamic as cancellationsDynamic, metadata as cancellationsMetadata } from "./cancelaciones/page";
 import LegalLayout from "./layout";
-import { ALLERGEN_NOTICE, LEGAL_PAGES, LEGAL_REVIEW, PAYMENT_DATA_RETENTION_DAYS, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
-import PrivacyPage, { dynamic as privacyDynamic } from "./privacidad/page";
-import TermsPage, { dynamic as termsDynamic } from "./terminos/page";
+import {
+  ALLERGEN_NOTICE,
+  LEGAL_NAV_VISIBLE,
+  LEGAL_PAGES,
+  LEGAL_REVIEW,
+  PAYMENT_DATA_RETENTION_DAYS,
+  PAYMENT_DATA_RETENTION_NOTICE
+} from "@/content/legal";
+import PrivacyPage, { dynamic as privacyDynamic, metadata as privacyMetadata } from "./privacidad/page";
+import TermsPage, { dynamic as termsDynamic, metadata as termsMetadata } from "./terminos/page";
 
 vi.mock("@/server/catalog", () => ({ getPublicCatalog: vi.fn() }));
 
@@ -206,6 +213,28 @@ describe("términos y cancelaciones", () => {
   it("are static pages", () => {
     expect(termsDynamic).toBe("force-static");
     expect(cancellationsDynamic).toBe("force-static");
+  });
+});
+
+describe("en revisión: fuera del pie de la carta y de los buscadores", () => {
+  it("the menu footer does not link them and the review is not approved", () => {
+    expect(LEGAL_NAV_VISIBLE).toBe(false);
+    expect(LEGAL_REVIEW.approved).toBe(false);
+  });
+
+  it.each([
+    ["/legal/terminos", termsMetadata],
+    ["/legal/privacidad", privacyMetadata],
+    ["/legal/cancelaciones", cancellationsMetadata]
+  ])("%s asks search engines not to index nor follow it", (_path, metadata) => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("every legal URL is still a page of the app, reachable directly", () => {
+    expect(LEGAL_PAGES.map((page) => page.href)).toEqual(["/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"]);
+    for (const { href } of LEGAL_PAGES) {
+      expect(existsSync(join(process.cwd(), "src", "app", ...href.slice(1).split("/"), "page.tsx"))).toBe(true);
+    }
   });
 });
 
