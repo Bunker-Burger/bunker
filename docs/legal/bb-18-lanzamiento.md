@@ -9,18 +9,20 @@ en el issue #18, con fecha). El código no puede aprobar nada.
 | Tema | Dónde | Comportamiento |
 |---|---|---|
 | Términos | `/legal/terminos` | Qué hace la web, precios y total, confirmación por WhatsApp, entrega sin plazos, medios de pago, sin comprobantes fiscales, alérgenos |
-| Privacidad | `/legal/privacidad` | Datos, finalidad, destinatarios, plazo (90 días) y canal de contacto (WhatsApp del local, leído de la base) |
+| Privacidad | `/legal/privacidad` | Datos, finalidad, destinatarios, plazo (purga diaria de lo que pasa los 90 días) y canal de contacto: el WhatsApp del local leído de la base o, si la base no responde, el contacto configurado por el dueño (`PRIVACY_CONTACT_WHATSAPP` / `PRIVACY_CONTACT_EMAIL`). Se renderiza en cada pedido, así el contacto no queda congelado en el build |
 | Cancelaciones | `/legal/cancelaciones` | Devolución total desde Mercado Pago, **sin plazo prometido** (igual que el runbook `mercado-pago-webhook.md` §5) |
 | Aviso de revisión | `src/content/legal.ts` (`LEGAL_REVIEW`) | Mientras `approved` sea `false`, las tres páginas muestran "Texto en revisión" |
 | Titular | `src/content/legal.ts` (`LEGAL_OWNER`) | Razón social, CUIT y domicilio se muestran como "pendiente de carga por el titular" hasta que el dueño los dé |
 | Alérgenos | Pie de la carta y términos | "La carta no informa alérgenos. Si tenés alguna alergia o intolerancia, consultá al local por WhatsApp antes de pedir." |
 | Pie legal | Carta (`/`) | Enlaces a los tres textos |
-| Checkout MP | Formulario de nombre y teléfono | "Se borran a los 90 días" y enlace a Privacidad |
-| Menú demo | `allowsDemoCatalog` | El menú de ejemplo sólo aparece sin Supabase y fuera de Vercel (local y CI). En un despliegue, si la carta no se puede leer, se muestra "No pudimos cargar la carta", nunca productos inventados |
+| Checkout MP | Formulario de nombre y teléfono | La misma frase de retención que Privacidad (`PAYMENT_DATA_RETENTION_NOTICE`) y enlace a Privacidad |
+| Menú demo | `allowsDemoCatalog` | El menú de ejemplo sólo aparece sin Supabase y fuera de Vercel (local y CI). En un despliegue, si la carta no se puede leer, se muestra "No pudimos cargar la carta", nunca productos inventados. **Límite:** la detección usa `VERCEL_ENV`; un servidor de producción fuera de Vercel y sin Supabase mostraría el menú demo. El destino previsto (BB-19) es Vercel; si cambia, pasar a un opt-in explícito para local/CI |
 | Fotos de Stitch | `src/data/catalog.ts`, `next.config.ts` | El menú demo ya no tiene fotos; se quitaron `lh3.googleusercontent.com` (mock-ups de Stitch) y `images.unsplash.com` de los orígenes de imagen permitidos |
 
 Los tests (`src/app/legal/legal-pages.test.tsx`) comprueban que:
-- el plazo que dice Privacidad es el que aplica `private.purge_expired_payment_data`;
+- la frase de retención de Privacidad y del checkout es la misma, habla de una purga diaria y no de un borrado exacto;
+- coincide con el job programado (`bb15-purge-expired-payment-data`, una vez por día) y con las condiciones de `private.purge_expired_payment_data`;
+- con la carta caída, Privacidad muestra el contacto configurado (enlace `https:`/`mailto:` validado) o dice que está pendiente; nunca un contacto inventado;
 - ningún texto promete plazos (salvo la retención de 90 días);
 - privacidad nombra datos, finalidad, destinatarios, plazo y contacto.
 
@@ -36,6 +38,7 @@ Los tests (`src/app/legal/legal-pages.test.tsx`) comprueban que:
 | A6 | Fotos de productos cargadas en el admin: originales o autorizadas (§5) | Dueño | Pendiente |
 | A7 | Datos del titular: razón social, CUIT, domicilio | Dueño | Pendiente |
 | A8 | Lo que los textos dicen del local: cómo cancela, que no usa el número para publicidad, cuánto conserva los chats de WhatsApp | Dueño | Pendiente |
+| A9 | **Bloqueante:** contacto de privacidad autorizado (WhatsApp E.164 o email) para `PRIVACY_CONTACT_WHATSAPP` / `PRIVACY_CONTACT_EMAIL` en Vercel. Sin él, si la base no responde, Privacidad dice que el canal está pendiente | Dueño | Pendiente |
 
 Al aprobar: cargar `LEGAL_OWNER`, poner `LEGAL_REVIEW.approved = true` y actualizar `LEGAL_TEXTS_UPDATED_AT` en
 `src/content/legal.ts`, en un PR que enlace la aprobación.
@@ -83,15 +86,17 @@ Toda foto que venga de Instagram, de Stitch o de terceros sin autorización escr
 
 ## 6. Política de datos
 
-- Mercado Pago: nombre, teléfono, detalle y estado del pago; se borran a los 90 días con la cotización y los eventos
-  del webhook (`private.purge_expired_payment_data`).
+- Mercado Pago: nombre, teléfono, detalle y estado del pago. Una purga diaria (06:15 UTC) elimina lo que tiene más de
+  90 días, junto con la cotización y los eventos del webhook (`private.purge_expired_payment_data`). Un registro
+  puede seguir guardado después del día 90 hasta la corrida siguiente; los textos no prometen un instante exacto ni
+  un máximo, que dependería de que el job corra y esté monitoreado.
 - Sin marketing, sin cuentas de clientes, sin direcciones guardadas: la dirección sólo viaja en el chat de WhatsApp.
 - En el navegador: carrito y la marca de "invitación a instalar descartada". Sin cookies de seguimiento ni analítica.
 
-**Requisito para que "se borran a los 90 días" sea cierto en producción:** la purga diaria la programa con `pg_cron`
+**Requisito para que la purga diaria exista en producción:** la purga diaria la programa con `pg_cron`
 la migración de BB-15 (`20261011180000_bb15_mercado_pago_webhook.sql`), que todavía no está aplicada en el proyecto
-cloud. Hasta que se aplique y se verifique el job, no hay borrado automático. Mercado Pago sigue sin habilitar (#38),
-así que hoy no se guardan esos datos.
+cloud. Hasta que se aplique y se verifique el job (`cron.job` y sus corridas), no hay borrado automático: **Mercado Pago no
+se habilita antes** (#38). Hoy no se guardan esos datos.
 
 Si un flujo empieza a guardar un dato nuevo (campo, tabla, cookie, analítica), la página de privacidad cambia en el
 mismo PR.

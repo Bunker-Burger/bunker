@@ -1,37 +1,44 @@
 import type { Metadata } from "next";
 import { getPublicCatalog } from "@/server/catalog";
-import { PAYMENT_DATA_RETENTION_DAYS } from "@/content/legal";
+import { resolvePrivacyContact, type PrivacyContact } from "@/server/legal/privacy-contact";
+import { PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 
 export const metadata: Metadata = { title: "Privacidad | Búnker Burger" };
+
+/*
+ * Rendered on every request: the contact must not be frozen with whatever the catalog answered at
+ * build time, and the configured fallback is read from the server environment.
+ */
+export const dynamic = "force-dynamic";
 
 /*
  * BB-18: exactly what the site handles today. If a flow starts storing something new (a field, a
  * table, a cookie), this page changes in the same pull request.
  */
 
-/** The store's WhatsApp, the contact channel for privacy requests; null when the catalog cannot be read. */
+/** The store's WhatsApp from the catalog; null when the catalog cannot be read. */
 async function storeWhatsapp(): Promise<string | null> {
   const catalog = await getPublicCatalog();
   return catalog.ok ? catalog.value.store.whatsappE164 : null;
 }
 
+function Contact({ contact }: { contact: PrivacyContact | null }) {
+  if (!contact) return <strong>el canal de contacto para privacidad todavía no fue cargado por el titular</strong>;
+  return <a href={contact.href}>{contact.label}</a>;
+}
+
 export default async function PrivacyPage() {
-  const whatsapp = await storeWhatsapp();
-  const contact = whatsapp ? (
-    <>
-      por WhatsApp al <a href={`https://wa.me/${whatsapp.slice(1)}`}>{whatsapp}</a>, el mismo número al que se envían
-      los pedidos
-    </>
-  ) : (
-    <>por WhatsApp, al mismo número al que se envían los pedidos</>
-  );
+  const contact = resolvePrivacyContact(await storeWhatsapp(), {
+    PRIVACY_CONTACT_WHATSAPP: process.env.PRIVACY_CONTACT_WHATSAPP,
+    PRIVACY_CONTACT_EMAIL: process.env.PRIVACY_CONTACT_EMAIL
+  });
 
   return (
     <>
       <h1>Privacidad</h1>
       <p>
         Búnker Burger es responsable de los datos que esta web usa para tomar tus pedidos. Para cualquier consulta o
-        pedido sobre tus datos, escribinos {contact}.
+        pedido sobre tus datos, escribinos: <Contact contact={contact} />.
       </p>
 
       <h2>Pedidos por WhatsApp</h2>
@@ -56,8 +63,8 @@ export default async function PrivacyPage() {
           tarjeta o cuenta los cargás en Mercado Pago y nunca pasan por esta web.
         </li>
         <li>
-          <strong>Cuánto tiempo:</strong> se borran automáticamente a los {PAYMENT_DATA_RETENTION_DAYS} días de iniciado
-          el pago. Lo que guarda Mercado Pago se rige por su propia política de privacidad.
+          <strong>Cuánto tiempo:</strong> {PAYMENT_DATA_RETENTION_NOTICE} Lo que guarda Mercado Pago se rige
+          por su propia política de privacidad.
         </li>
       </ul>
 
@@ -85,7 +92,7 @@ export default async function PrivacyPage() {
 
       <h2>Tus derechos</h2>
       <p>
-        Podés pedir acceso, rectificación o supresión de tus datos {contact}. El acceso es gratuito a intervalos no
+        Podés pedir acceso, rectificación o supresión de tus datos escribiendo a: <Contact contact={contact} />. El acceso es gratuito a intervalos no
         inferiores a seis meses, salvo que acredites un interés legítimo (art. 14, inc. 3, Ley 25.326).
       </p>
       <p>

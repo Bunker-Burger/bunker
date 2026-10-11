@@ -38,7 +38,7 @@ import { formatArs } from "@/lib/money";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
 import { STORE_TIMEZONE } from "@/data/catalog";
-import { ALLERGEN_NOTICE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_DAYS } from "@/content/legal";
+import { ALLERGEN_NOTICE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
@@ -982,7 +982,7 @@ function CheckoutSection({
               ? `Solo te pedimos nombre y teléfono para identificar tu pago. La entrega${fulfilment === "delivery" ? " y dirección" : ""} se coordina por WhatsApp tras abonar.`
               : `No te pedimos datos acá: tu nombre${fulfilment === "delivery" ? ", la dirección" : ""} y el pago se coordinan en el chat de WhatsApp del local.`}
             {payment === "mercado-pago" ? (
-              <> Se borran a los {PAYMENT_DATA_RETENTION_DAYS} días. <a href="/legal/privacidad">Privacidad</a></>
+              <> {PAYMENT_DATA_RETENTION_NOTICE} <a href="/legal/privacidad">Privacidad</a></>
             ) : null}
           </p>
         </div>

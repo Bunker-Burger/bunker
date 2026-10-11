@@ -119,6 +119,7 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
 ## Textos legales y privacidad (BB-18)
 
 - `/legal/terminos`, `/legal/privacidad` y `/legal/cancelaciones`, enlazadas desde el pie de la carta junto al aviso de que la carta no informa alérgenos. Los hechos que repiten (retención de 90 días, aviso de alérgenos, titular, estado de revisión) viven en `src/content/legal.ts`.
+- **Contacto de privacidad:** el WhatsApp del local (de la carta) o, si la base no responde, `PRIVACY_CONTACT_WHATSAPP` / `PRIVACY_CONTACT_EMAIL` del servidor, que da el dueño. Sin ninguno, la página dice que el canal está pendiente.
 - **Sin aprobar todavía:** las páginas muestran "Texto en revisión" y el titular como pendiente hasta que el dueño apruebe por escrito. Aprobaciones, preguntas legales y para el contador, e inventario de activos: `docs/legal/bb-18-lanzamiento.md`.
 - **Menú demo sólo sin Supabase y fuera de Vercel** (`allowsDemoCatalog`): un despliegue que no puede leer la carta muestra "No pudimos cargar la carta", nunca productos ni fotos de ejemplo. El menú demo no tiene fotos (las de Stitch no estaban autorizadas).
 

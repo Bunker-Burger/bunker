@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { PublicStoreStatus } from "@/domain/store-status";
@@ -151,7 +152,10 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
       screen.getByText(/Solo te pedimos nombre y teléfono para identificar tu pago/i)
     ).toBeInTheDocument();
     // BB-18: how long they are kept and where the privacy policy is.
-    const contactNote = screen.getByText(/Se borran a los 90 días/);
+    // R1 H1: the same retention sentence as the privacy policy (daily purge, no exact instant).
+    const contactNote = screen.getByText(/Se eliminan en una purga diaria de los registros con más de 90 días/);
+    expect(contactNote).toHaveTextContent(PAYMENT_DATA_RETENTION_NOTICE);
+    expect(contactNote.textContent).not.toMatch(/(?:borra|elimina)n?\s+(?:automáticamente\s+)?a\s+los\s+\d+\s+días/i);
     expect(within(contactNote).getByRole("link", { name: "Privacidad" })).toHaveAttribute("href", "/legal/privacidad");
 
     // With inputs empty, button is disabled

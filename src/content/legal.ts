@@ -4,8 +4,18 @@
  * (docs/legal/bb-18-lanzamiento.md). Until then every page says so.
  */
 
-/** Days a Mercado Pago attempt (name, phone, payment status) is kept: `private.purge_expired_payment_data`. */
+/** Age at which a Mercado Pago attempt (name, phone, payment status) becomes due: `private.purge_expired_payment_data`. */
 export const PAYMENT_DATA_RETENTION_DAYS = 90;
+
+/**
+ * How that data actually goes (BB-18 R1 H1): a daily job (`bb15-purge-expired-payment-data`, pg_cron)
+ * deletes what is older than the retention, so a record outlives day 90 until the next run. The
+ * same sentence goes in the privacy policy and next to the checkout fields; it promises no exact
+ * instant and no maximum, which would depend on the job running and being monitored.
+ */
+export const PAYMENT_DATA_RETENTION_NOTICE =
+  `Se eliminan en una purga diaria de los registros con más de ${PAYMENT_DATA_RETENTION_DAYS} días, ` +
+  "así que pueden seguir guardados hasta la purga siguiente: no se borran en el instante exacto en que se cumple el plazo.";
 
 /** Date of the current version of the texts, shown on every page. */
 export const LEGAL_TEXTS_UPDATED_AT = "11 de octubre de 2026";
