@@ -35,9 +35,7 @@ function markdownAnchor(heading: string): string {
   return heading
     .trim()
     .toLocaleLowerCase("es")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 _-]/g, "")
+    .replace(/[^\p{Letter}\p{Number} _-]/gu, "")
     .replace(/\s+/g, "-");
 }
 

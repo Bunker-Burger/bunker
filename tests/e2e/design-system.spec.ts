@@ -65,9 +65,9 @@ test("a populated drawer and checkout stay accessible and announce cart changes"
   await drawer.getByRole("button", { name: /Agregar 1 al carrito/ }).click();
   await expect(page.getByRole("status")).toHaveText("Smash Búnker Doble se agregó al carrito.");
 
-  const checkout = page.locator("#checkout");
+  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
   await checkout.getByRole("radio", { name: /Delivery/ }).check();
-  const checkoutAudit = await new AxeBuilder({ page }).include("#checkout").withTags(WCAG_AA).analyze();
+  const checkoutAudit = await new AxeBuilder({ page }).withTags(WCAG_AA).analyze();
   expect(checkoutAudit.violations).toEqual([]);
 });
 

@@ -106,6 +106,24 @@ describe("validateAcceptanceMatrix", () => {
     expect(missingAnchor).toContain(`${matrix.requirements[0]!.id}: checklist anchor not found in manual.md: mercado-pago-sandbox`);
   });
 
+  it("uses GitHub-compatible anchors for headings with accents", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.evidence = [{
+      kind: "manual",
+      environment: "local",
+      reason: "The check requires assistive technology.",
+      checklist: "manual.md#tecnología-asistiva"
+    }];
+    await writeFile(path.join(rootDir, "manual.md"), "## Tecnología asistiva\n", "utf8");
+
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+
+    matrix.requirements[0]!.evidence[0]!.checklist = "manual.md#tecnologia-asistiva";
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toContain(
+      `${matrix.requirements[0]!.id}: checklist anchor not found in manual.md: tecnologia-asistiva`
+    );
+  });
+
   it("keeps every BB-07 through BB-17 requirement mapped to resolvable evidence", async () => {
     const tickets = new Set(repositoryMatrix.requirements.map(({ ticket }) => ticket));
     expect(tickets).toEqual(new Set([

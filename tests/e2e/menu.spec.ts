@@ -103,7 +103,7 @@ test("one orderable product of every public type reaches the same cart", async (
   }
 
   await expect(page.getByLabel("Carrito, 4 productos")).toBeVisible();
-  const cart = page.locator("#carrito");
+  const cart = page.getByRole("region", { name: "Carrito" });
   for (const name of products) {
     await expect(cart.getByText(name, { exact: true })).toBeVisible();
   }
