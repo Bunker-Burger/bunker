@@ -74,8 +74,12 @@ describe("createCheckoutProPreference", () => {
       return new Response(JSON.stringify({ id: "pref-1", init_point: "https://mp.example/pay" }), { status: 201 });
     };
     const attempts = new Map();
+    const savedBeforeContactingMercadoPago: PaymentAttempt[] = [];
     const port: PaymentAttemptsPort = {
-      async save(attempt) { attempts.set(attempt.id, attempt); },
+      async save(attempt) {
+        if (requests.length === 0) savedBeforeContactingMercadoPago.push(attempt);
+        attempts.set(attempt.id, attempt);
+      },
       async findByExternalReference() { return null; },
       async markApproved() {}
     };
@@ -101,9 +105,38 @@ describe("createCheckoutProPreference", () => {
         success: "https://bunker.example/?payment=success&ref=attempt-1",
         pending: "https://bunker.example/?payment=pending&ref=attempt-1",
         failure: "https://bunker.example/?payment=failure&ref=attempt-1"
-      }
+      },
+      // BB-15: Mercado Pago notifies payment changes here.
+      notification_url: "https://bunker.example/api/payments/mercado-pago/webhook"
     });
-    expect(attempts.get("attempt-1")).toMatchObject({ quoteId: "quote-1", expectedAmountCents: 1_500_000n, status: "pending" });
+    expect(attempts.get("attempt-1")).toMatchObject({
+      quoteId: "quote-1",
+      expectedAmountCents: 1_500_000n,
+      status: "pending",
+      // BB-15: minimal contact kept with the attempt for the 90-day retention.
+      customer: { name: "Ana Pérez", phone: "+5491155551234" }
+    });
+    // Already with the contact before the payment can exist: a timeout after paying keeps it reachable.
+    expect(savedBeforeContactingMercadoPago).toEqual([expect.objectContaining({ customer: { name: "Ana Pérez", phone: "+5491155551234" } })]);
+  });
+
+  it("does not send a notification_url Mercado Pago would refuse (http APP_URL in development)", async () => {
+    let body: Record<string, unknown> = {};
+    await createCheckoutProPreference({
+      quote: { id: "quote-1", totalCents: 1_500_000n, expiresAt: new Date("2026-10-06T12:15:00Z") },
+      customer: { name: "Ana Pérez", phone: "+5491155551234" }
+    }, {
+      config: { accessToken: "secret-token", webhookSecret: "wh-secret", appUrl: "http://localhost:3000" },
+      fetcher: async (_input, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return new Response(JSON.stringify({ id: "pref-1", init_point: "https://mp.example/pay" }), { status: 201 });
+      },
+      attempts: { async save() {}, async findByExternalReference() { return null; }, async markApproved() {} },
+      storeStatus: storeStatus("open"),
+      createId: () => "attempt-1",
+      now: () => new Date("2026-10-06T12:00:00Z")
+    });
+    expect(body).not.toHaveProperty("notification_url");
   });
 
   it("does not contact Mercado Pago nor record an attempt once the store stopped taking orders", async () => {

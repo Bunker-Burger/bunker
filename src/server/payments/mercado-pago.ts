@@ -125,6 +125,14 @@ export class ConcurrentAttemptPendingError extends Error {
   }
 }
 
+/** The attempt was approved, refunded or closed while its preference was being created (BB-15). */
+export class PaymentAttemptSettledError extends Error {
+  constructor(message = "El intento de pago ya no está abierto.") {
+    super(message);
+    this.name = "PaymentAttemptSettledError";
+  }
+}
+
 function waitFor(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -162,6 +170,10 @@ export async function createCheckoutProPreference(
   if (inFlight) {
     return inFlight;
   }
+
+  // Minimal contact kept with the attempt (BB-15): a paid order is reachable even if the customer
+  // never sends the WhatsApp message. Removed with the attempt by the 90-day purge.
+  const customer = { name: input.customer.name.trim(), phone: input.customer.phone.trim() };
 
   const creationPromise = (async () => {
     assertAcceptingOrders(await dependencies.storeStatus());
@@ -206,7 +218,8 @@ export async function createCheckoutProPreference(
         externalReference: finalExternalReference,
         expectedAmountCents: input.quote.totalCents,
         status: "pending",
-        createdAt: dependencies.now()
+        createdAt: dependencies.now(),
+        customer
       });
     } catch (saveError) {
       const isUniqueConflict =
@@ -295,6 +308,11 @@ export async function createCheckoutProPreference(
           failure: `${dependencies.config.appUrl}/?payment=failure&ref=${finalExternalReference}`
         },
         auto_return: "approved",
+        // BB-15: where Mercado Pago notifies payment changes. Only a public https URL is accepted
+        // there; a local http APP_URL relies on the panel's webhook URL and the return check.
+        ...(dependencies.config.appUrl.startsWith("https://")
+          ? { notification_url: `${dependencies.config.appUrl}/api/payments/mercado-pago/webhook` }
+          : {}),
         expires: true,
         expiration_date_to: input.quote.expiresAt.toISOString()
       })
@@ -304,7 +322,11 @@ export async function createCheckoutProPreference(
 
     // P2-08: Completar provider_preference_id al volver exitosamente de Mercado Pago
     if (dependencies.attempts.updatePreferenceId) {
-      await dependencies.attempts.updatePreferenceId(finalExternalReference, parsed.id);
+      const recorded = await dependencies.attempts.updatePreferenceId(finalExternalReference, parsed.id);
+      // BB-15 R1 H3: a payment settled the attempt while the preference was being created (an
+      // earlier preference of the same reference was paid or refunded). Nothing is overwritten and
+      // no payment link is handed out for an order that is no longer open.
+      if (recorded === false) throw new PaymentAttemptSettledError();
     } else {
       await dependencies.attempts.save({
         id: finalAttemptId,
@@ -314,7 +336,8 @@ export async function createCheckoutProPreference(
         expectedAmountCents: input.quote.totalCents,
         status: "pending",
         createdAt: dependencies.now(),
-        providerPreferenceId: parsed.id
+        providerPreferenceId: parsed.id,
+        customer
       });
     }
 

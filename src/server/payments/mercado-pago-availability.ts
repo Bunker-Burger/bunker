@@ -6,6 +6,11 @@ import { isPaymentPersistenceConfigured } from "./payment-repository";
 export type MercadoPagoUnavailableReason =
   /** Access Token or public return URL (`APP_URL`) absent or invalid. */
   | "config"
+  /**
+   * No `MERCADO_PAGO_WEBHOOK_SECRET` (BB-15): without verified notifications a customer who pays
+   * and closes the browser would leave the attempt pending, so no checkout starts.
+   */
+  | "webhook"
   /** The store did not enable Mercado Pago, or its payment methods could not be read. */
   | "payment_method_disabled"
   /** No durable storage for quotes and attempts (service role / Supabase project). */
@@ -38,6 +43,7 @@ export function getMercadoPagoAvailability(
 
   const detection = detectMercadoPagoConfig(environment);
   if (!detection.enabled) reasons.push("config");
+  else if (!detection.config.webhookSecret) reasons.push("webhook");
 
   if (options.storePaymentMethods !== undefined) {
     const method = options.storePaymentMethods?.find((candidate) => candidate.method === "mercado_pago");

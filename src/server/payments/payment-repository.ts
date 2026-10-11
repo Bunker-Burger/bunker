@@ -2,15 +2,50 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { FulfilmentMethod } from "@/domain/types";
 import { readSupabaseConfig } from "@/server/supabase/config";
 import type { Database, Json } from "@/server/supabase/database.types";
+import { applyProviderPaymentToAttempt } from "./payment-application";
 import type {
   PaymentAttempt,
   PaymentAttemptsPort,
   PaymentQuote,
   PaymentQuotesPort,
-  QuoteLine
+  ProviderPayment,
+  ProviderPaymentOutcome,
+  QuoteLine,
+  WebhookClaim,
+  WebhookEventsPort
 } from "./ports";
 
 const DEFAULT_STORE_ID = "0199b2c8-40b0-7000-8000-000000000001";
+
+/** Statuses a payment can still approve (BB-15); approved and refunded attempts are settled. */
+const OPEN_ATTEMPT_STATUSES = ["created", "pending", "expired", "rejected", "cancelled"] as const;
+
+/** Statuses in which the checkout may still record the preference it just created (BB-15 R1 H3). */
+const PREFERENCE_STATUSES = ["created", "pending"] as const;
+
+const PROVIDER_PAYMENT_OUTCOMES = new Set<ProviderPaymentOutcome>([
+  "approved",
+  "refunded",
+  "rejected",
+  "cancelled",
+  "pending",
+  "unchanged",
+  "unknown_reference",
+  "currency_mismatch",
+  "amount_mismatch",
+  "conflicting_payment"
+]);
+
+/** An unexpected webhook claim in-flight longer than this is taken over by the next delivery. */
+export const WEBHOOK_CLAIM_STALE_MS = 60_000;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface PaymentPersistencePorts {
+  quotes: PaymentQuotesPort;
+  attempts: PaymentAttemptsPort & Required<Pick<PaymentAttemptsPort, "applyProviderPayment">>;
+  events: WebhookEventsPort;
+}
 
 function serializeLines(lines: QuoteLine[]): Json {
   return lines.map((line) => ({
@@ -42,10 +77,28 @@ function deserializeLines(json: unknown): QuoteLine[] {
   });
 }
 
+type AttemptRow = Database["public"]["Tables"]["payment_attempts"]["Row"];
+
+function toAttempt(data: AttemptRow): PaymentAttempt {
+  return {
+    id: data.id,
+    quoteId: data.quote_id ?? "",
+    idempotencyKey: data.idempotency_key ?? undefined,
+    externalReference: data.external_reference,
+    expectedAmountCents: BigInt(data.amount_cents),
+    status: data.status as PaymentAttempt["status"],
+    createdAt: new Date(data.created_at),
+    providerPaymentId: data.provider_payment_id ?? undefined,
+    providerPreferenceId: data.provider_preference_id ?? undefined,
+    providerStatus: data.provider_status ?? undefined,
+    customer: data.customer_name && data.customer_phone ? { name: data.customer_name, phone: data.customer_phone } : undefined
+  };
+}
+
 export function createSupabasePaymentRepository(
   client: SupabaseClient<Database>,
   options?: { storeId?: string }
-): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } {
+): PaymentPersistencePorts {
   const storeId = options?.storeId ?? DEFAULT_STORE_ID;
 
   const quotes: PaymentQuotesPort = {
@@ -89,7 +142,7 @@ export function createSupabasePaymentRepository(
     }
   };
 
-  const attempts: PaymentAttemptsPort = {
+  const attempts: PersistencePortsAttempts = {
     async save(attempt: PaymentAttempt): Promise<void> {
       const { error } = await client.from("payment_attempts").upsert({
         id: attempt.id,
@@ -103,26 +156,34 @@ export function createSupabasePaymentRepository(
         provider_preference_id: attempt.providerPreferenceId ?? null,
         provider_payment_id: attempt.providerPaymentId ?? null,
         status: attempt.status,
+        customer_name: attempt.customer?.name ?? null,
+        customer_phone: attempt.customer?.phone ?? null,
         expires_at: new Date(attempt.createdAt.getTime() + 15 * 60_000).toISOString()
-      }, { onConflict: "external_reference" });
+        // ON CONFLICT (external_reference) DO NOTHING: a retry never rewrites an attempt that a
+        // payment may have settled meanwhile (status, provider_payment_id). A clash on the
+        // idempotency key of another reference still raises 23505 (BB-14 race coordination).
+      }, { onConflict: "external_reference", ignoreDuplicates: true });
       if (error) {
         throw new Error(`Error al persistir attempt: ${error.message}`);
       }
     },
 
-    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
-      const { error } = await client
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<boolean> {
+      // Only the preference id, only on an open attempt: a late write never undoes an approval.
+      const { data, error } = await client
         .from("payment_attempts")
         .update({
           provider_preference_id: providerPreferenceId,
-          status: "pending",
           updated_at: new Date().toISOString()
         })
-        .eq("external_reference", reference);
+        .eq("external_reference", reference)
+        .in("status", [...PREFERENCE_STATUSES])
+        .select("external_reference");
 
       if (error) {
         throw new Error(`Error al actualizar preference_id: ${error.message}`);
       }
+      return (data?.length ?? 0) > 0;
     },
 
     async findByExternalReference(reference: string): Promise<PaymentAttempt | null> {
@@ -133,17 +194,7 @@ export function createSupabasePaymentRepository(
         .maybeSingle();
 
       if (error || !data) return null;
-      return {
-        id: data.id,
-        quoteId: data.quote_id ?? "",
-        idempotencyKey: data.idempotency_key ?? undefined,
-        externalReference: data.external_reference,
-        expectedAmountCents: BigInt(data.amount_cents),
-        status: data.status as PaymentAttempt["status"],
-        createdAt: new Date(data.created_at),
-        providerPaymentId: data.provider_payment_id ?? undefined,
-        providerPreferenceId: data.provider_preference_id ?? undefined
-      };
+      return toAttempt(data);
     },
 
     async findByIdempotencyKey(key: string): Promise<PaymentAttempt | null> {
@@ -154,20 +205,11 @@ export function createSupabasePaymentRepository(
         .maybeSingle();
 
       if (error || !data) return null;
-      return {
-        id: data.id,
-        quoteId: data.quote_id ?? "",
-        idempotencyKey: data.idempotency_key ?? undefined,
-        externalReference: data.external_reference,
-        expectedAmountCents: BigInt(data.amount_cents),
-        status: data.status as PaymentAttempt["status"],
-        createdAt: new Date(data.created_at),
-        providerPaymentId: data.provider_payment_id ?? undefined,
-        providerPreferenceId: data.provider_preference_id ?? undefined
-      };
+      return toAttempt(data);
     },
 
     async markApproved(reference: string, providerPaymentId: string): Promise<void> {
+      // Never over a settled attempt: another payment must not replace the approved one (BB-15).
       const { error } = await client
         .from("payment_attempts")
         .update({
@@ -175,23 +217,73 @@ export function createSupabasePaymentRepository(
           provider_payment_id: providerPaymentId,
           updated_at: new Date().toISOString()
         })
-        .eq("external_reference", reference);
+        .eq("external_reference", reference)
+        .in("status", [...OPEN_ATTEMPT_STATUSES]);
 
       if (error) {
         throw new Error(`Error al actualizar attempt: ${error.message}`);
       }
+    },
+
+    async applyProviderPayment(payment: ProviderPayment): Promise<ProviderPaymentOutcome> {
+      if (!payment.externalReference) return "unknown_reference";
+      const { data, error } = await client.rpc("apply_mercado_pago_payment", {
+        target_external_reference: payment.externalReference,
+        target_provider_payment_id: payment.id,
+        target_provider_status: payment.status,
+        target_amount_cents: Number(payment.amountCents),
+        target_currency: payment.currency
+      });
+      if (error) throw new Error(`Error al aplicar el pago: ${error.message}`);
+      if (!PROVIDER_PAYMENT_OUTCOMES.has(data as ProviderPaymentOutcome)) throw new Error("Resultado de pago inesperado");
+      return data as ProviderPaymentOutcome;
     }
   };
 
-  return { quotes, attempts };
+  // Closing goes through finish_payment_webhook_event: atomic and fenced by the claim token, so a
+  // delivery whose claim was taken over can never change the event (BB-15 round 1, H1).
+  const finish = async (claim: WebhookClaim, errorCode: string | null) => {
+    const { data, error } = await client.rpc("finish_payment_webhook_event", {
+      target_event_id: claim.eventId,
+      target_claim_token: claim.token,
+      // Without an error code the event is completed.
+      ...(errorCode === null ? {} : { target_error_code: errorCode.slice(0, 80) })
+    });
+    if (error) throw new Error(`Error al cerrar el evento: ${error.message}`);
+    if (typeof data !== "boolean") throw new Error("Resultado de evento inesperado");
+    return data;
+  };
+
+  const events: WebhookEventsPort = {
+    async begin(eventId: string, providerPaymentId: string) {
+      const { data, error } = await client.rpc("claim_payment_webhook_event", {
+        target_event_id: eventId,
+        target_provider_payment_id: providerPaymentId
+      });
+      if (error) throw new Error(`Error al registrar el evento: ${error.message}`);
+      if (data === null) return null;
+      if (typeof data !== "string" || !UUID.test(data)) throw new Error("Resultado de evento inesperado");
+      return { eventId, token: data };
+    },
+    complete: (claim) => finish(claim, null),
+    fail: (claim, errorCode) => finish(claim, errorCode)
+  };
+
+  return { quotes, attempts, events };
 }
 
-export function createInMemoryPaymentRepository(): {
-  quotes: PaymentQuotesPort;
-  attempts: PaymentAttemptsPort;
+type PersistencePortsAttempts = PaymentPersistencePorts["attempts"];
+
+export function createInMemoryPaymentRepository(options: { now?: () => Date } = {}): PaymentPersistencePorts & {
+  webhookEvent(eventId: string): { status: "processing" | "completed" | "failed"; errorCode: string | null; deliveries: number } | null;
 } {
+  const now = options.now ?? (() => new Date());
   const quotesMap = new Map<string, PaymentQuote>();
   const attemptsMap = new Map<string, PaymentAttempt>();
+  const eventsMap = new Map<
+    string,
+    { providerPaymentId: string; status: "processing" | "completed" | "failed"; claimedAt: number; errorCode: string | null; deliveries: number; token: string }
+  >();
 
   const quotes: PaymentQuotesPort = {
     async save(quote: PaymentQuote): Promise<void> {
@@ -203,7 +295,7 @@ export function createInMemoryPaymentRepository(): {
     }
   };
 
-  const attempts: PaymentAttemptsPort = {
+  const attempts: PersistencePortsAttempts = {
     async save(attempt: PaymentAttempt): Promise<void> {
       // P1-10: Simular la restricción UNIQUE de PostgreSQL sobre idempotency_key
       if (attempt.idempotencyKey) {
@@ -220,17 +312,15 @@ export function createInMemoryPaymentRepository(): {
           }
         }
       }
+      // Same as ON CONFLICT (external_reference) DO NOTHING: an existing attempt is never rewritten.
+      if (attemptsMap.has(attempt.externalReference)) return;
       attemptsMap.set(attempt.externalReference, { ...attempt });
     },
-    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<void> {
+    async updatePreferenceId(reference: string, providerPreferenceId: string): Promise<boolean> {
       const found = attemptsMap.get(reference);
-      if (found) {
-        attemptsMap.set(reference, {
-          ...found,
-          providerPreferenceId,
-          status: "pending"
-        });
-      }
+      if (!found || !(PREFERENCE_STATUSES as readonly string[]).includes(found.status)) return false;
+      attemptsMap.set(reference, { ...found, providerPreferenceId });
+      return true;
     },
     async findByExternalReference(reference: string): Promise<PaymentAttempt | null> {
       const found = attemptsMap.get(reference);
@@ -246,17 +336,61 @@ export function createInMemoryPaymentRepository(): {
     },
     async markApproved(reference: string, providerPaymentId: string): Promise<void> {
       const found = attemptsMap.get(reference);
-      if (found) {
+      if (found && (OPEN_ATTEMPT_STATUSES as readonly string[]).includes(found.status)) {
         attemptsMap.set(reference, {
           ...found,
           status: "approved",
           providerPaymentId
         });
       }
+    },
+    async applyProviderPayment(payment: ProviderPayment): Promise<ProviderPaymentOutcome> {
+      // Synchronous read-decide-write: no await in between, like the row lock of the database.
+      const attempt = payment.externalReference ? attemptsMap.get(payment.externalReference) ?? null : null;
+      const quoteTotal = attempt ? quotesMap.get(attempt.quoteId)?.totalCents ?? null : null;
+      const { outcome, next } = applyProviderPaymentToAttempt(attempt, quoteTotal, payment);
+      if (next) attemptsMap.set(next.externalReference, next);
+      return outcome;
     }
   };
 
-  return { quotes, attempts };
+  const events: WebhookEventsPort = {
+    async begin(eventId: string, providerPaymentId: string) {
+      const existing = eventsMap.get(eventId);
+      const at = now().getTime();
+      if (!existing) {
+        const token = crypto.randomUUID();
+        eventsMap.set(eventId, { providerPaymentId, status: "processing", claimedAt: at, errorCode: null, deliveries: 1, token });
+        return { eventId, token };
+      }
+      const retryable = existing.status === "failed" || (existing.status === "processing" && at - existing.claimedAt > WEBHOOK_CLAIM_STALE_MS);
+      if (existing.providerPaymentId !== providerPaymentId || !retryable) return null;
+      const token = crypto.randomUUID();
+      eventsMap.set(eventId, { ...existing, status: "processing", claimedAt: at, errorCode: null, deliveries: existing.deliveries + 1, token });
+      return { eventId, token };
+    },
+    complete: async (claim) => finish(claim, null),
+    fail: async (claim, errorCode) => finish(claim, errorCode)
+  };
+
+  // Same fencing as finish_payment_webhook_event: only the current lease, only while processing.
+  function finish(claim: WebhookClaim, errorCode: string | null) {
+    const existing = eventsMap.get(claim.eventId);
+    if (!existing || existing.token !== claim.token || existing.status !== "processing") return false;
+    eventsMap.set(claim.eventId, { ...existing, status: errorCode === null ? "completed" : "failed", errorCode });
+    return true;
+  }
+
+  return {
+    quotes,
+    attempts,
+    events,
+    /** Test helper: the stored state of a webhook event. */
+    webhookEvent(eventId: string) {
+      const found = eventsMap.get(eventId);
+      return found ? { status: found.status, errorCode: found.errorCode, deliveries: found.deliveries } : null;
+    }
+  };
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -278,7 +412,7 @@ export function isPaymentPersistenceConfigured(environment: Environment = proces
 
 export function getPaymentPersistencePorts(options?: {
   storeId?: string;
-}): { quotes: PaymentQuotesPort; attempts: PaymentAttemptsPort } | null {
+}): PaymentPersistencePorts | null {
   const settings = persistenceSettings(process.env);
   if (!settings) return null;
 

@@ -12,6 +12,7 @@ import { getMercadoPagoAvailability } from "./mercado-pago-availability";
 const completeProduction = {
   NODE_ENV: "production",
   MERCADO_PAGO_ACCESS_TOKEN: "TEST-access-token",
+  MERCADO_PAGO_WEBHOOK_SECRET: "webhook-secret-test",
   APP_URL: "https://bunker.example",
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
@@ -32,11 +33,17 @@ function without<T extends Record<string, string>>(environment: T, ...keys: Arra
 }
 
 describe("getMercadoPagoAvailability", () => {
+  it("is unavailable without the webhook secret: a paid order must reach the server even if the customer never returns (BB-15)", () => {
+    expect(
+      getMercadoPagoAvailability({ environment: without(completeProduction, "MERCADO_PAGO_WEBHOOK_SECRET"), storePaymentMethods: methods(true) })
+    ).toEqual({ available: false, reasons: ["webhook"] });
+  });
+
   it("is available with config, store method, durable storage and distributed quota", () => {
     const availability = getMercadoPagoAvailability({ environment: completeProduction, storePaymentMethods: methods(true) });
     expect(availability).toEqual({
       available: true,
-      config: { accessToken: "TEST-access-token", appUrl: "https://bunker.example" }
+      config: { accessToken: "TEST-access-token", appUrl: "https://bunker.example", webhookSecret: "webhook-secret-test" }
     });
   });
 
