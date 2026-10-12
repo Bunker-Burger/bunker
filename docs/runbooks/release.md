@@ -24,15 +24,25 @@ algo falla o para volver atrás. Las previews están en `vercel-preview.md` y la
 
 ## 2. Variables por entorno
 
-`vercel-production-guard.mjs` **sólo acepta** en Production de Vercel las variables que la app lee, y exige las tres
+`vercel-production-guard.mjs` **sólo acepta** en Production de Vercel las variables que la app lee y exige las cuatro
 obligatorias. Si sobra o falta algo, **no publica** y el run queda en rojo. El sitio en vivo no cambia.
+
+**Identidad del proyecto:** el único proyecto aprobado está fijado en el código versionado de `main`
+(`APPROVED_PRODUCTION_REF = "zokkgocmcaqcujltfkjf"`), no en una variable de Vercel. El guard exige:
+- la URL canónica exacta de ese proyecto;
+- `SUPABASE_PRODUCTION_PROJECT_REF` igual a esa ref;
+- una clave que pueda ir al navegador: `sb_publishable_…`, o un JWT legado con `role: anon` de ese proyecto. Rechaza
+  `sb_secret_…`, JWT `service_role`, JWT malformados, claves de otro proyecto y cualquier otra cadena;
+- `SUPABASE_PROJECT_ENV=production`. Esa etiqueta nunca alcanza como prueba de identidad.
+
+Cambiar de proyecto es una PR revisada.
 
 | Variable | Production (Vercel) | Preview | Entorno `main` de GitHub | Qué es |
 |---|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | **obligatoria** | — | sí (CI cloud) | `https://<ref>.supabase.co` del único proyecto |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **obligatoria** | — | sí | clave publicable; nunca `sb_secret_…` |
+| `NEXT_PUBLIC_SUPABASE_URL` | **obligatoria** | — | sí (CI cloud) | exactamente `https://zokkgocmcaqcujltfkjf.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **obligatoria** | — | sí | `sb_publishable_…` o JWT anon de ese proyecto; nunca secreta ni `service_role` |
 | `SUPABASE_PROJECT_ENV` | **obligatoria**, `production` | — | — | la app sólo acepta el proyecto de producción en Production |
-| `SUPABASE_PRODUCTION_PROJECT_REF` | recomendada | — | — | ref del proyecto; tiene que coincidir con la URL |
+| `SUPABASE_PRODUCTION_PROJECT_REF` | **obligatoria**, `zokkgocmcaqcujltfkjf` | — | — | ref del proyecto aprobado |
 | `SUPABASE_SERVICE_ROLE_KEY` | cuando haya pagos MP | — | sí | escritura de intentos de pago desde el servidor |
 | `APP_URL` | cuando haya pagos MP | — | — | `https://…`; base de `back_urls` y `notification_url` |
 | `NEXT_PUBLIC_SITE_URL` | opcional | — | — | URL pública (https) |
@@ -42,9 +52,10 @@ obligatorias. Si sobra o falta algo, **no publica** y el run queda en rojo. El s
 | `SUPABASE_SECRET_KEY`, `SUPABASE_TEST_*`, `SUPABASE_DEV_DB_URL` | **prohibidas** | — | sí (sólo CI) | la app no las lee; son de CI |
 | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | — | — | sí (`main` y `preview`) | deploy con la CLI |
 
-**Hoy (12/10) Production no pasa el guard.** Tiene `SUPABASE_SECRET_KEY` y `SUPABASE_TEST_ADMIN_*` cargadas y le falta
-`SUPABASE_PROJECT_ENV=production`. El primer deploy automático va a fallar sin publicar hasta que se corrija en Vercel →
-Settings → Environment Variables.
+**Hoy (12/10) Production no pasa el guard.** Tiene `SUPABASE_SECRET_KEY` y `SUPABASE_TEST_ADMIN_*` cargadas y le faltan
+`SUPABASE_PROJECT_ENV=production` y `SUPABASE_PRODUCTION_PROJECT_REF`. El primer deploy automático va a fallar sin
+publicar hasta que el dueño lo corrija en Vercel → Settings → Environment Variables. Producción queda **operativamente
+bloqueada** por esa configuración y por Vercel Hobby (§9) hasta su decisión.
 
 ## 3. Dominios, callbacks y webhook
 
@@ -89,12 +100,22 @@ que ser compatible con la versión que está en línea.
 
 1. La PR pasa `app`, `e2e`, `Vercel Preview (build)` y la evidencia cloud que corresponda. Se revisa y se mergea.
 2. CI corre sobre `main`. Si pasa, **Vercel Production** hace esto:
-   - comprueba que el commit sigue siendo el HEAD de `main`, para no pisar un deploy más nuevo;
+   - comprueba con `scripts/ci/main-head.mjs` que el commit sigue siendo el HEAD de `main`, para no pisar un deploy
+     más nuevo;
    - revisa las variables (§2);
-   - `vercel build --prod` → `vercel deploy --prebuilt --prod`;
-   - smoke test.
-3. **Smoke test** (`scripts/ci/smoke-production.mjs`) contra `https://bunker-burger.vercel.app`. Sólo lee; el pedido de
-   WhatsApp no guarda nada. Cubre:
+   - `vercel build --prod`;
+   - **vuelve a preguntar el HEAD de `main` en el mismo paso, justo antes de `vercel deploy --prebuilt --prod`**. Si
+     `main` avanzó durante el build, no publica: lo publica el run del commit nuevo;
+   - `scripts/ci/release-verify.mjs`:
+     1. el deployment devuelto por el deploy (URL inmutable) está `READY`, es de producción, de este proyecto y lleva
+        este commit (`githubCommitSha`);
+     2. smoke de esa URL inmutable, con el bypass de automatización del proyecto (leído de la API y enmascarado, porque
+        Vercel protege las URLs de deployment);
+     3. el alias `bunker-burger.vercel.app` apunta a **ese mismo** deployment id, con reintentos acotados;
+     4. smoke del alias.
+
+     Cualquier error de API, desajuste o fallo deja el run en rojo.
+3. **Smoke test** (`scripts/ci/smoke-production.mjs`). Sólo lee; el pedido de WhatsApp no guarda nada. Cubre:
    - carta (`/`), sin "No pudimos cargar la carta";
    - `/api/store/products` y `/api/store/status`;
    - WhatsApp: un pedido inválido es rechazado, y un pedido de prueba devuelve el enlace `wa.me` o "local cerrado";

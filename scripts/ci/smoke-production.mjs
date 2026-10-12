@@ -12,8 +12,13 @@ import { pathToFileURL } from "node:url";
 
 const TIMEOUT_MS = 15_000;
 
-async function request(base, path, init = {}) {
-  const response = await fetch(new URL(path, base), { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS), ...init });
+async function requestWith(base, path, init = {}, headers = {}) {
+  const response = await fetch(new URL(path, base), {
+    redirect: "manual",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    ...init,
+    headers: { ...headers, ...(init.headers ?? {}) }
+  });
   const text = await response.text();
   let json;
   try {
@@ -39,11 +44,13 @@ function selectionsFor(product) {
 
 /**
  * @param {string} base site origin, e.g. https://bunker-burger.vercel.app
- * @param {{ mercadoPago?: boolean }} options
+ * @param {{ mercadoPago?: boolean, headers?: Record<string, string> }} options `headers` go with every
+ *   request, e.g. Vercel's automation bypass to reach a protected deployment URL (never logged).
  * @returns {Promise<Array<{ name: string, ok: boolean, detail: string }>>}
  */
-export async function smoke(base, { mercadoPago = false } = {}) {
+export async function smoke(base, { mercadoPago = false, headers = {} } = {}) {
   const results = [];
+  const request = (url, path, init = {}) => requestWith(url, path, init, headers);
   const check = async (name, run) => {
     try {
       const detail = await run();

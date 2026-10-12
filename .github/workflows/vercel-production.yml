@@ -3,7 +3,8 @@ name: Vercel Production
 # Production deploy after every merge to main (owner's decision, BB-19; docs/runbooks/release.md).
 # Runs when CI finished green for a push to main: the YAML and the code are main's, never a PR's.
 # Fails closed, without deploying, when the Vercel Production variables are missing, unexpected or
-# malformed; a smoke test checks the live site afterwards. Rollback is manual (runbook §Rollback).
+# malformed; afterwards it proves the alias serves this commit and smoke tests it. Rollback is
+# manual (runbook §Rollback).
 
 on:
   workflow_run:
@@ -50,11 +51,9 @@ jobs:
         run: |
           set -euo pipefail
           # A slower run must never replace a newer deploy: the newer commit's run deploys it.
-          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
-          if [ "$head" = "$SHA" ]; then echo "deploy=true" >> "$GITHUB_OUTPUT"; else
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "\`$SHA\` ya no es el HEAD de main (\`$head\`): lo despliega el run de ese commit." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          current=$(node scripts/ci/main-head.mjs "$SHA")
+          echo "deploy=$current" >> "$GITHUB_OUTPUT"
+          if [ "$current" != "true" ]; then echo "\`$SHA\` ya no es el HEAD de main: lo despliega el run de ese commit." >> "$GITHUB_STEP_SUMMARY"; fi
       - if: steps.latest.outputs.deploy == 'true'
         uses: pnpm/action-setup@v4
       - if: steps.latest.outputs.deploy == 'true'
@@ -93,12 +92,26 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          # Again, right before publishing (R1 H4): main may have moved during the build.
+          current=$(node scripts/ci/main-head.mjs "$SHA")
+          if [ "$current" != "true" ]; then
+            echo "\`$SHA\` dejó de ser el HEAD de main durante el build: no se publica." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           url=$(pnpm dlx "$VERCEL_CLI" deploy --prebuilt --prod --meta "githubCommitSha=$SHA" --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Production de \`$SHA\`: $url (alias $PRODUCTION_URL)" >> "$GITHUB_STEP_SUMMARY"
-      - if: steps.latest.outputs.deploy == 'true'
-        name: Smoke test del sitio publicado
-        run: node scripts/ci/smoke-production.mjs "$PRODUCTION_URL"
+      # Identity and smoke of the immutable URL just published, then of the public alias (R1 H3).
+      - if: steps.latest.outputs.deploy == 'true' && steps.deploy.outputs.url != ''
+        name: Verificar el deployment publicado y el alias
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: node scripts/ci/release-verify.mjs "$DEPLOYMENT_URL" "$PRODUCTION_URL"

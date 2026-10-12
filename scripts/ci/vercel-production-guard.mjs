@@ -31,8 +31,19 @@ export const PRODUCTION_ENV_ALLOWLIST = Object.freeze([
   "MERCADO_PAGO_WEBHOOK_SECRET"
 ]);
 
-/** Without these the site cannot read the menu (src/server/supabase/config.ts). */
-export const PRODUCTION_ENV_REQUIRED = Object.freeze(["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PROJECT_ENV"]);
+/**
+ * The single Supabase project the owner approved for production (BB-19, docs/runbooks/release.md).
+ * Versioned here, on main: changing it is a reviewed change, never a Vercel variable.
+ */
+export const APPROVED_PRODUCTION_REF = "zokkgocmcaqcujltfkjf";
+
+/** Without these the site cannot read the menu, nor prove it reads the approved project. */
+export const PRODUCTION_ENV_REQUIRED = Object.freeze([
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_PROJECT_ENV",
+  "SUPABASE_PRODUCTION_PROJECT_REF"
+]);
 
 const WHY = {
   SUPABASE_SECRET_KEY: "la app no la lee (usa SUPABASE_SERVICE_ROLE_KEY)",
@@ -87,22 +98,62 @@ export function parseDotenv(text) {
   return values;
 }
 
+/** Payload of a JWT, without verifying its signature (only its claims matter here); null if malformed. */
+function jwtClaims(token) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    return claims && typeof claims === "object" && !Array.isArray(claims) ? claims : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Same rules as src/server/supabase/config.ts for a production deployment, plus the project ref
- * check that the app only applies when SUPABASE_PRODUCTION_PROJECT_REF is set.
+ * What may reach the browser as NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (src/lib/supabase/browser-client.ts):
+ * an `sb_publishable_…` key or a legacy JWT with role anon of the approved project (same rules as
+ * scripts/ci/preflight-supabase-dev.mjs). Never a secret key, a service_role JWT or anything else.
+ */
+export function publishableKeyFinding(key, ref = APPROVED_PRODUCTION_REF) {
+  if (!key) return "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY está vacía.";
+  if (key.startsWith("sb_secret_")) return "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY tiene una clave secreta: iría al navegador.";
+  if (key.startsWith("sb_publishable_")) {
+    return /^sb_publishable_[A-Za-z0-9_-]+$/.test(key) ? null : "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no es una clave publishable válida.";
+  }
+  const claims = jwtClaims(key);
+  if (!claims) return "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no es publishable ni un JWT anon.";
+  if (claims.role !== "anon") return "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY es un JWT que no es anon: iría al navegador.";
+  if (claims.ref !== ref) return "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY es un JWT anon de otro proyecto.";
+  return null;
+}
+
+/**
+ * Production must be THE approved project, identified by this versioned ref, not by a label
+ * (R1 H2): canonical URL, publishable key of that project, SUPABASE_PRODUCTION_PROJECT_REF equal to
+ * it and SUPABASE_PROJECT_ENV=production. Messages name the variable, never its value.
  * @param {Record<string, string>} values
  */
 export function checkProductionEnvValues(values) {
   const findings = [];
-  const url = values.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
-  const ref = /^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(url)?.[1];
-  if (!ref) findings.push("NEXT_PUBLIC_SUPABASE_URL no es https://<ref>.supabase.co.");
-  const key = values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
-  if (!key) findings.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY está vacía.");
-  else if (key.startsWith("sb_secret_")) findings.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY tiene una clave secreta: iría al navegador.");
+  const raw = values.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = null;
+  }
+  const canonical =
+    url && url.protocol === "https:" && !url.username && !url.password && !url.port && !url.search && !url.hash && url.pathname === "/";
+  if (!canonical || url.hostname !== `${APPROVED_PRODUCTION_REF}.supabase.co`) {
+    findings.push(`NEXT_PUBLIC_SUPABASE_URL no es https://${APPROVED_PRODUCTION_REF}.supabase.co, el proyecto aprobado.`);
+  }
+  const keyFinding = publishableKeyFinding(values.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "");
+  if (keyFinding) findings.push(keyFinding);
   if (values.SUPABASE_PROJECT_ENV?.trim() !== "production") findings.push("SUPABASE_PROJECT_ENV tiene que ser production.");
-  const productionRef = values.SUPABASE_PRODUCTION_PROJECT_REF?.trim();
-  if (productionRef && ref && productionRef !== ref) findings.push("SUPABASE_PRODUCTION_PROJECT_REF no coincide con NEXT_PUBLIC_SUPABASE_URL.");
+  if (values.SUPABASE_PRODUCTION_PROJECT_REF?.trim() !== APPROVED_PRODUCTION_REF) {
+    findings.push(`SUPABASE_PRODUCTION_PROJECT_REF tiene que ser ${APPROVED_PRODUCTION_REF}, el proyecto aprobado.`);
+  }
   for (const name of ["APP_URL", "NEXT_PUBLIC_SITE_URL"]) {
     const value = values[name]?.trim();
     if (value && !/^https:\/\/[^\s/]+/.test(value)) findings.push(`${name} tiene que ser una URL https.`);
