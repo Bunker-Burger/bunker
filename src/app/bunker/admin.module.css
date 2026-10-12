@@ -3191,3 +3191,8 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Fields side by side line up by their top (labels and boxes level), whatever is under each. */
+.valuePair {
+  align-items: start;
+}

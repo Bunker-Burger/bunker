@@ -400,9 +400,10 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           <small className={styles.requiredTag}>Calendario</small>
         </legend>
         <div className={styles.valuePair}>
-          <TextField defaultValue={defaults.startsAt} hint={`Hora de ${timezone}.`} label="Vigente desde" name="startsAt" required type="datetime-local" />
+          <TextField defaultValue={defaults.startsAt} label="Vigente desde" name="startsAt" required type="datetime-local" />
           <TextField defaultValue={defaults.endsAt} label="Hasta" name="endsAt" required type="datetime-local" />
         </div>
+        <small className={styles.hint}>Fechas y horas de {timezone}.</small>
 
         {byDay ? (
           <fieldset className={styles.fieldset}>
