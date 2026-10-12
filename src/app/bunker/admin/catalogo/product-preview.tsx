@@ -92,8 +92,8 @@ export function ProductPreview({ categories, photo }: { categories: ProductFormC
   } satisfies Product;
 
   return (
-    <section aria-labelledby="preview-title" className={styles.previewCard} ref={ref}>
-      <h2 className={styles.cardTitle} id="preview-title">
+    <section aria-labelledby="menu-preview-title" className={styles.previewCard} ref={ref}>
+      <h2 className={styles.cardTitle} id="menu-preview-title">
         <Eye aria-hidden="true" size={20} /> Así se verá en la carta
       </h2>
       <p className={styles.hint}>Se actualiza mientras completás el formulario. Las promociones vigentes se suman solas.</p>

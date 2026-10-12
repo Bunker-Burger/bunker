@@ -189,4 +189,26 @@ describe("PromotionForm preview", () => {
     await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
     expect((action.mock.calls.at(-1)![1]).get("removeImage")).toBe("true");
   });
+
+  it("keeps a stored weekly window when saving without touching it", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    render(<PromotionForm action={action} defaults={defaults({ schedule: [{ dayOfWeek: "2", startsAt: "18:00", endsAt: "23:59" }] })} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    const sent = action.mock.calls.at(-1)![1];
+    expect([sent.getAll("scheduleDay"), sent.getAll("scheduleStart"), sent.getAll("scheduleEnd")]).toEqual([["2"], ["18:00"], ["23:59"]]);
+  });
+
+  it("previews the banner and the section card once there is a photo (issue #54)", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    render(<PromotionForm defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
+    expect(within(preview).getByText(/Subí una foto para verla/)).toBeInTheDocument();
+
+    await userEvent.upload(screen.getByLabelText("Subir foto de la promo"), new File(["png"], "banner.png", { type: "image/png" }));
+    await userEvent.type(screen.getByRole("textbox", { name: /Nombre de la promoción/ }), "Jueves de birra");
+    expect(await within(preview).findByRole("region", { name: "Vista previa del banner" })).toBeInTheDocument();
+    expect(within(preview).getAllByRole("heading", { name: "Jueves de birra" })).toHaveLength(2);
+  });
 });

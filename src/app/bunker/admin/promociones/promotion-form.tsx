@@ -8,6 +8,7 @@ import { formatArs } from "@/lib/money";
 import styles from "../../admin.module.css";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "../admin-form";
 import { PhotoField, type PhotoValue } from "../catalogo/photo-field";
+import { PromotionPreview } from "./promotion-preview";
 import { savePromotionAction } from "./actions";
 
 export interface PromotionFormProduct {
@@ -194,6 +195,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   const [items, setItems] = useState(defaults.items);
   const [schedule, setSchedule] = useState(defaults.schedule);
   const [badge, setBadge] = useState(defaults.badgeText);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(photo?.url ?? null);
   const [customBadge, setCustomBadge] = useState(defaults.badgeText !== "" && !BADGE_SUGGESTIONS.includes(defaults.badgeText));
   const initialDays = uniformSchedule(defaults.schedule);
   const [byDay, setByDay] = useState(initialDays === null);
@@ -220,6 +222,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
       {photo ? (
         <PhotoField
           key={photo.url ?? ""}
+          onView={(view) => setPhotoUrl(view.url)}
           hint="Se muestra arriba de la carta mientras la promoción está vigente."
           legend="Foto de la promo"
           photo={photo}
@@ -516,6 +519,8 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           ))}
         </fieldset>
       </fieldset>
+
+      <PromotionPreview badge={badge} items={validItems} mechanic={mechanic} photoUrl={photoUrl} />
     </AdminForm>
   );
 }

@@ -41,7 +41,7 @@ export function PromoShowcase({ promotions, layout }: { promotions: readonly Pro
   return layout === "section" ? <PromoSection promotions={promotions} /> : <PromoBanner label="Promociones" promotions={promotions} />;
 }
 
-function PromoSection({ promotions }: { promotions: readonly PromotionRule[] }) {
+export function PromoSection({ promotions }: { promotions: readonly PromotionRule[] }) {
   return (
     <section aria-labelledby="seccion-promociones" className="menu-category promo-section">
       <div className="menu-heading">
@@ -70,7 +70,7 @@ function PromoSection({ promotions }: { promotions: readonly PromotionRule[] }) 
   );
 }
 
-function PromoBanner({ promotions, label }: { promotions: readonly PromotionRule[]; label: string }) {
+export function PromoBanner({ promotions, label }: { promotions: readonly PromotionRule[]; label: string }) {
   return (
     <section aria-label={label} className="promo-banner">
       <ul className="promo-banner-track" data-single={promotions.length === 1 || undefined}>
