@@ -3,6 +3,7 @@
 import { CirclePlus, CupSoda, Flame, Hamburger, Popcorn, Sandwich, Search, Store, Tag, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type CSSProperties } from "react";
+import { AdminNav } from "./admin-nav";
 import { normalizeSearch } from "@/components/storefront/menu-sections";
 import type { ProductType } from "@/domain/types";
 import styles from "../admin.module.css";
@@ -33,6 +34,8 @@ export interface DashboardPromotion {
   active: boolean;
   /** "$ 12.500", "15% OFF", "2x1", "Envío gratis". */
   valueLabel: string;
+  /** Applies to an order right now. */
+  running: boolean;
 }
 
 export interface DashboardStore {
@@ -65,6 +68,24 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
     <div className={styles.dashboard}>
       {/* Side column on desktop; on phones its cards keep the capture's order around the list. */}
       <div className={styles.dashboardSide}>
+      {/* The capture's two cards, with what the catalog really knows (no orders or sales are recorded). */}
+      <div className={styles.metrics}>
+        <div className={styles.metric}>
+          <span className={styles.metricLabel}>
+            Disponibles <Hamburger aria-hidden="true" size={18} />
+          </span>
+          <strong>
+            {products.filter((product) => product.form.published && product.form.inStock).length}
+            <small> de {products.filter((product) => product.form.published).length} publicados</small>
+          </strong>
+        </div>
+        <div className={styles.metric}>
+          <span className={styles.metricLabel}>
+            Promos vigentes <Tag aria-hidden="true" size={18} />
+          </span>
+          <strong>{promotions.filter((promotion) => promotion.running).length}</strong>
+        </div>
+      </div>
       <section aria-labelledby="store-state-title" className={styles.statusCard}>
         <div className={styles.statusHead}>
           <span className={styles.statusTitle}>
@@ -73,9 +94,8 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
           </span>
           <span className={styles[`state_${store.state}`]}>{store.stateLabel}</span>
         </div>
-        <p className={styles.statusReason}>{store.reason}</p>
         <QuickForm action={setStoreStatusAction} className={styles.statusForm} label="Abrir o cerrar el local">
-          <StoreSwitch open={store.state === "open"} />
+          <StoreSwitch open={store.state === "open"} reason={store.reason} />
         </QuickForm>
       </section>
 
@@ -142,10 +162,7 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
                 />
                 <QuickForm action={saveProductAction} className={styles.quickControls} label={`Precio y stock de ${product.form.name}`}>
                   <ProductHiddenFields form={product.form} />
-                  <span className={styles.priceInput}>
-                    <span aria-hidden="true">$</span>
-                    <input aria-label={`Precio de ${product.form.name}`} defaultValue={product.form.price} inputMode="decimal" min={0} name="price" step="0.01" type="number" />
-                  </span>
+                  <PriceField defaultValue={product.form.price} label={`Precio de ${product.form.name}`} name="price" />
                   <QuickSubmit ariaLabel={`Guardar precio de ${product.form.name}`} className={styles.smallAction}>
                     Guardar
                   </QuickSubmit>
@@ -191,13 +208,15 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
         <QuickForm action={saveStoreContactAction} className={styles.deliveryForm} label="Costo de delivery">
           <input name="whatsapp" type="hidden" value={store.whatsapp} />
           <label htmlFor="quick-delivery">Costo de delivery</label>
-          <span className={styles.priceInput}>
-            <span aria-hidden="true">$</span>
-            <input defaultValue={store.deliveryFee} id="quick-delivery" inputMode="decimal" min={0} name="deliveryFee" step="0.01" type="number" />
-          </span>
+          <PriceField defaultValue={store.deliveryFee} id="quick-delivery" name="deliveryFee" />
           <QuickSubmit className={styles.smallAction}>Actualizar</QuickSubmit>
         </QuickForm>
       </section>
+
+      <div className={styles.moreSettings}>
+        <p>Categorías, horarios, WhatsApp y medios de pago:</p>
+        <AdminNav />
+      </div>
     </div>
   );
 }
@@ -266,11 +285,11 @@ function ProductHiddenFields({ form }: { form: ProductFormValues }) {
  * Open or close the store, as the capture's switch: on sets "Abierto", off sets "Cerrado". Pausing
  * or going back to the opening hours stays on the store screen.
  */
-function StoreSwitch({ open }: { open: boolean }) {
+function StoreSwitch({ open, reason }: { open: boolean; reason: string }) {
   const override = useRef<HTMLInputElement>(null);
   return (
     <label className={styles.storeSwitch}>
-      <span>{open ? "Local abierto · recibiendo pedidos" : "Local cerrado · no recibe pedidos"}</span>
+      <span>{open ? "Local abierto · recibiendo pedidos" : `Local cerrado · ${reason}`}</span>
       <input name="statusOverride" ref={override} type="hidden" defaultValue={open ? "open" : "closed"} />
       <input
         aria-label="Local abierto"
@@ -282,5 +301,33 @@ function StoreSwitch({ open }: { open: boolean }) {
         type="checkbox"
       />
     </label>
+  );
+}
+
+const ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+/** "7800" → "7.800"; what the admin parsers expect stays in the hidden field ("7800", "7800.5"). */
+function PriceField({ name, defaultValue, label, id }: { name: string; defaultValue: string; label?: string; id?: string }) {
+  const [plain, setPlain] = useState(defaultValue);
+  const [shown, setShown] = useState(() => (defaultValue === "" ? "" : ARS.format(Number(defaultValue))));
+  return (
+    <span className={styles.priceInput}>
+      <span aria-hidden="true">$</span>
+      <input
+        aria-label={label}
+        id={id}
+        inputMode="decimal"
+        onBlur={() => setShown(plain === "" ? "" : ARS.format(Number(plain)))}
+        onChange={(event) => {
+          // Dots are thousands, a comma is the decimal separator (es-AR).
+          const typed = event.target.value.replace(/[^\d,]/g, "");
+          setShown(event.target.value);
+          setPlain(typed.replace(",", "."));
+        }}
+        type="text"
+        value={shown}
+      />
+      <input name={name} type="hidden" value={plain} />
+    </span>
   );
 }

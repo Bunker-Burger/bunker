@@ -14,7 +14,7 @@ vi.mock("@/server/store-admin", () => ({ getStoreAdminView: vi.fn() }));
 vi.mock("./catalogo/actions", () => ({ saveProductAction: vi.fn(async () => ({ status: "success", message: "Producto guardado." })) }));
 vi.mock("./tienda/actions", () => ({ setStoreStatusAction: vi.fn(), saveStoreContactAction: vi.fn() }));
 vi.mock("./promociones/actions", () => ({ setPromotionActiveAction: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/bunker/admin" }));
 
 const store = {
   id: "s1",
@@ -68,26 +68,35 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     expect(screen.getByRole("heading", { name: "Gestión de precios & stock" })).toBeInTheDocument();
 
     const products = screen.getByRole("list", { name: "Productos" });
-    expect(within(products).getByRole("spinbutton", { name: "Precio de Smash Búnker Doble" })).toHaveValue(7800);
+    expect(within(products).getByRole("textbox", { name: "Precio de Smash Búnker Doble" })).toHaveValue("7.800");
     expect(within(products).getByRole("checkbox", { name: "Smash Búnker Doble disponible" })).toBeChecked();
     expect(within(products).getByRole("checkbox", { name: "Pulled Pork Búnker disponible" })).not.toBeChecked();
-    expect(screen.getByRole("spinbutton", { name: "Costo de delivery" })).toHaveValue(1200);
+    expect(screen.getByRole("textbox", { name: "Costo de delivery" })).toHaveValue("1.200");
 
     expect(screen.getByRole("checkbox", { name: "Martes de Smash activa" })).toBeChecked();
 
     // Category pills narrow the price list.
     await user.click(screen.getByRole("button", { name: "Bebidas" }));
-    expect(within(products).queryByRole("spinbutton", { name: "Precio de Smash Búnker Doble" })).toBeNull();
-    expect(within(products).getByRole("spinbutton", { name: "Precio de Limonada de la Casa" })).toBeInTheDocument();
+    expect(within(products).queryByRole("textbox", { name: "Precio de Smash Búnker Doble" })).toBeNull();
+    expect(within(products).getByRole("textbox", { name: "Precio de Limonada de la Casa" })).toBeInTheDocument();
 
     expect(screen.queryByText(/pedidos hoy|facturaci|ventas|ingresos|clientes|kpi/i)).not.toBeInTheDocument();
+
+    // The other admin screens stay one click away, plus the public menu.
+    const nav = screen.getByRole("navigation", { name: "Administración" });
+    expect(within(nav).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Catálogo", "/bunker/admin/catalogo"],
+      ["Tienda", "/bunker/admin/tienda"],
+      ["Promociones", "/bunker/admin/promociones"],
+      ["Ver menú", "/"]
+    ]);
   });
 
   it("a quick price change sends the rest of the product exactly as stored", async () => {
     const user = userEvent.setup();
     render(await AdminHomePage());
 
-    const price = screen.getByRole("spinbutton", { name: "Precio de Smash Búnker Doble" });
+    const price = screen.getByRole("textbox", { name: "Precio de Smash Búnker Doble" });
     await user.clear(price);
     await user.type(price, "8100");
     await user.click(screen.getByRole("button", { name: "Guardar precio de Smash Búnker Doble" }));

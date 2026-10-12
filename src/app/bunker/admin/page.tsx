@@ -72,7 +72,8 @@ export default async function AdminHomePage() {
             phaseLabel: phase.label,
             phaseClass: phase.className,
             active: rule.active,
-            valueLabel: valueLabel(rule.mechanic)
+            valueLabel: valueLabel(rule.mechanic),
+            running: isPromotionInEffect(rule, now, store.timezone) && rule.active
           };
         })}
         store={{
