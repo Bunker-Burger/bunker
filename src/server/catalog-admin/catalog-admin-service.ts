@@ -367,6 +367,61 @@ export function deleteProductImage(deps: CatalogAdminDependencies, form: FormDat
 }
 
 // ---------------------------------------------------------------------------------------------
+// Promotion photo (issue #54): shown in the banner at the top of the menu.
+
+const PROMOTION_IMAGE_PENDING = "Las fotos de promociones todavía no están habilitadas en la base de datos (falta aplicar su migración).";
+
+/** Uploads or replaces the photo: new object first, then the row, then the old object is removed. */
+export function savePromotionImage(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "savePromotionImage", async (storeId) => {
+    const id = parseId(form, "promotionId");
+    if (!id.ok) return invalid(id.error);
+    const promotion = await deps.repository.getPromotionImage(storeId, id.value);
+    if (!promotion.ok) return failure(deps, "savePromotionImage", promotion.error);
+    if (!promotion.value) return failure(deps, "savePromotionImage", { code: "not_found", message: "promotion not in store" });
+    if (!promotion.value.supported) return { ok: false, message: PROMOTION_IMAGE_PENDING } as const;
+
+    const file = form.get("image");
+    if (typeof file !== "object" || file === null || file.size === 0) return invalid({ image: "Elegí una imagen." });
+    if (file.size > MAX_IMAGE_BYTES) return invalid({ image: "La imagen supera los 5 MB." });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const image = await inspectImage(bytes, file.type);
+    if (!image.ok) return invalid({ image: image.error.message });
+
+    const random = (deps.newId ?? (() => crypto.randomUUID()))();
+    const path = `${storeId}/promotions/${id.value}-${random}.${image.value.extension}`;
+    const uploaded = await deps.repository.putObject(path, bytes, image.value.mime);
+    if (!uploaded.ok) return failure(deps, "savePromotionImage", uploaded.error);
+
+    const previous = promotion.value.imagePath;
+    const saved = await deps.repository.setPromotionImage(storeId, id.value, path);
+    if (!saved.ok) {
+      await removeQuietly(deps, "savePromotionImage", [path]);
+      return failure(deps, "savePromotionImage", saved.error);
+    }
+    if (previous) await removeQuietly(deps, "savePromotionImage", [previous]);
+    return success(previous ? "Foto reemplazada." : "Foto agregada.", undefined);
+  });
+}
+
+/** Clears the path first (the banner stops showing it), then removes the stored file. */
+export function deletePromotionImage(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "deletePromotionImage", async (storeId) => {
+    const id = parseId(form, "promotionId");
+    if (!id.ok) return invalid(id.error);
+    const promotion = await deps.repository.getPromotionImage(storeId, id.value);
+    if (!promotion.ok) return failure(deps, "deletePromotionImage", promotion.error);
+    if (!promotion.value) return failure(deps, "deletePromotionImage", { code: "not_found", message: "promotion not in store" });
+    if (!promotion.value.imagePath) return success("La promoción ya no tiene foto.", undefined);
+
+    const cleared = await deps.repository.setPromotionImage(storeId, id.value, null);
+    if (!cleared.ok) return failure(deps, "deletePromotionImage", cleared.error);
+    await removeQuietly(deps, "deletePromotionImage", [promotion.value.imagePath]);
+    return success("Foto eliminada.", undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Options (issue #54): the price of an extra, e.g. one more medallion, is set by the store.
 
 /**

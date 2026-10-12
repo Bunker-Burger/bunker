@@ -7,6 +7,7 @@ import type { FulfilmentMethod, PromotionMechanic, PromotionRule } from "@/domai
 import { formatArs } from "@/lib/money";
 import styles from "../../admin.module.css";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "../admin-form";
+import { PromotionPhotoField, type PromotionPhoto } from "./promotion-image-form";
 import { savePromotionAction } from "./actions";
 
 export interface PromotionFormProduct {
@@ -52,6 +53,8 @@ interface PromotionFormProps {
   timezone: string;
   defaults: PromotionFormValues;
   action?: typeof savePromotionAction;
+  /** The banner photo card, first as in the capture; absent in contexts without uploads. */
+  photo?: PromotionPhoto;
 }
 
 /** Pesos as typed ("7800" or "7800.5") → cents, or null. */
@@ -181,7 +184,7 @@ function uniformSchedule(schedule: PromotionFormValues["schedule"]) {
   return same && new Set(days).size === days.length ? { days, startsAt: first!.startsAt, endsAt: first!.endsAt } : null;
 }
 
-export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, action = savePromotionAction }: PromotionFormProps) {
+export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, action = savePromotionAction, photo }: PromotionFormProps) {
   const [type, setType] = useState(defaults.type);
   const [percentOff, setPercentOff] = useState(defaults.percentOff);
   const [fixedPrice, setFixedPrice] = useState(defaults.fixedPrice);
@@ -214,6 +217,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   return (
     <AdminForm action={action} submitLabel={defaults.id ? "Guardar promoción" : "Crear promoción"}>
       {defaults.id ? <input name="promotionId" type="hidden" value={defaults.id} /> : null}
+      {photo ? <PromotionPhotoField photo={photo} /> : null}
       <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
         <legend>
           <span className={styles.promoLegend}>

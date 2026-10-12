@@ -29,6 +29,9 @@ export interface PublicPromotion {
   channels: PromotionRule["channels"];
   items: Array<{ productSlug: string | null; quantity: number }>;
   schedule: PromotionRule["schedule"];
+  /** Only for promotions with a photo: what the menu's banner shows (issue #54). */
+  imageUrl?: string | null | undefined;
+  badgeText?: string | null | undefined;
 }
 
 function toPublicMechanic(mechanic: PromotionMechanic): PublicPromotionMechanic {
@@ -47,7 +50,8 @@ export function toPublicPromotion(rule: PromotionRule, productSlugs: ReadonlyMap
     mechanic: toPublicMechanic(rule.mechanic),
     channels: rule.channels,
     items: rule.items.map((item) => ({ productSlug: productSlugs.get(item.productId) ?? null, quantity: item.quantity })),
-    schedule: rule.schedule
+    schedule: rule.schedule,
+    ...(rule.imageUrl ? { imageUrl: rule.imageUrl, badgeText: rule.badgeText } : {})
   };
 }
 
@@ -69,7 +73,9 @@ const publicPromotionSchema = z.object({
   ]),
   channels: z.array(z.enum(["delivery", "pickup"])),
   items: z.array(z.object({ productSlug: z.string().nullable(), quantity: positiveInt })),
-  schedule: z.array(z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: wallClock, endsAt: wallClock }))
+  schedule: z.array(z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: wallClock, endsAt: wallClock })),
+  imageUrl: z.string().url().nullable().optional(),
+  badgeText: z.string().nullable().optional()
 });
 
 const publicPromotionsSchema = z.object({ promotions: z.array(publicPromotionSchema) });
@@ -91,7 +97,8 @@ export function toPromotionRule(promotion: PublicPromotion, productIdBySlug: Rea
     slug: promotion.slug,
     name: promotion.name,
     description: "",
-    badgeText: null,
+    badgeText: promotion.badgeText ?? null,
+    ...(promotion.imageUrl ? { imageUrl: promotion.imageUrl } : {}),
     priority: promotion.priority,
     active: true,
     startsAt: new Date(promotion.startsAt),

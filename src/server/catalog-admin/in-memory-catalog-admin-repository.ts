@@ -44,6 +44,9 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
   images: MemoryImage[] = [];
   objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
   promotionProductIds = new Set<string>();
+  promotions: Array<{ id: string; storeId: string; name: string; imagePath: string | null }> = [];
+  /** False simulates a database without the promotion-photo migration. */
+  promotionImagesSupported = true;
   /** Every mutating call, in order, for sequencing assertions. */
   writes: string[] = [];
   /** Method names that fail with `unavailable` (or the given error). */
@@ -305,6 +308,22 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
     if (failed) return failed;
     this.images = this.images.filter((candidate) => candidate.id !== imageId);
     this.record(`deleteImage:${imageId}`);
+    return ok(undefined);
+  }
+
+  async getPromotionImage(storeId: string, promotionId: string) {
+    const promotion = this.promotions.find((candidate) => candidate.storeId === storeId && candidate.id === promotionId);
+    const supported = this.promotionImagesSupported;
+    return this.fail("getPromotionImage") ?? ok(promotion ? { name: promotion.name, imagePath: supported ? promotion.imagePath : null, supported } : null);
+  }
+
+  async setPromotionImage(storeId: string, promotionId: string, imagePath: string | null): Promise<AdminResult<void>> {
+    const failed = this.fail("setPromotionImage");
+    if (failed) return failed;
+    const promotion = this.promotions.find((candidate) => candidate.storeId === storeId && candidate.id === promotionId);
+    if (!promotion) return catalogError("not_found", "no row");
+    promotion.imagePath = imagePath;
+    this.record(`setPromotionImage:${imagePath}`);
     return ok(undefined);
   }
 }

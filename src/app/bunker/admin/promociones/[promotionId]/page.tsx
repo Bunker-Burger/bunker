@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { AdminForm } from "../../admin-form";
@@ -12,7 +13,7 @@ type Params = Promise<{ promotionId: string }>;
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function EditPromotionPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
-  const [{ promotionId }, { creada }] = await Promise.all([params, searchParams]);
+  const [{ promotionId }, { creada, foto }] = await Promise.all([params, searchParams]);
   const view = await getStoreAdminView();
   if (!view.ok) {
     return (
@@ -29,7 +30,11 @@ export default async function EditPromotionPage({ params, searchParams }: { para
   return (
     <section className={styles.adminPanel} aria-labelledby="promotion-title">
       <AdminPageBar backHref={ADMIN_PROMOTIONS_PATH} backLabel="Volver a promociones" title={rule.name} titleId="promotion-title" />
-      {creada === "1" ? (
+      {creada === "1" && foto === "0" ? (
+        <p className={styles.error} role="alert">
+          Promoción creada, pero la foto no se pudo subir. Probá de nuevo desde “Foto de la promo”.
+        </p>
+      ) : creada === "1" ? (
         <p className={styles.success} role="status">
           Promoción creada.
         </p>
@@ -37,7 +42,8 @@ export default async function EditPromotionPage({ params, searchParams }: { para
       <PromotionForm
         defaults={promotionValues(rule, catalog.store.timezone)}
         deliveryFeeCents={catalog.store.deliveryFeeCents === null ? null : catalog.store.deliveryFeeCents.toString()}
-        key={`${rule.id}-${rule.active}-${rule.items.length}-${rule.schedule.length}`}
+        key={`${rule.id}-${rule.active}-${rule.items.length}-${rule.schedule.length}-${rule.imageUrl ?? ""}`}
+        photo={{ url: rule.imageUrl ?? null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE }}
         products={formProducts(catalog)}
         timezone={catalog.store.timezone}
       />

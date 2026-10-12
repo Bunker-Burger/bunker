@@ -56,6 +56,7 @@ import {
   type PaymentMethod
 } from "./storefront-state";
 import { focalStyle } from "./focal-style";
+import { PromoShowcase, showcasePromotions, usePromoLayout } from "./promo-showcase";
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
@@ -210,6 +211,8 @@ export function Storefront({
     storeStatus.kind === "ready" && storeStatus.status.deliveryFeeCents !== null ? BigInt(storeStatus.status.deliveryFeeCents) : null;
   const timezone = storeStatus.kind === "ready" ? storeStatus.status.timezone : STORE_TIMEZONE;
   // The card price is what this product alone would cost with the selected fulfilment.
+  const promoLayout = usePromoLayout();
+  const showcase = useMemo(() => showcasePromotions(promotions, now, timezone), [promotions, now, timezone]);
   const cardContext = now
     ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
     : null;
@@ -409,6 +412,7 @@ export function Storefront({
         {/* The captures open straight on the menu; the page title stays for screen readers and links. */}
         <h1 className="sr-only" id="menu-title" tabIndex={-1}>LA CARTA DEL BÚNKER</h1>
 
+        {query.trim() === "" ? <PromoShowcase layout={promoLayout} promotions={showcase} /> : null}
         <Menu
           categories={categories}
           onAdd={addDirect}

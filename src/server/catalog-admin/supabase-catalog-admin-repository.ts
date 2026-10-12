@@ -5,7 +5,7 @@ import { parseRows, productTypeByKind } from "@/server/catalog/adapters";
 import { catalogError } from "@/server/catalog/errors";
 import { CATEGORY_SELECT, categoryRowSchema, optionGroupRowSchema } from "@/server/catalog/rows";
 import { fromWriteError, write, writeOne } from "@/server/admin/supabase-writes";
-import type { QueryResponse } from "@/server/catalog/supabase-catalog-repository";
+import { isMissingColumn, type QueryResponse } from "@/server/catalog/supabase-catalog-repository";
 import type { Database } from "@/server/supabase/database.types";
 import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository, OptionGroupLink, StoredImage, StoredProduct } from "./ports";
 
@@ -92,6 +92,8 @@ const imageRowSchema = z.object({
   is_primary: z.boolean(),
   sort_order: z.number().int()
 });
+
+const promotionImageRowSchema = z.object({ name: z.string(), image_path: z.string().nullable().optional() });
 
 export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Database>): CatalogAdminRepository {
   const bucket = () => client.storage.from(CATALOG_BUCKET);
@@ -445,6 +447,30 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
 
     deleteImage(imageId) {
       return writeOne("product_images.delete", client.from("product_images").delete().eq("id", imageId).select("id") as PromiseLike<QueryResponse>);
+    },
+
+    async getPromotionImage(storeId, promotionId) {
+      const read = (columns: string) =>
+        write("promotion_rules.select", client.from("promotion_rules").select(columns).eq("store_id", storeId).eq("id", promotionId) as PromiseLike<QueryResponse>);
+      let supported = true;
+      let response = await read("name, image_path");
+      // Before the promotion-photo migration the column does not exist.
+      if (!response.ok && isMissingColumn(response.error.cause)) {
+        supported = false;
+        response = await read("name");
+      }
+      if (!response.ok) return response;
+      const rows = parseRows("promotion_rules", promotionImageRowSchema, response.value);
+      if (!rows.ok) return rows;
+      const [row] = rows.value;
+      return ok(row ? { name: row.name, imagePath: row.image_path ?? null, supported } : null);
+    },
+
+    setPromotionImage(storeId, promotionId, imagePath) {
+      return writeOne(
+        "promotion_rules.update",
+        client.from("promotion_rules").update({ image_path: imagePath }).eq("store_id", storeId).eq("id", promotionId).select("id") as PromiseLike<QueryResponse>
+      );
     }
   };
 }

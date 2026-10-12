@@ -1,3 +1,4 @@
+import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { ADMIN_PROMOTIONS_PATH } from "../../paths";
@@ -23,6 +24,7 @@ export default async function NewPromotionPage() {
       <PromotionForm
         defaults={newPromotionValues(store.timezone)}
         deliveryFeeCents={store.deliveryFeeCents === null ? null : store.deliveryFeeCents.toString()}
+        photo={{ url: null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE }}
         products={formProducts(view.value.catalog)}
         timezone={store.timezone}
       />

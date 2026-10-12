@@ -566,6 +566,7 @@ export type Database = {
           fixed_price_cents: number | null
           get_quantity: number | null
           id: string
+          image_path: string | null
           is_active: boolean
           name: string
           percent_off: number | null
@@ -587,6 +588,7 @@ export type Database = {
           fixed_price_cents?: number | null
           get_quantity?: number | null
           id?: string
+          image_path?: string | null
           is_active?: boolean
           name: string
           percent_off?: number | null
@@ -608,6 +610,7 @@ export type Database = {
           fixed_price_cents?: number | null
           get_quantity?: number | null
           id?: string
+          image_path?: string | null
           is_active?: boolean
           name?: string
           percent_off?: number | null

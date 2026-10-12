@@ -68,6 +68,14 @@ export interface ImageDetails {
   focalY: number;
 }
 
+/** A promotion's photo for the menu banner (issue #54). */
+export interface StoredPromotionImage {
+  name: string;
+  imagePath: string | null;
+  /** False until the promotion-photo migration is applied: there is nowhere to store the path. */
+  supported: boolean;
+}
+
 export interface OrderedRow {
   id: string;
   sortOrder: number;
@@ -109,4 +117,8 @@ export interface CatalogAdminRepository {
   savePrimaryImage(productId: string, existingImageId: string | null, image: ImageDetails & { storagePath: string }): Promise<AdminResult<void>>;
   updateImageDetails(imageId: string, details: ImageDetails): Promise<AdminResult<void>>;
   deleteImage(imageId: string): Promise<AdminResult<void>>;
+
+  /** The promotion of the store with its photo path, or null when it is not in the store. */
+  getPromotionImage(storeId: string, promotionId: string): Promise<AdminResult<StoredPromotionImage | null>>;
+  setPromotionImage(storeId: string, promotionId: string, imagePath: string | null): Promise<AdminResult<void>>;
 }

@@ -6,6 +6,7 @@ import {
   deleteCategory,
   deleteProduct,
   deleteProductImage,
+  deletePromotionImage,
   moveCategory,
   moveProduct,
   reorderCategories,
@@ -14,6 +15,7 @@ import {
   saveOption,
   saveProduct,
   saveProductImage,
+  savePromotionImage,
   updateCategory,
   type CatalogAdminDependencies
 } from "./catalog-admin-service";
@@ -505,5 +507,72 @@ describe("drag-and-drop order from the panel (issue #54)", () => {
     const burgers = repository.products.filter((product) => product.categoryId === BURGERS && product.storeId === STORE).sort((a, b) => a.sortOrder - b.sortOrder);
     expect(burgers.map((product) => product.id)).toEqual([OKLAHOMA, SMASH]);
     expect((await reorderProducts(deps(), form({ categoryId: BURGERS, productId: [OKLAHOMA, FOREIGN] }))).ok).toBe(false);
+  });
+});
+
+describe("promotion photo for the menu banner (issue #54)", () => {
+  const PROMO = "0199b2c8-40b0-7000-8000-000000000501";
+  const FOREIGN_PROMO = "0199b2c8-40b0-7000-8000-000000000599";
+  const path = `${STORE}/promotions/${PROMO}-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`;
+  const upload = (promotionId = PROMO) => form({ promotionId, image: new File([real.png], "banner.png", { type: "image/png" }) });
+
+  beforeEach(() => {
+    repository.promotions = [
+      { id: PROMO, storeId: STORE, name: "Martes de Smash", imagePath: null },
+      { id: FOREIGN_PROMO, storeId: OTHER_STORE, name: "Ajena", imagePath: null }
+    ];
+  });
+
+  it("uploads the photo under the store's promotions folder, matching the column's check", async () => {
+    expect(await savePromotionImage(deps(), upload())).toMatchObject({ ok: true, message: "Foto agregada." });
+    expect(path).toMatch(/^[0-9a-f-]{36}\/promotions\/[^/]+$/);
+    expect(repository.objects.get(path)?.contentType).toBe("image/png");
+    expect(repository.promotions[0]?.imagePath).toBe(path);
+  });
+
+  it("replaces a photo: new object, then the row, then the old object", async () => {
+    repository.promotions[0]!.imagePath = `${STORE}/promotions/old.webp`;
+    repository.objects.set(`${STORE}/promotions/old.webp`, { bytes: real.webp, contentType: "image/webp" });
+    expect(await savePromotionImage(deps(), upload())).toMatchObject({ ok: true, message: "Foto reemplazada." });
+    expect(repository.writes).toEqual([`putObject:${path}`, `setPromotionImage:${path}`, `removeObjects:${STORE}/promotions/old.webp`]);
+  });
+
+  it("removes the uploaded object when the row cannot be saved", async () => {
+    repository.failing.set("setPromotionImage", { code: "unavailable", message: "timeout" });
+    expect(await savePromotionImage(deps(), upload())).toMatchObject({ ok: false });
+    expect(repository.objects.size).toBe(0);
+    expect(repository.promotions[0]?.imagePath).toBeNull();
+  });
+
+  it("rejects a file that is not an accepted image without uploading", async () => {
+    const outcome = await savePromotionImage(deps(), form({ promotionId: PROMO, image: new File(["hola"], "a.png", { type: "image/png" }) }));
+    expect(outcome).toMatchObject({ ok: false, fieldErrors: { image: expect.stringContaining("Formato no permitido") } });
+    expect(repository.writes).toEqual([]);
+  });
+
+  it("asks for a file", async () => {
+    expect(await savePromotionImage(deps(), form({ promotionId: PROMO }))).toMatchObject({ ok: false, fieldErrors: { image: "Elegí una imagen." } });
+  });
+
+  it("does not touch a promotion of another store", async () => {
+    expect(await savePromotionImage(deps(), upload(FOREIGN_PROMO))).toMatchObject({ ok: false, message: "Ese elemento ya no existe. Recargá la página." });
+    expect(repository.writes).toEqual([]);
+  });
+
+  it("explains that the migration is missing instead of uploading a file it cannot reference", async () => {
+    repository.promotionImagesSupported = false;
+    expect(await savePromotionImage(deps(), upload())).toMatchObject({ ok: false, message: expect.stringContaining("migración") });
+    expect(repository.writes).toEqual([]);
+  });
+
+  it("clears the path before removing the stored file", async () => {
+    repository.promotions[0]!.imagePath = `${STORE}/promotions/old.webp`;
+    expect(await deletePromotionImage(deps(), form({ promotionId: PROMO }))).toMatchObject({ ok: true, message: "Foto eliminada." });
+    expect(repository.writes).toEqual(["setPromotionImage:null", `removeObjects:${STORE}/promotions/old.webp`]);
+  });
+
+  it("refuses without an admin session", async () => {
+    expect(await savePromotionImage(deps(null), upload())).toMatchObject({ ok: false });
+    expect(repository.writes).toEqual([]);
   });
 });

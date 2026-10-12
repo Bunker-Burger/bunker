@@ -163,4 +163,30 @@ describe("PromotionForm preview", () => {
     await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
     expect((action.mock.calls.at(-1)![1]).get("badgeText")).toBe("Búnker Fest");
   });
+
+  it("opens with the photo card, as in the capture, and sends the file with the promotion (issue #54)", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const { container } = render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    expect(container.querySelector("fieldset legend")).toHaveTextContent("Foto de la promo");
+    const file = new File(["png"], "banner.png", { type: "image/png" });
+    const input = screen.getByLabelText<HTMLInputElement>("Subir foto de la promo");
+    await userEvent.upload(input, file);
+    // jsdom's FormData drops the file's name across realms, so check the field the form submits.
+    expect(input).toHaveAttribute("name", "image");
+    expect(input.form).toBe(screen.getByRole("button", { name: "Crear promoción" }).closest("form"));
+    expect(input.files?.[0]?.name).toBe("banner.png");
+    expect(screen.queryByLabelText("Quitar la foto al guardar")).not.toBeInTheDocument();
+  });
+
+  it("offers removing a stored photo", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    const photo = { url: "https://cdn.test/catalog/s1/promotions/p.webp", maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByLabelText("Quitar la foto al guardar"));
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1]).get("removeImage")).toBe("true");
+  });
 });

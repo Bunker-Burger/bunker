@@ -211,6 +211,8 @@ export interface PromotionRule {
   name: string;
   description: string;
   badgeText: string | null;
+  /** Photo for the menu's promotion banner (issue #54); absent when there is none. */
+  imageUrl?: string | null;
   priority: number;
   active: boolean;
   startsAt: Date;

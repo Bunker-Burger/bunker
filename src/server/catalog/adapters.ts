@@ -208,7 +208,8 @@ function toMechanic(row: PromotionRow): Result<PromotionMechanic, CatalogError> 
 }
 
 /** Ordered by ascending `priority` (the store-wide unique rank configured by the admin). */
-export function toPromotionRules(rows: PromotionRow[]): Result<PromotionRule[], CatalogError> {
+export function toPromotionRules(rows: PromotionRow[], imageBaseUrl = ""): Result<PromotionRule[], CatalogError> {
+  const base = imageBaseUrl.replace(/\/+$/, "");
   const rules: PromotionRule[] = [];
   for (const row of rows) {
     const mechanic = toMechanic(row);
@@ -222,6 +223,7 @@ export function toPromotionRules(rows: PromotionRow[]): Result<PromotionRule[], 
       name: row.name,
       description: row.description,
       badgeText: row.badge_text,
+      ...(row.image_path && base ? { imageUrl: `${base}/${row.image_path.split("/").map(encodeURIComponent).join("/")}` } : {}),
       priority: row.priority,
       active: row.is_active,
       startsAt: new Date(row.starts_at),

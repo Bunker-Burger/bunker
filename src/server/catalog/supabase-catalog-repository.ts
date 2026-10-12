@@ -10,6 +10,7 @@ import {
   PRODUCT_SELECT,
   productRowSchema,
   PROMOTION_SELECT,
+  PROMOTION_SELECT_WITH_IMAGE,
   promotionRowSchema,
   STORE_SELECT,
   storeRowSchema
@@ -25,6 +26,12 @@ export interface QueryResponse {
   data: unknown;
   error: unknown;
   status: number;
+}
+
+/** PostgREST answer for a column the database does not have (yet). */
+export function isMissingColumn(cause: unknown) {
+  const code = typeof cause === "object" && cause !== null && "code" in cause ? String((cause as { code: unknown }).code) : "";
+  return code === "42703" || code === "PGRST204";
 }
 
 /** Runs a PostgREST query, turning both returned errors and thrown network failures into results. */
@@ -79,12 +86,17 @@ export function createSupabaseCatalogRepository(
     async listPromotions(storeId) {
       // The validity window is applied by the caller at read time, so cached responses never
       // keep an expired promotion alive.
-      let query = client.from("promotion_rules").select(PROMOTION_SELECT).eq("store_id", storeId);
-      if (isPublic) query = query.eq("is_active", true);
-      const response = await run("promotion_rules.select", query.order("priority") as PromiseLike<QueryResponse>);
+      const read = (columns: string) => {
+        let query = client.from("promotion_rules").select(columns).eq("store_id", storeId);
+        if (isPublic) query = query.eq("is_active", true);
+        return run("promotion_rules.select", query.order("priority") as PromiseLike<QueryResponse>);
+      };
+      let response = await read(PROMOTION_SELECT_WITH_IMAGE);
+      // Before the promotion-photo migration the column does not exist: read as before.
+      if (!response.ok && isMissingColumn(response.error.cause)) response = await read(PROMOTION_SELECT);
       if (!response.ok) return response;
       const rows = parseRows("promotion_rules", promotionRowSchema, response.value);
-      return rows.ok ? toPromotionRules(rows.value) : rows;
+      return rows.ok ? toPromotionRules(rows.value, imageBaseUrl) : rows;
     }
   };
 }

@@ -912,7 +912,7 @@
   font-size: var(--text-headline-md);
   font-weight: 700;
   line-height: var(--text-headline-md--line-height);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
 }
 
@@ -1423,7 +1423,7 @@
   font-family: var(--font-display);
   font-size: var(--text-headline-md);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
 }
 
@@ -1470,7 +1470,7 @@
 .segmented button span {
   padding: 0 0.4rem;
   border-radius: var(--radius-full);
-  background: rgb(0 0 0 / 0.25);
+  background: var(--color-scrim);
 }
 
 .quickList {
@@ -1537,7 +1537,7 @@
   border-top-left-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font-size: 0.5625rem;
+  font-size: var(--text-badge);
   font-weight: 800;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -1767,8 +1767,8 @@
   border-radius: 0;
   background: none;
   color: inherit;
-  font-family: inherit;
-  font-size: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
 }
 
 .brand > .brandText strong {
@@ -1924,7 +1924,7 @@
 .segmented a span {
   padding: 0 0.4rem;
   border-radius: var(--radius-full);
-  background: rgb(0 0 0 / 0.25);
+  background: var(--color-scrim);
 }
 
 .promosTitle {
@@ -2444,13 +2444,13 @@ label.dropzone:hover {
 
 .dropzoneTip {
   padding: 0.25rem 0.65rem;
-  font-size: 0.625rem;
+  font-size: var(--text-badge);
   white-space: nowrap;
 }
 
 label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-normal);
   text-transform: none;
 }
 
@@ -2494,8 +2494,8 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 
 .choicePill,
 .choicePillActive {
-  font-size: 0.625rem;
-  letter-spacing: 0.02em;
+  font-size: var(--text-badge);
+  letter-spacing: var(--tracking-display);
   overflow-wrap: anywhere;
 }
 
@@ -2979,7 +2979,7 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 
 .promoCard .field > label {
   font-size: var(--text-body-sm);
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-normal);
   text-transform: none;
 }
 
@@ -3195,4 +3195,19 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 /* Fields side by side line up by their top (labels and boxes level), whatever is under each. */
 .valuePair {
   align-items: start;
+}
+
+/* Promotion photo: cropped like the banner at the top of the menu (issue #54). */
+.promoPhotoPreview {
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.promoPhotoPreview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

@@ -81,4 +81,13 @@ describe("public promotions", () => {
     expect(parsePublicPromotions({ promotions: [{ ...valid, startsAt: "martes" }] })).toBeNull();
     expect(parsePublicPromotions({ promotions: [valid] })).toHaveLength(1);
   });
+
+  it("publishes the banner photo and its badge only for promotions with a photo (issue #54)", () => {
+    const withPhoto = { ...rule, imageUrl: "https://cdn.test/catalog/s1/promotions/combo.webp" };
+    const published = toPublicPromotion(withPhoto, slugs);
+    expect(published).toMatchObject({ imageUrl: withPhoto.imageUrl, badgeText: "$1" });
+    const [parsed] = parsePublicPromotions(JSON.parse(JSON.stringify({ promotions: [published] })))!;
+    expect(toPromotionRule(parsed!, new Map())).toMatchObject({ imageUrl: withPhoto.imageUrl, badgeText: "$1" });
+    expect(toPublicPromotion(rule, slugs)).not.toHaveProperty("imageUrl");
+  });
 });
