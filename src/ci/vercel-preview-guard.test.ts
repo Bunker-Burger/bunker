@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 // Plain Node ESM so the workflows run it without installing app code.
 // @ts-expect-error The JavaScript module carries its own runtime contract and is tested below.
-import { PREVIEW_ENV_ALLOWLIST, checkBuildEnv, checkDispatch, checkPrebuilt, checkPreviewEnv } from "../../scripts/ci/vercel-preview-guard.mjs";
+import { PREVIEW_ENV_ALLOWLIST, checkBuildEnv, checkDispatch, checkPrebuilt, checkPreviewEnv, checkPreviewEnvPages } from "../../scripts/ci/vercel-preview-guard.mjs";
 
 /*
  * Guards of the Vercel preview pipeline (docs/runbooks/vercel-preview.md). Every value below is a
@@ -101,6 +101,48 @@ describe("preview-env: Preview de Vercel sin variables (R1 H2)", () => {
   });
 });
 
+describe("preview-env: respuestas incompletas fallan cerradas (R2 H5)", () => {
+  const variable = (key: string) => ({ key, target: ["preview"], type: "encrypted", value: FAKE_SECRET });
+  const page = (envs: unknown[], next: number | null | undefined = null) =>
+    next === undefined ? { envs } : { envs, pagination: { count: envs.length, next, prev: null } };
+
+  it("an empty last page with no cursor passes", () => {
+    expect(checkPreviewEnvPages([page([])])).toEqual([]);
+    expect(checkPreviewEnvPages([page([], undefined)])).toEqual([]);
+  });
+
+  it("an empty page that still points to a next one fails: the rest was never read", () => {
+    expect(checkPreviewEnvPages([page([], 1760000000000)]).join("\n")).toMatch(/incompleta/);
+  });
+
+  it("a Preview variable on a later page fails, even when the first page is empty", () => {
+    const findings = checkPreviewEnvPages([page([], 1760000000000), page([variable("NEXT_PUBLIC_SUPABASE_URL")])]);
+    expect(findings).toEqual([expect.stringContaining("NEXT_PUBLIC_SUPABASE_URL")]);
+  });
+
+  it("every page read must be complete and well formed", () => {
+    expect(checkPreviewEnvPages([])).toHaveLength(1);
+    expect(checkPreviewEnvPages([page([], 1760000000000), { pagination: { next: null } }]).join("\n")).toMatch(/respuesta 2/);
+    expect(checkPreviewEnvPages([null as never])).toHaveLength(1);
+  });
+
+  it("CLI: an empty page with a cursor exits 1; pages read to the end pass; values never printed", async () => {
+    const dir = tempDir();
+    const cursor = await cli(["preview-env", json(dir, "p1.json", page([], 1760000000000))]);
+    expect(cursor.code).toBe(1);
+    expect(cursor.output).toMatch(/::error::.*incompleta/);
+    expect(cursor.output).not.toContain("Preview de Vercel sin variables");
+
+    const later = await cli(["preview-env", json(dir, "a.json", page([], 1760000000000)), json(dir, "b.json", page([variable("RATE_LIMIT_API_KEY")]))]);
+    expect(later.code).toBe(1);
+    expect(later.output).toContain("::error::RATE_LIMIT_API_KEY");
+    expect(later.output).not.toContain(FAKE_SECRET);
+
+    const complete = await cli(["preview-env", json(dir, "c.json", page([], 1760000000000)), json(dir, "d.json", page([]))]);
+    expect(complete).toEqual({ code: 0, output: "Preview de Vercel sin variables.\n" });
+  });
+});
+
 describe("build-env: el código de la PR no ve credenciales (R1 H1)", () => {
   it("accepts a clean environment, and empty values", () => {
     expect(checkBuildEnv({ PATH: "/bin", VERCEL_TOKEN: "", CI: "true" })).toEqual([]);
@@ -193,7 +235,7 @@ describe("prebuilt: el artefacto es un build de preview, sin entorno ni enlaces 
   });
 
   it.each<[string, (dir: string) => void, RegExp]>([
-    ["a production build", (dir) => writeFileSync(path.join(dir, "builds.json"), JSON.stringify({ target: "production" })), /build de production/],
+    ["a production build", (dir) => writeFileSync(path.join(dir, "builds.json"), JSON.stringify({ target: "production" })), /target "production"/],
     ["an env file", (dir) => writeFileSync(path.join(dir, "functions", "index.func", ".env.production"), "X=1"), /archivo de entorno/],
     ["no config.json", (dir) => rmSync(path.join(dir, "config.json")), /config\.json/],
     ["no builds.json", (dir) => rmSync(path.join(dir, "builds.json")), /builds\.json/],
@@ -203,6 +245,32 @@ describe("prebuilt: el artefacto es un build de preview, sin entorno ni enlaces 
     const dir = output();
     mutate(dir);
     expect(checkPrebuilt(dir).join("\n")).toMatch(message);
+  });
+
+  // R2 H6: the target must be exactly "preview"; anything else, missing included, is rejected.
+  it.each<[string, string]>([
+    ["no target", "{}"],
+    ["a null target", JSON.stringify({ target: null })],
+    ["a production target", JSON.stringify({ target: "production" })],
+    ["a differently cased target", JSON.stringify({ target: "Preview" })],
+    ["a non-string target", JSON.stringify({ target: ["preview"] })],
+    ["a JSON null", "null"],
+    ["a JSON array", "[]"]
+  ])("CLI: %s in builds.json exits 1 and is not accepted", async (_case, builds) => {
+    const result = await cli(["prebuilt", output(builds)]);
+    expect(result.code).toBe(1);
+    expect(result.output).toMatch(/::error::builds\.json declara target .*sólo se publica "preview"/);
+    expect(result.output).not.toContain("Artefacto de preview sin archivos de entorno.");
+  });
+
+  it("CLI: a preview build passes", async () => {
+    expect(await cli(["prebuilt", output()])).toEqual({ code: 0, output: "Artefacto de preview sin archivos de entorno.\n" });
+  });
+
+  it("CLI: a target string never reaches the log as a workflow command", async () => {
+    const result = await cli(["prebuilt", output({ target: "x\n::add-mask::y" })]);
+    expect(result.code).toBe(1);
+    expect(result.output).not.toMatch(/^::add-mask::/m);
   });
 });
 

@@ -29,7 +29,7 @@ No hay deploy de producción en este circuito: eso queda para BB-19 y la decisi�
   - ese SHA es el **HEAD actual** de la PR (si se pushea algo después de revisar, hay que volver a autorizar);
   - existe un run **exitoso** de `vercel-preview.yml`, con evento `pull_request`, para ese SHA.
 - **`vercel-preview-guard prebuilt`** revisa el artefacto: tiene que tener `config.json` y `builds.json` con
-  `target: "preview"`, no puede traer ningún `.env*` ni enlaces que apunten fuera del output. Un enlace así subiría
+  `target` **exactamente** `"preview"` (si falta, es `null` u otro valor, se rechaza), no puede traer ningún `.env*` ni enlaces que apunten fuera del output. Un enlace así subiría
   archivos del runner.
 - **La CLI de Vercel** se instala aparte, con versión fija y `--ignore-scripts`. Nunca se usa la de la PR.
 
@@ -38,7 +38,8 @@ No hay deploy de producción en este circuito: eso queda para BB-19 y la decisi�
 Hoy hay **un solo** proyecto Supabase cloud, y va a ser producción (BB-19). Una preview **no puede** apuntar ahí: ponerle
 la etiqueta `development` no aísla nada. Por eso `vercel-preview-guard preview-env` consulta las variables del
 proyecto en Vercel (sólo los nombres) y **falla antes de publicar** si hay **cualquier** variable con target Preview.
-No es una lista de nombres prohibidos: la lista de permitidas está vacía.
+No es una lista de nombres prohibidos: la lista de permitidas está vacía. También falla si la respuesta de Vercel está incompleta (sin lista de variables, o con otra
+página por leer): no se afirma que Preview esté vacío sin haberlo leído entero.
 
 Sin variables, la preview muestra "No pudimos cargar la carta". Nunca muestra el menú demo (`allowsDemoCatalog`) ni
 datos reales.

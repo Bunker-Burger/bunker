@@ -46,6 +46,30 @@ export function checkPreviewEnv(envs) {
 }
 
 /**
+ * Every page of GET /v10/projects/:id/env, in order (R2 H5). Fails closed: a page without `envs`
+ * or a last page that still points to a next one means variables were left unread, whatever the
+ * pages read so far say.
+ * @param {Array<{ envs?: unknown, pagination?: { next?: unknown } | null }>} pages
+ * @returns {string[]} findings (names only)
+ */
+export function checkPreviewEnvPages(pages) {
+  if (!Array.isArray(pages) || pages.length === 0) return ["No se leyó ninguna respuesta de variables de Vercel."];
+  const findings = [];
+  pages.forEach((page, index) => {
+    if (!page || typeof page !== "object" || !Array.isArray(page.envs)) {
+      findings.push(`La respuesta ${index + 1} de Vercel no trae la lista de variables.`);
+      return;
+    }
+    findings.push(...checkPreviewEnv(page.envs));
+  });
+  const next = pages.at(-1)?.pagination?.next;
+  if (next !== undefined && next !== null) {
+    findings.push("La respuesta de variables de Vercel está incompleta (hay otra página sin leer): no se puede afirmar que Preview esté vacío.");
+  }
+  return findings;
+}
+
+/**
  * Names only: a forbidden variable counts as present when it has any non-empty value.
  * @param {Record<string, string | undefined>} env
  */
@@ -103,13 +127,17 @@ export function checkPrebuilt(dir) {
   if (!existsSync(builds)) {
     findings.push("El artefacto no tiene builds.json.");
   } else {
-    let target;
+    let parsed;
     try {
-      target = JSON.parse(readFileSync(builds, "utf8")).target;
+      parsed = JSON.parse(readFileSync(builds, "utf8"));
     } catch {
       findings.push("builds.json no es JSON válido.");
     }
-    if (target !== undefined && target !== "preview") findings.push(`El artefacto es un build de ${target}, no de preview.`);
+    // Exactly "preview": a missing, null or unexpected target is not a preview build (R2 H6).
+    // Quoted and cut, so an artifact's string never reaches the log as a workflow command.
+    if (parsed !== undefined && parsed?.target !== "preview") {
+      findings.push(`builds.json declara target ${JSON.stringify(parsed?.target ?? null).slice(0, 40)}; sólo se publica "preview".`);
+    }
   }
   const root = existsSync(dir) ? realpathSync(dir) : dir;
   const walk = (current) => {
@@ -148,7 +176,7 @@ export function main(argv, env = process.env) {
     case "build-env":
       return report(checkBuildEnv(env), "Sin credenciales de Vercel ni de Supabase en el build de la PR.");
     case "preview-env":
-      return report(checkPreviewEnv(readJson(args[0]).envs), "Preview de Vercel sin variables.");
+      return report(checkPreviewEnvPages(args.map(readJson)), "Preview de Vercel sin variables.");
     case "dispatch": {
       const { findings, runId } = checkDispatch({
         repository: env.GITHUB_REPOSITORY ?? "",
@@ -165,7 +193,7 @@ export function main(argv, env = process.env) {
     case "prebuilt":
       return report(checkPrebuilt(args[0] ?? ""), "Artefacto de preview sin archivos de entorno.");
     default:
-      console.log("::error::Uso: vercel-preview-guard.mjs build-env | preview-env <env.json> | dispatch <pr.json> <runs.json> | prebuilt <dir>");
+      console.log("::error::Uso: vercel-preview-guard.mjs build-env | preview-env <page1.json> [<page2.json> ...] | dispatch <pr.json> <runs.json> | prebuilt <dir>");
       return 1;
   }
 }
