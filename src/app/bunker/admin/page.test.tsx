@@ -73,8 +73,12 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     expect(within(products).getByRole("checkbox", { name: "Pulled Pork Búnker disponible" })).not.toBeChecked();
     expect(screen.getByRole("spinbutton", { name: "Costo de delivery" })).toHaveValue(1200);
 
-    await user.click(screen.getByRole("button", { name: /Promociones/ }));
     expect(screen.getByRole("checkbox", { name: "Martes de Smash activa" })).toBeChecked();
+
+    // Category pills narrow the price list.
+    await user.click(screen.getByRole("button", { name: "Bebidas" }));
+    expect(within(products).queryByRole("spinbutton", { name: "Precio de Smash Búnker Doble" })).toBeNull();
+    expect(within(products).getByRole("spinbutton", { name: "Precio de Limonada de la Casa" })).toBeInTheDocument();
 
     expect(screen.queryByText(/pedidos hoy|facturaci|ventas|ingresos|clientes|kpi/i)).not.toBeInTheDocument();
   });
@@ -111,6 +115,18 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     expect(form.get("inStock")).toBeNull();
     expect(form.get("price")).toBe("7800");
     expect(form.get("published")).toBe("true");
+  });
+
+  it("the store switch closes an open store and opens a closed one", async () => {
+    const user = userEvent.setup();
+    const { setStoreStatusAction } = await import("./tienda/actions");
+    vi.mocked(setStoreStatusAction).mockResolvedValue({ status: "success", message: "ok" });
+    render(await AdminHomePage());
+
+    const storeSwitch = screen.getByRole("checkbox", { name: "Local abierto" });
+    const wasOpen = (storeSwitch as HTMLInputElement).checked;
+    await user.click(storeSwitch);
+    expect(vi.mocked(setStoreStatusAction).mock.calls.at(-1)![1].get("statusOverride")).toBe(wasOpen ? "closed" : "open");
   });
 
   it("says so when the panel cannot be read", async () => {

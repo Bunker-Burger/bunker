@@ -1798,3 +1798,191 @@
     flex-wrap: nowrap;
   }
 }
+
+/* Capture details: store switch, category pills, promotions block, toggles without words. */
+.statusForm {
+  display: block;
+}
+
+.storeSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: var(--spacing-tap);
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.storeSwitch input[type="checkbox"] {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 1.75rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.storeSwitch input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.storeSwitch input[type="checkbox"]:checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.storeSwitch input[type="checkbox"]:checked::after {
+  background: var(--color-foreground);
+  transform: translateX(1.2rem);
+}
+
+.storeSwitch input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.statusReason {
+  color: var(--color-muted);
+}
+
+.state_open::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  box-shadow: 0 0 8px var(--color-success);
+  vertical-align: middle;
+}
+
+.categoryPills {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.categoryPills button {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.categoryPills button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.segmented a {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
+  border-radius: var(--radius-full);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.segmented a[aria-current="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.segmented a span {
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.25);
+}
+
+.promosTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  text-transform: uppercase;
+  scroll-margin-top: 5rem;
+}
+
+#lista-productos,
+#lista-promociones {
+  scroll-margin-top: 5rem;
+}
+
+.priceValue {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  min-width: 6.5rem;
+  align-items: center;
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.smallActionLink {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  padding: 0 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+/* The capture's switches carry no word next to them; it stays for screen readers. */
+.quickToggle > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

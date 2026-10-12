@@ -2,7 +2,7 @@
 
 import { CirclePlus, CupSoda, Flame, Hamburger, Popcorn, Sandwich, Search, Store, Tag, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { normalizeSearch } from "@/components/storefront/menu-sections";
 import type { ProductType } from "@/domain/types";
 import styles from "../admin.module.css";
@@ -31,14 +31,14 @@ export interface DashboardPromotion {
   phaseLabel: string;
   phaseClass: "badge" | "badgeMuted" | "badgeWarning";
   active: boolean;
+  /** "$ 12.500", "15% OFF", "2x1", "Envío gratis". */
+  valueLabel: string;
 }
 
 export interface DashboardStore {
   state: "open" | "paused" | "closed";
   stateLabel: string;
   reason: string;
-  statusOverride: string;
-  overrideOptions: ReadonlyArray<{ value: string; label: string }>;
   deliveryFee: string;
   whatsapp: string;
 }
@@ -53,9 +53,12 @@ const ICONS: Record<ProductType, LucideIcon> = { burger: Hamburger, sandwich: Sa
  */
 export function AdminDashboard({ products, promotions, store }: { products: DashboardProduct[]; promotions: DashboardPromotion[]; store: DashboardStore }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"products" | "promotions">("products");
+  const [category, setCategory] = useState<string | null>(null);
   const needle = normalizeSearch(query);
-  const shownProducts = products.filter((product) => normalizeSearch(`${product.form.name} ${product.description}`).includes(needle));
+  const categories = [...new Set(products.map((product) => product.categoryName).filter(Boolean))];
+  const shownProducts = products.filter(
+    (product) => (category === null || product.categoryName === category) && normalizeSearch(`${product.form.name} ${product.description}`).includes(needle)
+  );
   const shownPromotions = promotions.filter((promotion) => normalizeSearch(`${promotion.name} ${promotion.explanation}`).includes(needle));
 
   return (
@@ -71,16 +74,8 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
           <span className={styles[`state_${store.state}`]}>{store.stateLabel}</span>
         </div>
         <p className={styles.statusReason}>{store.reason}</p>
-        <QuickForm action={setStoreStatusAction} className={styles.statusForm} label="Cambiar el estado del local">
-          <label className="sr-only" htmlFor="quick-status">Pedidos</label>
-          <select defaultValue={store.statusOverride} id="quick-status" name="statusOverride">
-            {store.overrideOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <QuickSubmit className={styles.smallAction}>Aplicar</QuickSubmit>
+        <QuickForm action={setStoreStatusAction} className={styles.statusForm} label="Abrir o cerrar el local">
+          <StoreSwitch open={store.state === "open"} />
         </QuickForm>
       </section>
 
@@ -98,6 +93,16 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
             <CirclePlus aria-hidden="true" size={18} /> Promoción
           </Link>
         </div>
+        <div aria-label="Categorías" className={styles.categoryPills} role="group">
+          <button aria-pressed={category === null} onClick={() => setCategory(null)} type="button">
+            Todas ({products.length})
+          </button>
+          {categories.map((name) => (
+            <button aria-pressed={category === name} key={name} onClick={() => setCategory(name)} type="button">
+              {name}
+            </button>
+          ))}
+        </div>
       </div>
       </div>
 
@@ -107,18 +112,17 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
             <h2 id="prices-title">Gestión de precios &amp; stock</h2>
             <p>Activá, pausá o actualizá precios y promociones.</p>
           </div>
-          <div aria-label="Lista" className={styles.segmented} role="group">
-            <button aria-pressed={tab === "products"} onClick={() => setTab("products")} type="button">
+          <nav aria-label="Listas" className={styles.segmented}>
+            <a aria-current="true" href="#lista-productos">
               <Hamburger aria-hidden="true" size={16} /> Productos <span>{products.length}</span>
-            </button>
-            <button aria-pressed={tab === "promotions"} onClick={() => setTab("promotions")} type="button">
+            </a>
+            <a href="#lista-promociones">
               <Tag aria-hidden="true" size={16} /> Promociones <span>{promotions.length}</span>
-            </button>
-          </div>
+            </a>
+          </nav>
         </div>
 
-        {tab === "products" ? (
-          <ul aria-label="Productos" className={styles.quickList}>
+        <ul aria-label="Productos" className={styles.quickList} id="lista-productos">
             {shownProducts.length === 0 ? <li className={styles.empty}>No hay productos que coincidan.</li> : null}
             {shownProducts.map((product) => (
               <li className={product.form.inStock ? styles.quickRow : `${styles.quickRow} ${styles.quickRowOff}`} key={product.form.id}>
@@ -149,9 +153,12 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
                 </QuickForm>
               </li>
             ))}
-          </ul>
-        ) : (
-          <ul aria-label="Promociones" className={styles.quickList}>
+        </ul>
+
+        <h3 className={styles.promosTitle} id="promos-title">
+          <Tag aria-hidden="true" size={20} /> Promociones &amp; combos activos
+        </h3>
+        <ul aria-labelledby="promos-title" className={styles.quickList} id="lista-promociones">
             {shownPromotions.length === 0 ? <li className={styles.empty}>No hay promociones que coincidan.</li> : null}
             {shownPromotions.map((promotion) => (
               <li className={`${styles.quickRow} ${styles.quickRowPromo}`} key={promotion.id}>
@@ -164,13 +171,16 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
                   tag={promotion.badgeText}
                 />
                 <QuickForm action={setPromotionActiveAction} className={styles.quickControls} label={`Estado de ${promotion.name}`}>
+                  <span className={styles.priceValue}>{promotion.valueLabel}</span>
+                  <Link className={styles.smallActionLink} href={promotionEditPath(promotion.id)}>
+                    Editar
+                  </Link>
                   <input name="promotionId" type="hidden" value={promotion.id} />
                   <QuickToggle defaultChecked={promotion.active} label={`${promotion.name} activa`} name="active" offLabel="Pausada" onLabel="Activa" />
                 </QuickForm>
               </li>
             ))}
-          </ul>
-        )}
+        </ul>
       </section>
 
       <section aria-labelledby="delivery-title" className={styles.deliveryCard}>
@@ -249,5 +259,28 @@ function ProductHiddenFields({ form }: { form: ProductFormValues }) {
         </span>
       ))}
     </>
+  );
+}
+
+/**
+ * Open or close the store, as the capture's switch: on sets "Abierto", off sets "Cerrado". Pausing
+ * or going back to the opening hours stays on the store screen.
+ */
+function StoreSwitch({ open }: { open: boolean }) {
+  const override = useRef<HTMLInputElement>(null);
+  return (
+    <label className={styles.storeSwitch}>
+      <span>{open ? "Local abierto · recibiendo pedidos" : "Local cerrado · no recibe pedidos"}</span>
+      <input name="statusOverride" ref={override} type="hidden" defaultValue={open ? "open" : "closed"} />
+      <input
+        aria-label="Local abierto"
+        defaultChecked={open}
+        onChange={(event) => {
+          if (override.current) override.current.value = event.currentTarget.checked ? "open" : "closed";
+          event.currentTarget.form?.requestSubmit();
+        }}
+        type="checkbox"
+      />
+    </label>
   );
 }

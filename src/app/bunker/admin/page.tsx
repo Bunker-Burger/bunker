@@ -1,12 +1,28 @@
 import { focalStyle } from "@/components/storefront/focal-style";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
+import type { PromotionMechanic } from "@/domain/types";
+import { formatArs } from "@/lib/money";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../admin.module.css";
 import { formValues, pesos } from "./catalogo/product-props";
 import { AdminDashboard } from "./dashboard";
 import { PHASE, promotionPhase } from "./promociones/promotion-props";
-import { OVERRIDE_OPTIONS, STATE_LABEL, statusReason } from "./tienda/status-labels";
+import { STATE_LABEL, statusReason } from "./tienda/status-labels";
+
+/** What the promotion is worth, shown where a product shows its price. */
+function valueLabel(mechanic: PromotionMechanic) {
+  switch (mechanic.type) {
+    case "fixed_price":
+      return formatArs(mechanic.fixedPriceCents);
+    case "percent_off":
+      return `${mechanic.percentOff}% OFF`;
+    case "buy_x_get_y":
+      return `${mechanic.buyQuantity + mechanic.getQuantity}x${mechanic.buyQuantity}`;
+    case "free_delivery":
+      return "Envío gratis";
+  }
+}
 
 /**
  * Control panel (issue #54, capture admin_configuraci_n_precios): store status, prices and stock
@@ -55,15 +71,14 @@ export default async function AdminHomePage() {
             badgeText: rule.badgeText,
             phaseLabel: phase.label,
             phaseClass: phase.className,
-            active: rule.active
+            active: rule.active,
+            valueLabel: valueLabel(rule.mechanic)
           };
         })}
         store={{
           state: status.state,
           stateLabel: STATE_LABEL[status.state],
           reason: statusReason(status, store.timezone),
-          statusOverride: store.statusOverride,
-          overrideOptions: OVERRIDE_OPTIONS,
           deliveryFee: store.deliveryFeeCents === null ? "" : pesos(store.deliveryFeeCents),
           whatsapp: store.whatsappE164
         }}
