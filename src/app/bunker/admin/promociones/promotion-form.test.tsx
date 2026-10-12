@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { quoteCart } from "@/domain/pricing";
 import type { PromotionRule } from "@/domain/types";
+import type { AdminFormState } from "../form-state";
 import { PromotionForm, previewRows, type PromotionFormProduct, type PromotionFormValues } from "./promotion-form";
 
 vi.mock("./actions", () => ({ savePromotionAction: vi.fn() }));
@@ -122,14 +123,14 @@ describe("PromotionForm preview", () => {
   });
 
   it("the day chips send one window per marked day with the same hours (issue #54)", async () => {
-    const action = vi.fn(async () => ({ status: "idle" as const, message: null }));
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
     render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
     await userEvent.click(screen.getByRole("button", { name: "Jueves" }));
     await userEvent.click(screen.getByRole("button", { name: "Domingo" }));
     expect(screen.getByRole("button", { name: "Jueves" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
 
-    const sent = action.mock.calls.at(-1)![1] as FormData;
+    const sent = action.mock.calls.at(-1)![1];
     expect(sent.getAll("scheduleDay")).toEqual(["4", "0"]);
     expect(sent.getAll("scheduleStart")).toEqual(["20:00", "20:00"]);
     expect(sent.getAll("scheduleEnd")).toEqual(["23:30", "23:30"]);
@@ -149,17 +150,17 @@ describe("PromotionForm preview", () => {
   });
 
   it("a suggested tag fills the badge; Personalizado opens a free field", async () => {
-    const action = vi.fn(async () => ({ status: "idle" as const, message: null }));
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
     render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
     await userEvent.click(screen.getByRole("button", { name: "30% OFF" }));
     await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
-    expect((action.mock.calls.at(-1)![1] as FormData).get("badgeText")).toBe("30% OFF");
+    expect((action.mock.calls.at(-1)![1]).get("badgeText")).toBe("30% OFF");
 
     await userEvent.click(screen.getByRole("button", { name: "Personalizado" }));
     const custom = screen.getByRole("textbox", { name: "Tag personalizado" });
     await userEvent.clear(custom);
     await userEvent.type(custom, "Búnker Fest");
     await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
-    expect((action.mock.calls.at(-1)![1] as FormData).get("badgeText")).toBe("Búnker Fest");
+    expect((action.mock.calls.at(-1)![1]).get("badgeText")).toBe("Búnker Fest");
   });
 });
