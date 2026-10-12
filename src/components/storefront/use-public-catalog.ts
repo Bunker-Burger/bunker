@@ -20,8 +20,9 @@ export interface PublicCatalogView {
   recheckProducts: () => void;
 }
 
-/** Static demo menu, shown only when the server gave no snapshot at all (e.g. no Supabase configured). */
+/** Static demo menu, shown only when the server gave no snapshot and allows the demo (no Supabase configured). */
 const FIXTURE_SNAPSHOT: PublicCatalogSnapshot = { products: fixtureProducts, categories: fixtureCategories };
+const EMPTY_SNAPSHOT: PublicCatalogSnapshot = { products: [], categories: [] };
 
 export interface UsePublicCatalogOptions {
   /**
@@ -29,6 +30,11 @@ export interface UsePublicCatalogOptions {
    * published), or null when the server could not read the catalog.
    */
   initialCatalog?: PublicCatalogSnapshot | null;
+  /**
+   * What to show while there is no snapshot: the demo menu (local work and CI without Supabase) or
+   * nothing until the server answers (BB-18: a deployment never shows invented products or photos).
+   */
+  fallback?: "demo" | "empty";
 }
 
 /**
@@ -39,7 +45,9 @@ export interface UsePublicCatalogOptions {
  * empties the menu nor wipes cart lines.
  */
 export function usePublicCatalog(options: UsePublicCatalogOptions = {}): PublicCatalogView {
-  const [snapshot, setSnapshot] = useState<PublicCatalogSnapshot>(() => options.initialCatalog ?? FIXTURE_SNAPSHOT);
+  const [snapshot, setSnapshot] = useState<PublicCatalogSnapshot>(
+    () => options.initialCatalog ?? (options.fallback === "empty" ? EMPTY_SNAPSHOT : FIXTURE_SNAPSHOT)
+  );
   const [verificationStatus, setVerificationStatus] = useState<CatalogVerificationStatus>("pending");
   const [verifiedGeneration, setVerifiedGeneration] = useState(0);
   const requestIdRef = useRef(0);

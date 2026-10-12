@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ALLERGEN_NOTICE } from "@/content/legal";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import type { Category } from "@/domain/types";
 import { resetCartStoreForTesting } from "@/lib/cart-store";
@@ -108,6 +109,50 @@ describe("carta pública", () => {
     expect(addSoldOut).toBeDisabled();
     await user.click(addSoldOut);
     expect(localStorage.getItem("bunker-cart") ?? "").not.toContain("pulled-pork");
+  });
+});
+
+describe("sin carta leída y sin menú demo (BB-18)", () => {
+  it("no inventa productos: avisa que no pudo cargar y muestra la carta real cuando el servidor responde", async () => {
+    renderStorefront({ catalogFallback: "empty" });
+
+    expect(menu().getByRole("heading", { level: 2, name: "No pudimos cargar la carta" })).toBeTruthy();
+    expect(menu().queryByRole("heading", { level: 3 })).toBeNull();
+    expect(await menu().findByRole("heading", { level: 3, name: "Smash Búnker Doble" })).toBeTruthy();
+    expect(menu().queryByText("No pudimos cargar la carta")).toBeNull();
+  });
+
+  it("si el servidor tampoco responde, sigue sin productos y no dice que la carta está vacía", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
+    renderStorefront({ catalogFallback: "empty" });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(menu().getByText("No pudimos cargar la carta")).toBeTruthy();
+    expect(menu().queryByText("La carta está vacía por ahora")).toBeNull();
+    expect(menu().queryByRole("heading", { level: 3 })).toBeNull();
+  });
+
+  it("una carta real vacía sigue diciendo que el local no publicó productos", () => {
+    renderStorefront({ catalogFallback: "empty", initialCatalog: { products: [], categories: fixtureCategories } });
+
+    expect(menu().getByText("La carta está vacía por ahora")).toBeTruthy();
+  });
+});
+
+describe("pie legal (BB-18)", () => {
+  it("avisa que la carta no informa alérgenos y, con los textos en revisión, no enlaza las páginas legales", () => {
+    renderStorefront();
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent(ALLERGEN_NOTICE);
+    const hiddenContainer = footer.querySelector("div[hidden]");
+    expect(hiddenContainer).not.toBeNull();
+    expect(hiddenContainer).not.toBeVisible();
+    expect(within(footer).queryByRole("navigation", { name: "Textos legales" })).toBeNull();
+    expect(within(footer).queryAllByRole("link")).toEqual([]);
+    expect([...footer.querySelectorAll('a[href^="/legal/"]')].map((link) => link.getAttribute("href"))).toEqual([
+      "/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"
+    ]);
   });
 });
 

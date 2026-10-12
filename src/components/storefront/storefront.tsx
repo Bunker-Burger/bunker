@@ -38,6 +38,7 @@ import { formatArs } from "@/lib/money";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
 import { STORE_TIMEZONE } from "@/data/catalog";
+import { ALLERGEN_NOTICE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { useActiveSection } from "@/components/shell/use-active-section";
@@ -83,6 +84,8 @@ export interface StorefrontProps {
    * server could not read the catalog; the client then re-reads it and that answer is the truth.
    */
   initialCatalog?: PublicCatalogSnapshot | null | undefined;
+  /** Without a snapshot: the demo menu (no Supabase configured) or nothing until the server answers (BB-18). */
+  catalogFallback?: "demo" | "empty";
   initialReturnReference?: string | null;
   initialReturnPaymentId?: string | null;
   onCheckoutRedirect?: ((url: string) => void) | undefined;
@@ -128,6 +131,7 @@ export function Storefront({
   showAdminNav = false,
   onInvalidProduct,
   initialCatalog = null,
+  catalogFallback = "demo",
   initialReturnReference = null,
   initialReturnPaymentId = null,
   onCheckoutRedirect
@@ -165,7 +169,7 @@ export function Storefront({
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
-  const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog });
+  const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog, fallback: catalogFallback });
   const storageDegraded = useStorageDegraded();
 
   /** Promotion items name products by slug; the cart uses the storefront's product ids. */
@@ -336,6 +340,7 @@ export function Storefront({
           onOpen={openProduct}
           products={products}
           promotionFor={(product) => (cardContext ? promotionalPrice(product, promotions, cardContext) : null)}
+          unavailable={catalogFallback === "empty" && initialCatalog === null && verifiedGeneration === 0}
         />
       </section>
 
@@ -363,6 +368,18 @@ export function Storefront({
         verificationStatus={verificationStatus}
         onCheckoutRedirect={onCheckoutRedirect}
       />
+
+      <footer className="store-legal">
+        <p>{ALLERGEN_NOTICE}</p>
+        {/* Quitar `hidden` de este contenedor cuando se quieran mostrar los enlaces. */}
+        <div hidden>
+          <nav aria-label="Textos legales">
+            {LEGAL_PAGES.map((page) => (
+              <a href={page.href} key={page.href}>{page.label}</a>
+            ))}
+          </nav>
+        </div>
+      </footer>
 
       {itemCount > 0 && !keyboardOpen ? (
         <a className="cart-tray" href="#carrito">
@@ -967,6 +984,9 @@ function CheckoutSection({
             {payment === "mercado-pago"
               ? `Solo te pedimos nombre y teléfono para identificar tu pago. La entrega${fulfilment === "delivery" ? " y dirección" : ""} se coordina por WhatsApp tras abonar.`
               : `No te pedimos datos acá: tu nombre${fulfilment === "delivery" ? ", la dirección" : ""} y el pago se coordinan en el chat de WhatsApp del local.`}
+            {payment === "mercado-pago" ? (
+              <> {PAYMENT_DATA_RETENTION_NOTICE} <a href="/legal/privacidad">Privacidad</a></>
+            ) : null}
           </p>
         </div>
 
