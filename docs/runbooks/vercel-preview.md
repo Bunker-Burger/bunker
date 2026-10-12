@@ -18,8 +18,10 @@ y la decisión del mantenedor.
   URL también aparece en el resumen del run.
 - **Falla, sin publicar,** si:
   - falta alguno de los secretos `VERCEL_TOKEN`, `VERCEL_ORG_ID` o `VERCEL_PROJECT_ID` en el entorno `preview`;
-  - las variables de **Preview** en Vercel tienen algo de producción: `SUPABASE_SERVICE_ROLE_KEY`,
-    `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` o `SUPABASE_PROJECT_ENV=production`.
+  - las variables de **Preview** en Vercel tienen algo secreto o de producción: `SUPABASE_SERVICE_ROLE_KEY`,
+    `SUPABASE_SECRET_KEY`, `SUPABASE_TEST_ADMIN_EMAIL`, `SUPABASE_TEST_ADMIN_PASSWORD`, `MERCADO_PAGO_ACCESS_TOKEN`,
+    `MERCADO_PAGO_WEBHOOK_SECRET` o `SUPABASE_PROJECT_ENV=production`. La app no lee ninguna de las de Supabase o de
+    test; `vercel pull` las dejaría en el runner de cualquier PR.
 - **Sin variables de Preview cargadas,** la preview muestra "No pudimos cargar la carta". Nunca muestra el menú demo
   (`allowsDemoCatalog`) ni datos de producción.
 
