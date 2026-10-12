@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
+import { ProductPreview, type PhotoView } from "./product-preview";
 import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
 import { PriceField, QuickForm } from "../quick-form";
 import { reorderOptionsAction, saveOptionAction } from "./actions";
@@ -63,6 +64,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = { burger: Hamburger, sandwich
  */
 export function ProductForm({ categories, optionGroups, product, defaultCategoryId, action = saveProductAction, photo }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "");
+  const [photoView, setPhotoView] = useState<PhotoView>({ url: photo?.url ?? null, focal: photo?.focal ?? { x: 50, y: 50 } });
   const [assigned, setAssigned] = useState<Set<string>>(() => new Set(product?.optionGroups.map((link) => link.groupId)));
 
   // Options can be dragged (or moved with the arrow keys on their handle) to set their order;
@@ -116,7 +118,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     <>
     <AdminForm action={action} submitLabel={product ? "Guardar producto" : "Crear producto"}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
-      {photo ? <PhotoField key={`${photo.url ?? ""}-${photo.focal?.x ?? ""}-${photo.focal?.y ?? ""}`} hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
+      {photo ? <PhotoField onView={setPhotoView} key={`${photo.url ?? ""}-${photo.focal?.x ?? ""}-${photo.focal?.y ?? ""}`} hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
 
       <fieldset className={styles.formCard}>
         <legend>
@@ -312,6 +314,8 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
         </div>
         {type === "beverage" ? <p className={styles.hint}>Las bebidas se guardan siempre sin alcohol.</p> : null}
       </fieldset>
+
+      <ProductPreview categories={categories} photo={photoView} />
     </AdminForm>
     {/* Forms of the option rows above: HTML ties each row's fields to them with the form attribute. */}
     {applicable

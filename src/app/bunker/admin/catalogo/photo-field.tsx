@@ -25,7 +25,22 @@ const clamp = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
  * by dragging the preview (finger or mouse) or with the arrow keys; no numbers to type.
  * Type, size and dimensions are checked again on the server from the file's bytes.
  */
-export function PhotoField({ legend, uploadLabel, replaceLabel, hint, photo }: { legend: string; uploadLabel: string; replaceLabel: string; hint: string; photo: PhotoValue }) {
+export function PhotoField({
+  legend,
+  uploadLabel,
+  replaceLabel,
+  hint,
+  photo,
+  onView
+}: {
+  legend: string;
+  uploadLabel: string;
+  replaceLabel: string;
+  hint: string;
+  photo: PhotoValue;
+  /** What the menu would show now (chosen file, framing, or none), for a live preview. */
+  onView?: (view: { url: string | null; focal: { x: number; y: number } }) => void;
+}) {
   const [preview, setPreview] = useState<string | null>(photo.url);
   const [localWarning, setLocalWarning] = useState<string | null>(null);
   const [remove, setRemove] = useState(false);
@@ -39,6 +54,10 @@ export function PhotoField({ legend, uploadLabel, replaceLabel, hint, photo }: {
       if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     };
   }, [preview]);
+
+  useEffect(() => {
+    onView?.({ url: remove ? null : preview, focal });
+  }, [onView, preview, remove, focal]);
 
   const move = (x: number, y: number) => {
     setFocal({ x: clamp(x), y: clamp(y) });

@@ -131,4 +131,24 @@ describe("ProductForm", () => {
     expect(sent.getAll("optionId")).toEqual(["o-triple", "o-double"]);
     expect(screen.getByRole("button", { name: /Mover Triple/ })).toHaveFocus();
   });
+
+  it("previews the product as the menu will show it while the form is filled (issue #54)", async () => {
+    render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
+    const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
+    await waitFor(() => expect(within(preview).getByRole("heading", { name: "Nombre del producto" })).toBeInTheDocument());
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Nombre" }), "Doble Bacon");
+    await userEvent.type(screen.getByRole("spinbutton", { name: /Precio base/ }), "8900");
+    await waitFor(() => expect(within(preview).getByRole("heading", { name: "Doble Bacon" })).toBeInTheDocument());
+    await waitFor(() => expect(within(preview).getByText(/8\.900/)).toBeInTheDocument());
+    expect(within(preview).getByText(/8.900/)).toBeInTheDocument();
+    expect(within(preview).getAllByRole("heading", { name: "Doble Bacon" })).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Destacado" }));
+    await waitFor(() => expect(within(preview).getAllByRole("heading", { name: "Doble Bacon" })).toHaveLength(2));
+    expect(within(preview).getByText("En “Las más pedidas”")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /Con stock/ }));
+    await waitFor(() => expect(within(preview).getAllByText("Agotado")).toHaveLength(2));
+  });
 });

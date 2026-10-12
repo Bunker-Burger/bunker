@@ -11,8 +11,8 @@ import { buildMenuSections, menuCategories } from "./menu-sections";
 const plural = (count: number) => (count === 1 ? "1 producto" : `${count} productos`);
 
 /** Card layouts of the canonical menu capture: large (most ordered), row (burgers, sandwiches), compact (sides, drinks). */
-type CardLayout = "hero" | "row" | "compact";
-const layoutFor = (product: Product, featured: boolean): CardLayout =>
+export type CardLayout = "hero" | "row" | "compact";
+export const layoutFor = (product: Product, featured: boolean): CardLayout =>
   featured ? "hero" : product.type === "fries" || product.type === "beverage" ? "compact" : "row";
 
 const PLACEHOLDER_ICONS: Record<ProductType, LucideIcon> = {
@@ -119,7 +119,8 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
   );
 }
 
-function ProductCard({ product, promotion, layout, categoryName, onOpen, onAdd }: {
+/** One product of the menu; also the admin's "Así se verá en la carta" preview (issue #54). */
+export function ProductCard({ product, promotion, layout, categoryName, onOpen, onAdd }: {
   product: Product;
   promotion: PromotionalPrice | null;
   layout: CardLayout;
