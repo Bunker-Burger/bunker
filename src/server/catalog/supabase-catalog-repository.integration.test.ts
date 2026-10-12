@@ -98,7 +98,7 @@ describe.skipIf(!enabled)("Supabase catalog (cloud development project)", () => 
 
       const smash = bySlug.get("smash-bunker-doble");
       expect(smash?.optionGroups.map((group) => [group.name, group.selectionMode])).toEqual([
-        ["Tamaño / medallones", "single"],
+        ["Tamaño / medallones", "multiple"],
         ["Extras", "multiple"]
       ]);
       expect(smash?.optionGroups[0]?.defaultOptionIds).toHaveLength(1);

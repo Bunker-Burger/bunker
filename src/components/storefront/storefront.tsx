@@ -620,12 +620,14 @@ export function ProductDrawer({ product, initialLine, cart = [], onClose, onSubm
             const isOptionalSingle = group.selectionMode === "single" && !group.required;
             // Few exclusive choices read as tiles side by side (size, medallions); the rest as a list.
             const tiles = group.selectionMode === "single" && group.required && group.options.length <= 3;
+            // Extras without a real cap (issue #54): the customer adds as many as they want.
+            const unlimited = group.maxSelections >= group.options.length;
             return (
               <fieldset className="drawer-card option-group" key={group.id}>
                 <legend>
                   <span className="option-group-title">
                     <span>{group.name}</span>
-                    <small>{group.selectionMode === "single" ? "Elegí una opción" : `Podés sumar hasta ${group.maxSelections}`}</small>
+                    <small>{group.selectionMode === "single" ? "Elegí una opción" : unlimited ? "Sumá los que quieras" : `Podés sumar hasta ${group.maxSelections}`}</small>
                   </span>
                   <span className="option-group-meta">
                     {isOptionalSingle && groupSelections.length > 0 ? (
@@ -638,7 +640,7 @@ export function ProductDrawer({ product, initialLine, cart = [], onClose, onSubm
                         Limpiar
                       </button>
                     ) : null}
-                    <small className="option-badge">{group.required ? "Requerido" : `Hasta ${group.maxSelections}`}</small>
+                    <small className="option-badge">{group.required ? "Requerido" : unlimited ? "Opcional" : `Hasta ${group.maxSelections}`}</small>
                   </span>
                 </legend>
                 <div className={tiles ? "option-tiles" : "option-list"}>

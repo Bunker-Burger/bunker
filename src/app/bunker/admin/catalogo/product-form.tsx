@@ -1,6 +1,6 @@
 "use client";
 
-import { CirclePlus, CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { Check, CirclePlus, CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import styles from "../../admin.module.css";
@@ -56,12 +56,6 @@ interface ProductFormProps {
 
 /** Icons of the capture's product selector, by the type the category gives its products. */
 const CATEGORY_ICONS: Record<string, LucideIcon> = { burger: Hamburger, sandwich: Sandwich, fries: Popcorn, beverage: CupSoda };
-
-function rule(group: ProductFormOptionGroup) {
-  const parts = [group.required ? "Obligatorio" : "Opcional"];
-  parts.push(group.selectionMode === "single" ? "una opción" : `de ${group.minSelections} a ${group.maxSelections} opciones`);
-  return parts.join(", ");
-}
 
 /**
  * Product editor. Option groups are listed for the type of the chosen category only; the
@@ -176,7 +170,6 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
             <div className={styles.optionGroup} key={group.id}>
               <div className={styles.checkField}>
                 <input
-                  aria-describedby={`rule-${group.id}`}
                   checked={isAssigned}
                   id={`offer-${group.id}`}
                   name="optionGroup"
@@ -187,8 +180,6 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                 <label htmlFor={`offer-${group.id}`}>
                   Ofrecer <strong>{group.name}</strong>
                 </label>
-                <span className={styles.selectionTag} aria-hidden="true">{group.selectionMode === "single" ? "Selección única" : "Opcional"}</span>
-                <small className={styles.hint} id={`rule-${group.id}`}>{rule(group)}</small>
               </div>
               {isAssigned ? (
                 <fieldset className={styles.defaults}>
@@ -257,6 +248,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                         {option.available ? null : <span className={styles.badgeMuted}>Sin stock</span>}
                       </span>
                       <PriceField defaultValue={option.price} form={`option-${option.id}`} label={`Precio extra de ${option.name}`} name="price" />
+                      <span className={styles.variantActions}>
                       <label className={styles.variantAvailable}>
                         <input
                           aria-label={`${option.name} disponible`}
@@ -269,8 +261,10 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                         />
                       </label>
                       <button aria-label={`Guardar ${option.name}`} className={styles.smallAction} form={`option-${option.id}`} type="submit">
-                        Guardar
+                        <Check aria-hidden="true" size={16} />
+                        <span className={styles.variantSaveText}>Guardar</span>
                       </button>
+                      </span>
                     </div>
                   ))}
                   {orderMessage[group.id] ? (

@@ -59,8 +59,8 @@ insert into public.option_groups (
   minimum_selections, maximum_selections, is_required, sort_order,
   applicable_category_kinds
 ) values
-  ('0199b2c8-40b0-7000-8000-000000000301', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño / medallones', 'single', 1, 1, true, 10, array['burger']::public.category_kind[]),
-  ('0199b2c8-40b0-7000-8000-000000000302', '0199b2c8-40b0-7000-8000-000000000001', 'Extras', 'multiple', 0, 3, false, 20, array['burger', 'sandwich']::public.category_kind[]),
+  ('0199b2c8-40b0-7000-8000-000000000301', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño / medallones', 'multiple', 1, 99, true, 10, array['burger']::public.category_kind[]),
+  ('0199b2c8-40b0-7000-8000-000000000302', '0199b2c8-40b0-7000-8000-000000000001', 'Extras', 'multiple', 0, 99, false, 20, array['burger', 'sandwich']::public.category_kind[]),
   ('0199b2c8-40b0-7000-8000-000000000303', '0199b2c8-40b0-7000-8000-000000000001', 'Tamaño de porción', 'single', 1, 1, true, 10, array['side']::public.category_kind[])
 on conflict (id) do update set
   name = excluded.name,

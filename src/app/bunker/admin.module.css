@@ -3258,3 +3258,101 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   pointer-events: none;
   transform: translateX(-50%);
 }
+
+/* Option rows, final layout (issue #54). On a phone: handle and choice on the left, the name on
+   top, then price, availability and save underneath; on wider screens, one line. Earlier
+   .variantRow rules are layered; this block is the one that decides. */
+.defaults > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.defaults > legend + * {
+  clear: both;
+}
+
+.variantRow {
+  grid-template-areas:
+    "handle choice name name"
+    "handle choice price actions";
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  row-gap: 0.5rem;
+}
+
+.variantRow > .dragHandle {
+  grid-area: handle;
+}
+
+.variantRow > input[type="radio"],
+.variantRow > input[type="checkbox"] {
+  grid-area: choice;
+}
+
+.variantRow > .variantName {
+  grid-area: name;
+}
+
+.variantRow > .priceInput {
+  grid-area: price;
+  width: 100%;
+  min-width: 0;
+}
+
+.variantRow .priceInput input[type="text"] {
+  flex: 1;
+}
+
+.variantRow > .variantActions {
+  display: flex;
+  grid-area: actions;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.variantRow .priceInput input[type="text"] {
+  width: 100%;
+  min-width: 0;
+}
+
+/* On a phone the save button is its check icon (its name stays in aria-label). */
+.variantSaveText {
+  display: none;
+}
+
+@media (max-width: 39.99rem) {
+  .defaults {
+    padding: 0.5rem;
+  }
+
+  .variantRow {
+    column-gap: 0.4rem;
+    padding: 0.5rem;
+  }
+
+  .variantRow > .dragHandle {
+    width: 1.5rem;
+  }
+
+  .variantRow .smallAction {
+    min-width: var(--spacing-tap);
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+@media (min-width: 40rem) {
+  .variantSaveText {
+    display: inline;
+  }
+
+  .variantRow {
+    grid-template-areas: "handle choice name price actions";
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  }
+
+  .variantRow > .priceInput {
+    width: 8rem;
+  }
+}
