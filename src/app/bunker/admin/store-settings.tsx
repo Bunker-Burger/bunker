@@ -2,7 +2,6 @@
 
 import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import styles from "../admin.module.css";
 import { useOrderSaver } from "./category-tools";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
@@ -59,10 +58,6 @@ export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, payment
       <OpeningHours shifts={shifts} timezone={timezone} />
 
       <PaymentMethods mercadoPagoNote={mercadoPagoNote} methods={paymentMethods} />
-
-      <Link className={styles.viewMenuLink} href="/">
-        Ver la carta como cliente
-      </Link>
     </div>
   );
 }

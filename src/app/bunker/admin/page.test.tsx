@@ -97,9 +97,8 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
 
     expect(screen.queryByText(/pedidos hoy|facturaci|ventas|ingresos|clientes|kpi/i)).not.toBeInTheDocument();
 
-    // Everything lives in the panel now; the public menu stays one click away.
+    // Everything lives in the panel now (the menu is in the bottom navigation).
     expect(screen.queryByRole("navigation", { name: "Administración" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver la carta como cliente" })).toHaveAttribute("href", "/");
   });
 
   it("a quick price change sends the rest of the product exactly as stored", async () => {

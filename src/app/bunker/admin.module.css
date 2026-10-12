@@ -3608,13 +3608,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   color: var(--color-danger-text);
 }
 
-.viewMenuLink {
-  justify-self: start;
-  color: var(--color-primary);
-  font-size: var(--text-body-sm);
-  font-weight: 700;
-}
-
 /* Inside the settings column the cards stack; the old single delivery card's placement does not apply. */
 .settingsColumn > .deliveryCard {
   grid-column: auto;
