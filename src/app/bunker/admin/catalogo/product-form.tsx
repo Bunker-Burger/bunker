@@ -183,11 +183,16 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
               </div>
               {isAssigned ? (
                 <fieldset className={styles.defaults}>
-                  <legend>Por defecto en {group.name}</legend>
+                  <legend>Opciones de {group.name}</legend>
+                  <p className={styles.hint}>
+                    {group.selectionMode === "single"
+                      ? "En la carta se muestran todas; el cliente elige una. La marcada como “Por defecto” viene elegida."
+                      : "En la carta se muestran todas; el cliente suma las que quiera. Las marcadas como “Por defecto” vienen incluidas."}
+                  </p>
                   {group.selectionMode === "single" && !group.required ? (
                     <label className={styles.checkField}>
                       <input defaultChecked={groupDefaults.size === 0} name={`default:${group.id}`} type="radio" value="" />
-                      <span>Ninguna</span>
+                      <span>Ninguna por defecto</span>
                     </label>
                   ) : null}
                   {ordered(group).map((option, index) => (
@@ -227,14 +232,17 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                       >
                         <GripVertical aria-hidden="true" size={18} />
                       </button>
-                      <input
-                        aria-label={`${option.name} por defecto${option.available ? "" : " (sin stock)"}`}
-                        defaultChecked={groupDefaults.has(option.id)}
-                        disabled={!option.available && !groupDefaults.has(option.id)}
-                        name={`default:${group.id}`}
-                        type={group.selectionMode === "single" ? "radio" : "checkbox"}
-                        value={option.id}
-                      />
+                      <label className={styles.defaultChip}>
+                        <input
+                          aria-label={`${option.name} por defecto${option.available ? "" : " (sin stock)"}`}
+                          defaultChecked={groupDefaults.has(option.id)}
+                          disabled={!option.available && !groupDefaults.has(option.id)}
+                          name={`default:${group.id}`}
+                          type={group.selectionMode === "single" ? "radio" : "checkbox"}
+                          value={option.id}
+                        />
+                        <span aria-hidden="true">Por defecto</span>
+                      </label>
                       {/* Name and price of the option: saved by its own form (below), not by "Guardar producto". */}
                       <span className={styles.variantName}>
                         <input

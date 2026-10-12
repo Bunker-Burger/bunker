@@ -39,12 +39,12 @@ describe("ProductForm", () => {
   it("asks for defaults once a group is offered: one choice for single groups, several for multiple", async () => {
     render(<ProductForm categories={categories} optionGroups={groups} />);
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
-    const size = screen.getByRole("group", { name: "Por defecto en Tamaño" });
+    const size = screen.getByRole("group", { name: "Opciones de Tamaño" });
     expect(within(size).getAllByRole("radio")).toHaveLength(2);
     expect(within(size).getByRole("radio", { name: "Triple por defecto" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
-    const extras = screen.getByRole("group", { name: "Por defecto en Extras" });
+    const extras = screen.getByRole("group", { name: "Opciones de Extras" });
     expect(within(extras).getByRole("checkbox", { name: "Bacon por defecto" })).toBeEnabled();
     expect(within(extras).getByRole("checkbox", { name: /Pepinillos.*sin stock/ })).toBeDisabled();
   });
@@ -123,7 +123,7 @@ describe("ProductForm", () => {
     screen.getByRole("button", { name: /Mover Triple/ }).focus();
     await userEvent.keyboard("{ArrowUp}");
 
-    const size = screen.getByRole("group", { name: "Por defecto en Tamaño" });
+    const size = screen.getByRole("group", { name: "Opciones de Tamaño" });
     expect(within(size).getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["o-triple", "o-double"]);
     await waitFor(() => expect(reorderOptionsAction).toHaveBeenCalled());
     const sent = vi.mocked(reorderOptionsAction).mock.calls.at(-1)![1];
