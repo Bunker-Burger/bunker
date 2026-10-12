@@ -209,9 +209,20 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
       } as never);
       render(await AdminHomePage());
       expect(screen.getByRole("textbox", { name: "WhatsApp del local" })).toHaveValue("+5493815551234");
-      const shifts = screen.getByRole("list", { name: "Turnos" });
-      expect(shifts).toHaveTextContent("Jueves 20:00 a 00:30");
-      expect(shifts).toHaveTextContent("Cruza medianoche");
+      // Collapsed by default: title, summary and arrow; the week is inside.
+      const hours = screen.getByRole("heading", { name: "Horarios" }).closest("details")!;
+      expect(hours).not.toHaveAttribute("open");
+      expect(hours.querySelector("summary")).toHaveTextContent("Abierto 1 día · cerrado lun, mar, mié, vie, sáb, dom");
+      const days = within(screen.getByRole("list", { name: "Turnos", hidden: true })).getAllByRole("listitem", { hidden: true });
+      expect(days.map((day) => day.textContent)).toEqual([
+        "LunesCerrado",
+        "MartesCerrado",
+        "MiércolesCerrado",
+        "Jueves20:00 – 00:30 +1",
+        "ViernesCerrado",
+        "SábadoCerrado",
+        "DomingoCerrado"
+      ]);
       const methods = screen.getByRole("list", { name: "Medios de pago" });
       expect(within(methods).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label"))).toEqual([
         "Efectivo habilitado",
