@@ -170,7 +170,13 @@ describe("validateAcceptanceMatrix", () => {
     ["a test.describe.fixme suite", `test.describe.fixme("fixme group", () => { test("${TEST_TITLE}", () => {}); });\n`],
     ["a test nested inside another test callback", `test("outer test", () => { test("${TEST_TITLE}", () => {}); });\n`],
     ["an inert unexecuted callback", `const dead = () => { test("${TEST_TITLE}", () => {}); };\n`],
-    ["an unexecuted array iteration callback", `[].forEach(() => { test("${TEST_TITLE}", () => {}); });\n`]
+    ["an unexecuted array iteration callback", `[].forEach(() => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["a statically empty for-of loop", `for (const x of []) { test("${TEST_TITLE}", () => {}); }\n`],
+    ["a statically empty for loop", `for (let i = 0; i < 0; i++) { test("${TEST_TITLE}", () => {}); }\n`],
+    ["a statically skipped test.skipIf(true)", `test.skipIf(true)("${TEST_TITLE}", () => {});\n`],
+    ["a statically skipped it.skipIf(true)", `it.skipIf(true)("${TEST_TITLE}", () => {});\n`],
+    ["a statically inert test.runIf(false)", `test.runIf(false)("${TEST_TITLE}", () => {});\n`],
+    ["a statically inert it.runIf(false)", `it.runIf(false)("${TEST_TITLE}", () => {});\n`]
   ])("rejects automated evidence where the test is declared inside %s", async (_kind, source) => {
     const matrix = completeMatrix();
     await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
@@ -190,6 +196,18 @@ describe("validateAcceptanceMatrix", () => {
     expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
   });
 
+  it("detects a removed executable test even if a statically empty loop or skipIf(true) retains it", async () => {
+    const matrix = completeMatrix();
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+    await writeFile(
+      path.join(rootDir, "sample.test.ts"),
+      `for (const x of []) { test("${TEST_TITLE}", () => {}); }\ntest.skipIf(true)("${TEST_TITLE}", () => {});\n`,
+      "utf8"
+    );
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
   it("accepts legitimate test registrations in active describe blocks and declarative loops", async () => {
     const matrix = completeMatrix();
     const source = `
@@ -197,10 +215,10 @@ describe("validateAcceptanceMatrix", () => {
         test("${TEST_TITLE}", () => {});
       });
       test.describe("playwright active group", () => {
-        test("BB07-AC2 test", () => {});
+        test.skipIf(false)("BB07-AC2 test", () => {});
       });
       for (const item of [1]) {
-        test("BB07-AC3 test", () => {});
+        it.runIf(true)("BB07-AC3 test", () => {});
       }
       for (let i = 0; i < 1; i++) {
         test("BB07-AC4 test", () => {});
@@ -212,13 +230,40 @@ describe("validateAcceptanceMatrix", () => {
     matrix.requirements[3]!.evidence[0]!.test = "BB07-AC4 test";
     await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
   });
+
+  it.each([
+    ["single-quoted literal", `select 'select ok(true, ''${TEST_TITLE}'');';\n`],
+    ["dollar-quoted literal ($$)", `select $$ select ok(true, '${TEST_TITLE}'); $$;\n`],
+    ["tagged dollar-quoted literal ($tag$)", `select $tag$ select ok(true, '${TEST_TITLE}'); $tag$;\n`],
+    ["single-quoted literal with is assertion", `select 'select is(1, 1, ''${TEST_TITLE}'');';\n`],
+    ["dollar-quoted literal with is assertion", `select $$ select is(1, 1, '${TEST_TITLE}'); $$;\n`]
+  ])("rejects automated evidence in SQL where the assertion appears inside %s", async (_kind, source) => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
+    await writeFile(path.join(rootDir, "sample.sql"), source, "utf8");
+
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.sql: ${TEST_TITLE}`);
+  });
+
   it("rejects automated evidence in SQL where the assertion only appears in a comment", async () => {
     const matrix = completeMatrix();
     matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
-    await writeFile(path.join(rootDir, "sample.sql"), `-- select ok(1, '${TEST_TITLE}');\nselect 1;\n`, "utf8");
+    await writeFile(path.join(rootDir, "sample.sql"), `-- select ok(1, '${TEST_TITLE}');\n/* select is(1, 1, '${TEST_TITLE}'); */\nselect 1;\n`, "utf8");
 
     const errors = await validateAcceptanceMatrix(matrix, rootDir);
 
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.sql: ${TEST_TITLE}`);
+  });
+
+  it("detects a removed executable SQL test even if a string literal retains its assertion", async () => {
+    const matrix = completeMatrix();
+    matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
+    await writeFile(path.join(rootDir, "sample.sql"), `select ok(true, '${TEST_TITLE}');\n`, "utf8");
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+
+    await writeFile(path.join(rootDir, "sample.sql"), `select 'select ok(true, ''${TEST_TITLE}'');';\n`, "utf8");
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
     expect(errors).toContain(`BB07-AC1: test title not found in sample.sql: ${TEST_TITLE}`);
   });
 

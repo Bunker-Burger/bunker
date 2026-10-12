@@ -44,44 +44,65 @@ function expectedTicketForId(id: string): string {
   return match ? `${match[1]}-${match[2]}` : "";
 }
 
-function stripSqlComments(source: string): string {
-  let result = "";
-  let i = 0;
-  const n = source.length;
-  while (i < n) {
-    if (source[i] === "'") {
-      result += "'";
-      i++;
-      while (i < n) {
-        if (source[i] === "'" && source[i + 1] === "'") {
-          result += "''";
-          i += 2;
-        } else if (source[i] === "'") {
-          result += "'";
-          i++;
-          break;
-        } else {
-          result += source[i];
-          i++;
+function isStaticallyFalsy(expr: ts.Expression): boolean {
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return true;
+  if (ts.isNumericLiteral(expr) && expr.text === "0") return true;
+  if (ts.isStringLiteral(expr) && expr.text === "") return true;
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return true;
+  if (ts.isIdentifier(expr) && expr.text === "undefined") return true;
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
+    return isStaticallyTruthy(expr.operand);
+  }
+  return false;
+}
+
+function isStaticallyTruthy(expr: ts.Expression): boolean {
+  if (expr.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (ts.isNumericLiteral(expr) && expr.text !== "0") return true;
+  if (ts.isStringLiteral(expr) && expr.text !== "") return true;
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
+    return isStaticallyFalsy(expr.operand);
+  }
+  return false;
+}
+
+function isStaticallyEmptyIterable(expr: ts.Expression): boolean {
+  if (ts.isArrayLiteralExpression(expr) && expr.elements.length === 0) return true;
+  if (ts.isObjectLiteralExpression(expr) && expr.properties.length === 0) return true;
+  if (ts.isStringLiteral(expr) && expr.text === "") return true;
+  return false;
+}
+
+function getStaticNumericValue(expr: ts.Expression): number | null {
+  if (ts.isNumericLiteral(expr)) return Number(expr.text);
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(expr.operand)) {
+    return -Number(expr.operand.text);
+  }
+  return null;
+}
+
+function isStaticallyEmptyFor(node: ts.ForStatement): boolean {
+  if (node.condition && isStaticallyFalsy(node.condition)) return true;
+  if (node.initializer && ts.isVariableDeclarationList(node.initializer) && node.initializer.declarations.length === 1) {
+    const decl = node.initializer.declarations[0]!;
+    if (ts.isIdentifier(decl.name) && decl.initializer) {
+      const initVal = getStaticNumericValue(decl.initializer);
+      if (initVal !== null && node.condition && ts.isBinaryExpression(node.condition)) {
+        if (ts.isIdentifier(node.condition.left) && node.condition.left.text === decl.name.text) {
+          const limitVal = getStaticNumericValue(node.condition.right);
+          if (limitVal !== null) {
+            const op = node.condition.operatorToken.kind;
+            if (op === ts.SyntaxKind.LessThanToken && !(initVal < limitVal)) return true;
+            if (op === ts.SyntaxKind.LessThanEqualsToken && !(initVal <= limitVal)) return true;
+            if (op === ts.SyntaxKind.GreaterThanToken && !(initVal > limitVal)) return true;
+            if (op === ts.SyntaxKind.GreaterThanEqualsToken && !(initVal >= limitVal)) return true;
+            if ((op === ts.SyntaxKind.EqualsEqualsToken || op === ts.SyntaxKind.EqualsEqualsEqualsToken) && !(initVal === limitVal)) return true;
+          }
         }
       }
-    } else if (source[i] === "-" && source[i + 1] === "-") {
-      i += 2;
-      while (i < n && source[i] !== "\n" && source[i] !== "\r") {
-        i++;
-      }
-    } else if (source[i] === "/" && source[i + 1] === "*") {
-      i += 2;
-      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
-        i++;
-      }
-      i += 2;
-    } else {
-      result += source[i];
-      i++;
     }
   }
-  return result;
+  return false;
 }
 
 const JS_TEST_ROOTS = new Set(["it", "test"]);
@@ -90,11 +111,20 @@ const JS_TEST_ROOTS = new Set(["it", "test"]);
 function isTestCall(expression: ts.LeftHandSideExpression): boolean {
   if (ts.isIdentifier(expression)) return JS_TEST_ROOTS.has(expression.text);
 
-  // Vitest / Playwright: it.each([...])("title", fn), test.skipIf(cond)("title", fn).
+  // Vitest / Playwright: it.each([...])("title", fn), test.skipIf(cond)("title", fn), test.runIf(cond)("title", fn).
   if (ts.isCallExpression(expression) && ts.isPropertyAccessExpression(expression.expression)) {
     const { expression: root, name } = expression.expression;
-    return ts.isIdentifier(root) && JS_TEST_ROOTS.has(root.text)
-      && (name.text === "each" || name.text === "skipIf" || name.text === "runIf");
+    if (ts.isIdentifier(root) && JS_TEST_ROOTS.has(root.text)) {
+      if (name.text === "each") return true;
+      if (name.text === "skipIf") {
+        const cond = expression.arguments[0];
+        return !cond || !isStaticallyTruthy(cond);
+      }
+      if (name.text === "runIf") {
+        const cond = expression.arguments[0];
+        return !cond || !isStaticallyFalsy(cond);
+      }
+    }
   }
 
   // Vitest tagged tables: it.each`...\`("title", fn).
@@ -152,6 +182,13 @@ function getDescribeKind(expr: ts.LeftHandSideExpression): "active" | "skipped" 
       const chain = getPropertyChain(expr.expression);
       if (!chain || !isDescribeChain(chain)) return null;
       if (chain.some((part) => SKIPPED_SUITE_MODIFIERS.has(part))) return "skipped";
+      const name = expr.expression.name.text;
+      if (name === "skipIf" && expr.arguments[0] && isStaticallyTruthy(expr.arguments[0])) {
+        return "skipped";
+      }
+      if (name === "runIf" && expr.arguments[0] && isStaticallyFalsy(expr.arguments[0])) {
+        return "skipped";
+      }
       return "active";
     }
   }
@@ -176,28 +213,6 @@ function getDescribeCallback(call: ts.CallExpression): ts.ArrowFunction | ts.Fun
     }
   }
   return null;
-}
-
-function isStaticallyFalsy(expr: ts.Expression): boolean {
-  if (expr.kind === ts.SyntaxKind.FalseKeyword) return true;
-  if (ts.isNumericLiteral(expr) && expr.text === "0") return true;
-  if (ts.isStringLiteral(expr) && expr.text === "") return true;
-  if (expr.kind === ts.SyntaxKind.NullKeyword) return true;
-  if (ts.isIdentifier(expr) && expr.text === "undefined") return true;
-  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
-    return isStaticallyTruthy(expr.operand);
-  }
-  return false;
-}
-
-function isStaticallyTruthy(expr: ts.Expression): boolean {
-  if (expr.kind === ts.SyntaxKind.TrueKeyword) return true;
-  if (ts.isNumericLiteral(expr) && expr.text !== "0") return true;
-  if (ts.isStringLiteral(expr) && expr.text !== "") return true;
-  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
-    return isStaticallyFalsy(expr.operand);
-  }
-  return false;
 }
 
 function checkJsTestDeclaration(source: string, testTitle: string, file: string): boolean {
@@ -231,7 +246,21 @@ function checkJsTestDeclaration(source: string, testTitle: string, file: string)
       return;
     }
 
-    if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node) || ts.isDoStatement(node)) {
+    if (ts.isForStatement(node)) {
+      if (!isStaticallyEmptyFor(node)) {
+        visitActiveNode(node.statement);
+      }
+      return;
+    }
+
+    if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+      if (!isStaticallyEmptyIterable(node.expression)) {
+        visitActiveNode(node.statement);
+      }
+      return;
+    }
+
+    if (ts.isDoStatement(node)) {
       visitActiveNode(node.statement);
       return;
     }
@@ -297,51 +326,202 @@ const PGTAP_ASSERTIONS = new Set([
   "fail"
 ]);
 
-function checkPgTapAssertion(cleanSource: string, testTitle: string): boolean {
-  let searchPos = 0;
-  while (true) {
-    const idx = cleanSource.indexOf(testTitle, searchPos);
-    if (idx === -1) return false;
-    searchPos = idx + 1;
+function parsePgTapCallArguments(source: string, startPos: number): { endPos: number; argumentStrings: string[] } {
+  let i = startPos;
+  const n = source.length;
+  let depth = 1;
+  const argumentStrings: string[] = [];
 
-    let depth = 0;
-    let funcName = "";
-    let i = idx - 1;
-    while (i >= 0) {
-      if (cleanSource[i] === ")") {
-        depth++;
-      } else if (cleanSource[i] === "(") {
-        if (depth === 0) {
-          let j = i - 1;
-          while (j >= 0 && /\s/.test(cleanSource[j]!)) {
-            j--;
-          }
-          const nameEnd = j;
-          while (j >= 0 && /[a-zA-Z0-9_]/.test(cleanSource[j]!)) {
-            j--;
-          }
-          funcName = cleanSource.slice(j + 1, nameEnd + 1).toLowerCase();
+  while (i < n && depth > 0) {
+    if (/\s/.test(source[i]!)) {
+      i++;
+      continue;
+    }
+
+    // Single-line comment inside call args
+    if (source[i] === "-" && source[i + 1] === "-") {
+      i += 2;
+      while (i < n && source[i] !== "\n" && source[i] !== "\r") {
+        i++;
+      }
+      continue;
+    }
+
+    // Multi-line comment inside call args
+    if (source[i] === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
+        i++;
+      }
+      i = Math.min(n, i + 2);
+      continue;
+    }
+
+    // Dollar-quoted string argument: $<tag>$...$<tag>$
+    if (source[i] === "$") {
+      const match = /^\$([a-zA-Z0-9_]*)\$/.exec(source.slice(i));
+      if (match) {
+        const tag = match[0];
+        const contentStart = i + tag.length;
+        const endTagIdx = source.indexOf(tag, contentStart);
+        if (endTagIdx === -1) {
+          break;
+        }
+        argumentStrings.push(source.slice(contentStart, endTagIdx));
+        i = endTagIdx + tag.length;
+        continue;
+      }
+    }
+
+    // Single-quoted string argument: '...' (unescaping '')
+    if (source[i] === "'") {
+      i++;
+      let strVal = "";
+      while (i < n) {
+        if (source[i] === "'" && source[i + 1] === "'") {
+          strVal += "'";
+          i += 2;
+        } else if (source[i] === "'") {
+          i++;
           break;
         } else {
-          depth--;
+          strVal += source[i];
+          i++;
         }
-      } else if (cleanSource[i] === ";") {
-        break;
       }
-      i--;
+      argumentStrings.push(strVal);
+      continue;
     }
 
-    if (PGTAP_ASSERTIONS.has(funcName)) {
-      return true;
+    // Nested parentheses
+    if (source[i] === "(") {
+      depth++;
+      i++;
+      continue;
     }
+    if (source[i] === ")") {
+      depth--;
+      i++;
+      if (depth === 0) {
+        break;
+      }
+      continue;
+    }
+
+    i++;
   }
+
+  return { endPos: i, argumentStrings };
+}
+
+function checkPgTapAssertion(source: string, testTitle: string): boolean {
+  let i = 0;
+  const n = source.length;
+
+  while (i < n) {
+    if (/\s/.test(source[i]!)) {
+      i++;
+      continue;
+    }
+
+    // Single-line comment: -- ...
+    if (source[i] === "-" && source[i + 1] === "-") {
+      i += 2;
+      while (i < n && source[i] !== "\n" && source[i] !== "\r") {
+        i++;
+      }
+      continue;
+    }
+
+    // Multi-line comment: /* ... */
+    if (source[i] === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
+        i++;
+      }
+      i = Math.min(n, i + 2);
+      continue;
+    }
+
+    // Dollar-quoted string literal: $<tag>$...$<tag>$ (skip the entire literal)
+    if (source[i] === "$") {
+      const match = /^\$([a-zA-Z0-9_]*)\$/.exec(source.slice(i));
+      if (match) {
+        const tag = match[0];
+        const endTagIdx = source.indexOf(tag, i + tag.length);
+        if (endTagIdx === -1) {
+          break;
+        }
+        i = endTagIdx + tag.length;
+        continue;
+      }
+    }
+
+    // Standard single-quoted string literal: '...' (skip the entire literal)
+    if (source[i] === "'") {
+      i++;
+      while (i < n) {
+        if (source[i] === "'" && source[i + 1] === "'") {
+          i += 2;
+        } else if (source[i] === "'") {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // Double-quoted identifier: "..."
+    if (source[i] === '"') {
+      i++;
+      while (i < n && source[i] !== '"') {
+        i++;
+      }
+      if (i < n) i++;
+      continue;
+    }
+
+    // Unquoted identifier: [a-zA-Z_][a-zA-Z0-9_.]*
+    if (/[a-zA-Z_]/.test(source[i]!)) {
+      const start = i;
+      while (i < n && /[a-zA-Z0-9_.]/.test(source[i]!)) {
+        i++;
+      }
+      const rawIdent = source.slice(start, i);
+      const parts = rawIdent.split(".");
+      const funcName = (parts[parts.length - 1] ?? "").toLowerCase();
+
+      let j = i;
+      while (j < n && /\s/.test(source[j]!)) {
+        j++;
+      }
+      if (j < n && source[j] === "(") {
+        if (PGTAP_ASSERTIONS.has(funcName)) {
+          const { endPos, argumentStrings } = parsePgTapCallArguments(source, j + 1);
+          for (const argStr of argumentStrings) {
+            if (argStr.includes(testTitle)) {
+              return true;
+            }
+          }
+          i = endPos;
+          continue;
+        }
+      }
+      continue;
+    }
+
+    i++;
+  }
+
+  return false;
 }
 
 function isValidTestEvidence(source: string, testTitle: string, file: string): boolean {
   if (!testTitle) return false;
   if (file.endsWith(".sql")) {
-    const clean = stripSqlComments(source);
-    return checkPgTapAssertion(clean, testTitle);
+    return checkPgTapAssertion(source, testTitle);
   }
   return checkJsTestDeclaration(source, testTitle, file);
 }
