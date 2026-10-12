@@ -11,7 +11,7 @@ export function PhotoDropzoneContent({ title, detail }: { title: string; detail:
       <strong>{title}</strong>
       <span>{detail}</span>
       <span className={styles.dropzoneTip}>
-        <Zap aria-hidden="true" size={12} /> Fondo oscuro Maillard recomendado
+        <Zap aria-hidden="true" size={12} /> Mejor con fondo oscuro y buena luz
       </span>
     </>
   );

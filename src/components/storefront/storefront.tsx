@@ -36,7 +36,7 @@ import {
   validateOptionSelection
 } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
-import { promotionalPrice, type PromotionLine } from "@/domain/promotions";
+import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule } from "@/domain/public-promotions";
 import { PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
 import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
@@ -482,6 +482,7 @@ export function Storefront({
           key={`${activeProduct.id}:${editingLine?.id ?? "new"}`}
           cart={cart}
           initialLine={editingLine}
+          promotion={cardContext ? promotionalPrice(activeProduct, promotions, cardContext) : null}
           onClose={closeProduct}
           onSubmit={(submittedLine) => {
             if (editingLine) {
@@ -534,8 +535,10 @@ export function Storefront({
   );
 }
 
-export function ProductDrawer({ product, initialLine, cart = [], onClose, onSubmit }: {
+export function ProductDrawer({ product, initialLine, cart = [], promotion = null, onClose, onSubmit }: {
   product: Product;
+  /** The promotional price the menu card shows for this product, if any (issue #54). */
+  promotion?: PromotionalPrice | null;
   /** The cart as it is now, for the order summary at the end (the line being edited is replaced). */
   cart?: readonly CartLine[];
   initialLine?: CartLine | null;
@@ -606,10 +609,21 @@ export function ProductDrawer({ product, initialLine, cart = [], onClose, onSubm
             {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
             {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
             <div className="drawer-hero-copy">
-              <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
+              <div className="drawer-title">
+                <h2>{product.name}</h2>
+                <span className="product-price">
+                  <strong>{formatArs(promotion?.priceCents ?? product.priceCents)}</strong>
+                  {promotion ? <s className="compare-at">{formatArs(promotion.compareAtPriceCents)}</s> : null}
+                </span>
+              </div>
               <p className="sr-only" id={summaryId}>
-                {`Precio ${formatArs(product.priceCents)}. ${product.inStock ? "Disponible." : "Agotado, no se puede agregar al carrito."}`}
+                {`Precio ${formatArs(promotion?.priceCents ?? product.priceCents)}${promotion ? `, antes ${formatArs(promotion.compareAtPriceCents)}` : ""}. ${product.inStock ? "Disponible." : "Agotado, no se puede agregar al carrito."}`}
               </p>
+              {promotion ? (
+                <p className="promo-note">
+                  {promotion.promotionName}: {promotion.explanation}. El descuento se aplica al confirmar el pedido.
+                </p>
+              ) : null}
               {!product.inStock ? <p className="drawer-sold-out" aria-hidden="true">Agotado · no se puede agregar al carrito</p> : null}
               <p>{product.description}</p>
             </div>

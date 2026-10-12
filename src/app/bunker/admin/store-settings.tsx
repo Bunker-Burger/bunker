@@ -44,7 +44,7 @@ export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, payment
   return (
     <div className={styles.settingsColumn}>
       <CollapsibleCard icon={Truck} summary={deliverySummary(deliveryFee, whatsapp)} title="Delivery y WhatsApp" titleId="delivery-title">
-        <p className={styles.hint}>Sin costo de delivery cargado, los pedidos quedan deshabilitados.</p>
+        {deliveryFee === "" ? <p className={styles.error}>Cargá el costo de delivery: sin él no se pueden tomar pedidos.</p> : null}
         <QuickForm action={saveStoreContactAction} className={styles.settingsForm} label="Delivery y WhatsApp">
           <label htmlFor="quick-delivery">Costo de delivery</label>
           <PriceField defaultValue={deliveryFee} id="quick-delivery" name="deliveryFee" />

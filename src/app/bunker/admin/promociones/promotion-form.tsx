@@ -355,7 +355,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
               </tbody>
             </table>
           )}
-          <p className={styles.hint}>Calculado con el mismo motor que el checkout; no considera fechas ni franjas.</p>
+          <p className={styles.hint}>Precios de ejemplo con esta promo, sin tener en cuenta fechas ni horarios.</p>
         </section>
       </fieldset>
 

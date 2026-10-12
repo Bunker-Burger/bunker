@@ -29,7 +29,7 @@ describe("/bunker/admin layout", () => {
 
     expect(connection).toHaveBeenCalledOnce();
     expect(screen.getByText("Contenido privado")).toBeInTheDocument();
-    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Dueño")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
     expect(screen.queryByText("private-user-uuid")).not.toBeInTheDocument();
     expect(screen.queryByText("private-store-uuid")).not.toBeInTheDocument();

@@ -320,3 +320,13 @@ body.drawer-open { overflow: hidden; }
   .promo-banner-track { grid-auto-columns: calc((100% - .75rem) / 2); padding: 0; scroll-padding: 0; }
   .promo-slide { aspect-ratio: 16 / 7; }
 }
+
+/* "Las más pedidas" with one or two products on wide screens: no empty columns (issue #54 audit). */
+@media (min-width: 48rem) {
+  .featured-grid:has(> .product-card:nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .featured-grid:has(> .product-card:only-child) { grid-template-columns: minmax(0, 1fr); }
+  .featured-grid > .product-card.hero:only-child .product-main { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: stretch; }
+  .featured-grid > .product-card.hero:only-child .product-image-wrap { height: 16rem; }
+  .featured-grid > .product-card.hero:only-child .product-image-wrap::after { background: linear-gradient(to left, var(--color-surface), transparent 40%); }
+  .featured-grid > .product-card.hero:only-child .product-copy { align-self: center; padding-bottom: 4.5rem; }
+}

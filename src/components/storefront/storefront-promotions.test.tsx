@@ -209,6 +209,17 @@ describe("promotions in the storefront, read from the public route", () => {
     expect(estimatedTotal()).toHaveTextContent(displayed(quote.totalCents));
   });
 
+  it("shows the card's promotional price in the product detail too, and where the discount lands", async () => {
+    at(TUESDAY_NIGHT);
+    const user = await renderWithSmashInCart();
+    await smashCard().findByText("$ 6.630");
+    await user.click(smashCard().getByRole("button", { name: "Ver Smash Búnker Doble" }));
+    const detail = await screen.findByRole("dialog");
+    expect(within(detail).getByText("$ 6.630")).toBeInTheDocument();
+    expect(within(detail).getByText("$ 7.800", { selector: "s" })).toBeInTheDocument();
+    expect(within(detail).getByText(/El descuento se aplica al confirmar el pedido/)).toBeInTheDocument();
+  });
+
   it("stops announcing a promotion paused in the database at the next read", async () => {
     at(TUESDAY_NIGHT);
     await renderWithSmashInCart();

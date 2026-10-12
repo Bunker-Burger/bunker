@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const currentAdmin = await getCurrentStoreAdmin();
   if (!currentAdmin.ok) redirect(ADMIN_LOGIN_PATH);
 
-  const role = currentAdmin.value.role === "owner" ? "Owner" : "Admin";
+  const role = currentAdmin.value.role === "owner" ? "Dueño" : "Encargado";
   return (
     <main className={styles.adminViewport}>
       <header className={styles.adminHeader}>
