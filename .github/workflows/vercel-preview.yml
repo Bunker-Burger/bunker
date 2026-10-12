@@ -58,7 +58,7 @@ jobs:
           # Production-only values never reach a preview build (BB-19: previews without dangerous resources).
           # Also the secret key and CI test credentials: the app never reads them, and `vercel pull` would
           # hand them to any pull request's runner.
-          for name in SUPABASE_SERVICE_ROLE_KEY SUPABASE_SECRET_KEY SUPABASE_TEST_ADMIN_EMAIL SUPABASE_TEST_ADMIN_PASSWORD             MERCADO_PAGO_ACCESS_TOKEN MERCADO_PAGO_WEBHOOK_SECRET; do
+          for name in SUPABASE_SERVICE_ROLE_KEY SUPABASE_SECRET_KEY SUPABASE_TEST_ADMIN_EMAIL SUPABASE_TEST_ADMIN_PASSWORD MERCADO_PAGO_ACCESS_TOKEN MERCADO_PAGO_WEBHOOK_SECRET; do
             if grep -Eq "^${name}=\"?[^\"]" "$file"; then echo "::error::$name está cargada para Preview en Vercel; quitála."; exit 1; fi
           done
           if grep -Eq '^SUPABASE_PROJECT_ENV="?production' "$file"; then
