@@ -55,6 +55,13 @@ describe("promotions at the top of the menu (issue #54)", () => {
     expect(within(section).getByText("Se aplica sola al pedido")).toBeInTheDocument();
   });
 
+  it("shows the banner and the section together with ?promos=ambas, to compare", () => {
+    render(<PromoShowcase layout="both" promotions={[promotion({})]} />);
+    expect(screen.getByRole("region", { name: "Promociones destacadas" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Promociones" })).toBeInTheDocument();
+    expect(screen.getAllByText("2x1 Burger Night")).toHaveLength(2);
+  });
+
   it("renders nothing without promotions", () => {
     const { container } = render(<PromoShowcase layout="banner" promotions={[]} />);
     expect(container).toBeEmptyDOMElement();
