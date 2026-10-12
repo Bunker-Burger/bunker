@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
+import { PhotoField, type PhotoValue } from "./photo-field";
 import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
 import { PriceField, QuickForm } from "../quick-form";
 import { reorderOptionsAction, saveOptionAction } from "./actions";
@@ -49,6 +50,8 @@ interface ProductFormProps {
   product?: ProductFormValues;
   defaultCategoryId?: string;
   action?: typeof saveProductAction;
+  /** The photo card, first as in the capture; absent in contexts without uploads. */
+  photo?: PhotoValue;
 }
 
 /** Icons of the capture's product selector, by the type the category gives its products. */
@@ -64,7 +67,7 @@ function rule(group: ProductFormOptionGroup) {
  * Product editor. Option groups are listed for the type of the chosen category only; the
  * server validates everything again and refuses to publish an invalid configuration.
  */
-export function ProductForm({ categories, optionGroups, product, defaultCategoryId, action = saveProductAction }: ProductFormProps) {
+export function ProductForm({ categories, optionGroups, product, defaultCategoryId, action = saveProductAction, photo }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "");
   const [assigned, setAssigned] = useState<Set<string>>(() => new Set(product?.optionGroups.map((link) => link.groupId)));
 
@@ -119,6 +122,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     <>
     <AdminForm action={action} submitLabel={product ? "Guardar producto" : "Crear producto"}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
+      {photo ? <PhotoField hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
 
       <fieldset className={styles.formCard}>
         <legend>

@@ -7,7 +7,7 @@ import type { FulfilmentMethod, PromotionMechanic, PromotionRule } from "@/domai
 import { formatArs } from "@/lib/money";
 import styles from "../../admin.module.css";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "../admin-form";
-import { PromotionPhotoField, type PromotionPhoto } from "./promotion-image-form";
+import { PhotoField, type PhotoValue } from "../catalogo/photo-field";
 import { savePromotionAction } from "./actions";
 
 export interface PromotionFormProduct {
@@ -54,7 +54,7 @@ interface PromotionFormProps {
   defaults: PromotionFormValues;
   action?: typeof savePromotionAction;
   /** The banner photo card, first as in the capture; absent in contexts without uploads. */
-  photo?: PromotionPhoto;
+  photo?: PhotoValue;
 }
 
 /** Pesos as typed ("7800" or "7800.5") → cents, or null. */
@@ -217,7 +217,15 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   return (
     <AdminForm action={action} submitLabel={defaults.id ? "Guardar promoción" : "Crear promoción"}>
       {defaults.id ? <input name="promotionId" type="hidden" value={defaults.id} /> : null}
-      {photo ? <PromotionPhotoField photo={photo} /> : null}
+      {photo ? (
+        <PhotoField
+          hint="Se muestra arriba de la carta mientras la promoción está vigente."
+          legend="Foto de la promo"
+          photo={photo}
+          replaceLabel="Reemplazar foto de la promo"
+          uploadLabel="Subir foto de la promo"
+        />
+      ) : null}
       <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
         <legend>
           <span className={styles.promoLegend}>
