@@ -1,6 +1,6 @@
 "use client";
 
-import {
+import { MapPin, 
   ArrowLeft,
   ArrowRight,
   Banknote,
@@ -1115,6 +1115,20 @@ function CheckoutSection({
                 <span className="choice-cost"><small>Costo</small><strong>$0</strong></span>
               </label>
             </div>
+            {fulfilment === "pickup" && storeStatus.kind === "ready" && storeStatus.status.pickupAddress ? (
+              <p className="pickup-place">
+                <MapPin aria-hidden="true" size={18} />
+                <span>
+                  <small>Retirás en</small>
+                  <strong>{storeStatus.status.pickupAddress}</strong>
+                </span>
+                {storeStatus.status.pickupMapsUrl ? (
+                  <a href={storeStatus.status.pickupMapsUrl} rel="noopener noreferrer" target="_blank">
+                    Cómo llegar
+                  </a>
+                ) : null}
+              </p>
+            ) : null}
           </fieldset>
 
           <fieldset className="choice-group payment-group">

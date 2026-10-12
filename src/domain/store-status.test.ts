@@ -4,7 +4,9 @@ import {
   deliveryChargeCents,
   evaluateStoreStatus,
   isValidTimeZone,
+  parsePublicStoreStatus,
   StoreNotAcceptingOrdersError,
+  toPublicStoreStatus,
   wallClockSeconds,
   zonedInstant,
   type BusinessHoursWindow,
@@ -233,5 +235,20 @@ describe("time helpers", () => {
   it("resolves repeated local times to the earlier instant", () => {
     // 01:30 on 2026-11-01 happens twice in New York: 05:30Z (EDT) and 06:30Z (EST).
     expect(zonedInstant(Date.UTC(2026, 10, 1), 5400, "America/New_York")).toBe(Date.parse("2026-11-01T05:30:00Z"));
+  });
+});
+
+describe("pickup place (issue #54)", () => {
+  it("is published with the status only when the store set it", () => {
+    const now = "2026-10-13T23:00:00Z";
+    const withPlace = toPublicStoreStatus(status(now, { pickupAddress: "San Lorenzo 877, Aguilares", pickupMapsUrl: "https://maps.app.goo.gl/x" }));
+    expect(withPlace).toMatchObject({ pickupAddress: "San Lorenzo 877, Aguilares", pickupMapsUrl: "https://maps.app.goo.gl/x" });
+    expect(parsePublicStoreStatus(JSON.parse(JSON.stringify(withPlace)))).toMatchObject({ pickupAddress: "San Lorenzo 877, Aguilares" });
+    expect(toPublicStoreStatus(status(now))).not.toHaveProperty("pickupAddress");
+  });
+
+  it("refuses a map link that is not https", () => {
+    const published = { ...toPublicStoreStatus(status("2026-10-13T23:00:00Z")), pickupAddress: "Acá", pickupMapsUrl: "javascript:alert(1)" };
+    expect(parsePublicStoreStatus(published)).toBeNull();
   });
 });

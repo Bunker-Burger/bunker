@@ -49,6 +49,7 @@ export function toStoreOperatingSettings(row: StoreOperatingRow): StoreOperating
     timezone: row.timezone,
     statusOverride: row.status_override,
     deliveryFeeCents: row.delivery_fee_cents,
+    ...(row.pickup_address ? { pickupAddress: row.pickup_address, pickupMapsUrl: row.pickup_maps_url ?? null } : {}),
     businessHours: row.store_business_hours
       .map((window) => ({ dayOfWeek: window.day_of_week, opensAt: window.opens_at, closesAt: window.closes_at }))
       .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt))

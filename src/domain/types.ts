@@ -188,6 +188,9 @@ export interface StoreSettings {
   deliveryFeeCents: bigint | null;
   businessHours: readonly BusinessHoursWindow[];
   paymentMethods: PaymentMethodSetting[];
+  /** Where pickup orders are collected and its map link (issue #54); absent until set. */
+  pickupAddress?: string | null;
+  pickupMapsUrl?: string | null;
 }
 
 export type PromotionMechanic =

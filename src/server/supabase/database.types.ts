@@ -761,6 +761,8 @@ export type Database = {
           is_open: boolean
           is_public: boolean
           name: string
+          pickup_address: string | null
+          pickup_maps_url: string | null
           slug: string
           status_override: Database["public"]["Enums"]["store_status_override"]
           timezone: string
@@ -776,6 +778,8 @@ export type Database = {
           is_open?: boolean
           is_public?: boolean
           name: string
+          pickup_address?: string | null
+          pickup_maps_url?: string | null
           slug: string
           status_override?: Database["public"]["Enums"]["store_status_override"]
           timezone?: string
@@ -791,6 +795,8 @@ export type Database = {
           is_open?: boolean
           is_public?: boolean
           name?: string
+          pickup_address?: string | null
+          pickup_maps_url?: string | null
           slug?: string
           status_override?: Database["public"]["Enums"]["store_status_override"]
           timezone?: string

@@ -14,6 +14,7 @@ import {
   PROMOTION_SELECT_WITH_IMAGE,
   promotionRowSchema,
   STORE_SELECT,
+  PICKUP_COLUMNS,
   storeRowSchema
 } from "./rows";
 
@@ -55,9 +56,14 @@ export function createSupabaseCatalogRepository(
     scope,
 
     async getStoreBySlug(slug) {
-      let query = client.from("stores").select(STORE_SELECT).eq("slug", slug);
-      if (isPublic) query = query.eq("is_public", true).eq("store_payment_methods.is_enabled", true);
-      const response = await run("stores.select", query.maybeSingle() as PromiseLike<QueryResponse>);
+      const read = (columns: string) => {
+        let query = client.from("stores").select(columns).eq("slug", slug);
+        if (isPublic) query = query.eq("is_public", true).eq("store_payment_methods.is_enabled", true);
+        return run("stores.select", query.maybeSingle() as PromiseLike<QueryResponse>);
+      };
+      let response = await read(STORE_SELECT + PICKUP_COLUMNS);
+      // Before the pickup-location migration the columns do not exist: read as before.
+      if (!response.ok && isMissingColumn(response.error.cause)) response = await read(STORE_SELECT);
       if (!response.ok) return response;
       if (response.value === null) return catalogError("not_found", `stores: no store "${slug}" for ${scope} reads`);
       const rows = parseRows("stores", storeRowSchema, [response.value]);

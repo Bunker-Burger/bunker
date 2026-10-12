@@ -32,6 +32,8 @@ export const storeRowSchema = z.object({
   status_override: z.enum(enums.store_status_override),
   is_public: z.boolean(),
   delivery_fee_cents: cents.nullable(),
+  pickup_address: z.string().nullable().optional(),
+  pickup_maps_url: z.string().nullable().optional(),
   store_business_hours: z.array(
     z.object({ day_of_week: z.number().int().min(0).max(6), opens_at: wallClock, closes_at: wallClock })
   ),
@@ -49,12 +51,17 @@ export type StoreRow = z.output<typeof storeRowSchema>;
 export const STORE_OPERATING_SELECT =
   "id, slug, timezone, status_override, delivery_fee_cents:delivery_fee_cents::text, store_business_hours(day_of_week, opens_at, closes_at)";
 
+/** Pickup address and map link (issue #54); databases without that migration answer to the selects above. */
+export const PICKUP_COLUMNS = ", pickup_address, pickup_maps_url";
+
 export const storeOperatingRowSchema = storeRowSchema.pick({
   id: true,
   slug: true,
   timezone: true,
   status_override: true,
   delivery_fee_cents: true,
+  pickup_address: true,
+  pickup_maps_url: true,
   store_business_hours: true
 });
 export type StoreOperatingRow = z.output<typeof storeOperatingRowSchema>;

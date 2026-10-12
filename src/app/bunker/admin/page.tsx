@@ -103,6 +103,8 @@ export default async function AdminHomePage() {
         settings={{
           deliveryFee: store.deliveryFeeCents === null ? "" : pesos(store.deliveryFeeCents),
           whatsapp: store.whatsappE164,
+          pickupAddress: store.pickupAddress ?? "",
+          pickupMapsUrl: store.pickupMapsUrl ?? "",
           timezone: store.timezone,
           shifts: [...shifts].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt)),
           paymentMethods: PAYMENT_METHODS.map((method) => {

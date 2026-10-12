@@ -30,6 +30,9 @@ export interface StoredPaymentMethod {
 export interface StoreContactFields {
   deliveryFeeCents: bigint | null;
   whatsappE164: string;
+  /** Where pickup orders are collected and its map link; null clears them (issue #54). */
+  pickupAddress: string | null;
+  pickupMapsUrl: string | null;
 }
 
 export interface PromotionFields {

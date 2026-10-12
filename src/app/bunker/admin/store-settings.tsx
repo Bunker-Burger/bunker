@@ -29,6 +29,8 @@ export interface SettingsPaymentMethod {
 export interface StoreSettingsProps {
   deliveryFee: string;
   whatsapp: string;
+  pickupAddress: string;
+  pickupMapsUrl: string;
   timezone: string;
   shifts: SettingsShift[];
   paymentMethods: SettingsPaymentMethod[];
@@ -40,17 +42,22 @@ export interface StoreSettingsProps {
  * What used to be the "Tienda" screen, inside the control panel (issue #54): delivery fee and
  * WhatsApp, opening hours, and payment methods. Same Server Actions and rules as before.
  */
-export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, paymentMethods, mercadoPagoNote }: StoreSettingsProps) {
+export function StoreSettings({ deliveryFee, whatsapp, pickupAddress, pickupMapsUrl, timezone, shifts, paymentMethods, mercadoPagoNote }: StoreSettingsProps) {
   return (
     <div className={styles.settingsColumn}>
-      <CollapsibleCard icon={Truck} summary={deliverySummary(deliveryFee, whatsapp)} title="Delivery y WhatsApp" titleId="delivery-title">
+      <CollapsibleCard icon={Truck} summary={deliverySummary(deliveryFee, whatsapp)} title="Delivery, retiro y WhatsApp" titleId="delivery-title">
         {deliveryFee === "" ? <p className={styles.error}>Cargá el costo de delivery: sin él no se pueden tomar pedidos.</p> : null}
-        <QuickForm action={saveStoreContactAction} className={styles.settingsForm} label="Delivery y WhatsApp">
+        <QuickForm action={saveStoreContactAction} className={styles.settingsForm} label="Delivery, retiro y WhatsApp">
           <label htmlFor="quick-delivery">Costo de delivery</label>
           <PriceField defaultValue={deliveryFee} id="quick-delivery" name="deliveryFee" />
           <label htmlFor="quick-whatsapp">WhatsApp del local</label>
           <input autoComplete="tel" className={styles.optionName} defaultValue={whatsapp} id="quick-whatsapp" inputMode="tel" name="whatsapp" required />
           <small className={styles.hint}>Con código de país, por ejemplo +54 9 381 555-1234. Los pedidos llegan a este número.</small>
+          <label htmlFor="quick-pickup">Dirección para retirar</label>
+          <input className={styles.optionName} defaultValue={pickupAddress} id="quick-pickup" maxLength={200} name="pickupAddress" placeholder="Ej: San Lorenzo 877, Aguilares, Tucumán" />
+          <label htmlFor="quick-maps">Enlace de Google Maps</label>
+          <input className={styles.optionName} defaultValue={pickupMapsUrl} id="quick-maps" inputMode="url" maxLength={500} name="pickupMapsUrl" placeholder="https://maps.app.goo.gl/…" type="url" />
+          <small className={styles.hint}>Se muestran al elegir “Retiro en local” en el pedido, con un botón “Cómo llegar”.</small>
           <QuickSubmit className={styles.smallAction}>Guardar</QuickSubmit>
         </QuickForm>
       </CollapsibleCard>

@@ -223,10 +223,10 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
         "DomingoCerrado"
       ]);
       // Every settings card starts collapsed, with what matters in its summary.
-      for (const title of ["Delivery y WhatsApp", "Horarios", "Medios de pago"]) {
+      for (const title of ["Delivery, retiro y WhatsApp", "Horarios", "Medios de pago"]) {
         expect(screen.getByRole("heading", { name: title }).closest("details")).not.toHaveAttribute("open");
       }
-      expect(screen.getByRole("heading", { name: "Delivery y WhatsApp" }).closest("summary")).toHaveTextContent("+5493815551234");
+      expect(screen.getByRole("heading", { name: "Delivery, retiro y WhatsApp" }).closest("summary")).toHaveTextContent("+5493815551234");
       expect(screen.getByRole("heading", { name: "Medios de pago" }).closest("summary")).toHaveTextContent("Ninguno habilitado");
       const methods = screen.getByRole("list", { name: "Medios de pago" });
       expect(within(methods).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label"))).toEqual([

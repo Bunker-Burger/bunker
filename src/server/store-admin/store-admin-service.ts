@@ -69,7 +69,7 @@ export function saveStoreContact(deps: StoreAdminDependencies, form: FormData) {
     }
     const saved = await deps.repository.setContact(storeId, contact.value);
     if (!saved.ok) return writeFailure(deps, "saveStoreContact", saved.error, { rejected: "La base rechazó la tarifa o el teléfono." });
-    return success("Tarifa y WhatsApp guardados.", undefined);
+    return success("Delivery, retiro y WhatsApp guardados.", undefined);
   });
 }
 

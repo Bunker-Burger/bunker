@@ -132,10 +132,23 @@ describe("store status and contact", () => {
     expect(await setStoreStatus(deps(), form({ statusOverride: "open" }))).toEqual({ ok: false, message: "Configurá la tarifa de delivery antes de habilitar pedidos.", mayHaveWritten: true });
   });
 
+  it("saves where pickup orders are collected, and clears it when emptied (issue #54)", async () => {
+    const maps = "https://maps.app.goo.gl/bunker";
+    expect(
+      await saveStoreContact(deps(), form({ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "  San Lorenzo 877,   Aguilares ", pickupMapsUrl: maps }))
+    ).toMatchObject({ ok: true });
+    expect(repository.stores[0]).toMatchObject({ pickupAddress: "San Lorenzo 877, Aguilares", pickupMapsUrl: maps });
+    expect(await saveStoreContact(deps(), form({ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "", pickupMapsUrl: "" }))).toMatchObject({ ok: true });
+    expect(repository.stores[0]).toMatchObject({ pickupAddress: null, pickupMapsUrl: null });
+  });
+
   it.each([
     [{ deliveryFee: "12,50", whatsapp: "+5493815551234" }, "deliveryFee"],
     [{ deliveryFee: "1200", whatsapp: "3815551234" }, "whatsapp"],
-    [{ deliveryFee: "1200", whatsapp: "+0123" }, "whatsapp"]
+    [{ deliveryFee: "1200", whatsapp: "+0123" }, "whatsapp"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupMapsUrl: "http://maps.google.com/x" }, "pickupMapsUrl"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupMapsUrl: "javascript:alert(1)" }, "pickupMapsUrl"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "x".repeat(201) }, "pickupAddress"]
   ])("rejects %j", async (fields, field) => {
     expect(await saveStoreContact(deps(), form(fields))).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
   });
