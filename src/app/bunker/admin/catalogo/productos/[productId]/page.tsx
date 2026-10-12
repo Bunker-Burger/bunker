@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
@@ -8,6 +7,7 @@ import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
 import { ImageForm } from "../../image-form";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups, formValues } from "../../product-props";
+import { AdminPageBar } from "../../../page-bar";
 
 type Params = Promise<{ productId: string }>;
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
@@ -19,7 +19,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="product-title">
-        <h1 id="product-title">Producto</h1>
+        <AdminPageBar backHref={ADMIN_CATALOG_PATH} backLabel="Volver al catálogo" title="Producto" titleId="product-title" />
         <p className={styles.error} role="alert">No pudimos cargar el catálogo. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -33,10 +33,7 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   return (
     <section className={styles.adminPanel} aria-labelledby="product-title">
-      <Link className={styles.backLink} href={backHref}>
-        ← Volver al catálogo
-      </Link>
-      <h1 id="product-title">{product.name}</h1>
+      <AdminPageBar backHref={backHref} backLabel="Volver al catálogo" title={product.name} titleId="product-title" />
       <p>
         {product.published ? "Publicado" : "Borrador"}
         {category ? ` · ${category.name}` : null}
@@ -58,7 +55,7 @@ export default async function EditProductPage({ params, searchParams }: { params
       </section>
 
       <section aria-labelledby="photo-title" className={styles.tabPanel}>
-        <h2 id="photo-title">Foto</h2>
+        <h2 id="photo-title">Foto del producto</h2>
         <ImageForm
           image={product.imageUrl ? { url: product.imageUrl, alt: product.imageAlt ?? "", focalX: product.imageFocalPoint?.x ?? 50, focalY: product.imageFocalPoint?.y ?? 50 } : null}
           key={product.imageUrl ?? "no-image"}

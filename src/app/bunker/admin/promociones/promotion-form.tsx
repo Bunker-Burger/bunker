@@ -142,6 +142,17 @@ export function previewRows(
   });
 }
 
+/** One line under each mechanic tile, as in the capture. */
+const MECHANIC_HINT: Record<PromotionMechanic["type"], string> = {
+  fixed_price: "Combo armado con precio cerrado",
+  percent_off: "Rebaja porcentual directa",
+  buy_x_get_y: "Llevás más, pagás menos",
+  free_delivery: "Delivery $0 sobre el pedido"
+};
+
+/** Quick tags; the field stays free text. */
+const BADGE_SUGGESTIONS = ["2x1", "30% OFF", "Combo dúo", "Happy hour"];
+
 export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, action = savePromotionAction }: PromotionFormProps) {
   const [type, setType] = useState(defaults.type);
   const [percentOff, setPercentOff] = useState(defaults.percentOff);
@@ -151,6 +162,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   const [channels, setChannels] = useState<FulfilmentMethod[]>(defaults.channels);
   const [items, setItems] = useState(defaults.items);
   const [schedule, setSchedule] = useState(defaults.schedule);
+  const [badge, setBadge] = useState(defaults.badgeText);
 
   const mechanic = mechanicFrom({ type, percentOff, fixedPrice, buyQuantity, getQuantity });
   const validItems = items
@@ -167,21 +179,33 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         <legend>
           Datos de la promoción <small className={styles.requiredTag}>Requerido *</small>
         </legend>
-        <TextField defaultValue={defaults.name} label="Nombre" maxLength={60} name="name" required />
+        <TextField defaultValue={defaults.name} hint="Máx. 60 caracteres." label="Nombre de la promoción" maxLength={60} name="name" required />
         <TextField defaultValue={defaults.slug} hint="Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
         <TextAreaField defaultValue={defaults.description} label="Descripción" maxLength={1000} name="description" rows={2} />
-        <TextField defaultValue={defaults.badgeText} hint="Etiqueta corta en la carta (opcional)." label="Badge" maxLength={24} name="badgeText" />
+        <TextField hint="Etiqueta corta en la carta (opcional)." label="Badge o tag de impacto" maxLength={24} name="badgeText" onChange={(event) => setBadge(event.target.value)} value={badge} />
+        <div aria-label="Tags sugeridos" className={styles.badgeChips} role="group">
+          {BADGE_SUGGESTIONS.map((suggestion) => (
+            <button aria-pressed={badge === suggestion} key={suggestion} onClick={() => setBadge(badge === suggestion ? "" : suggestion)} type="button">
+              {suggestion}
+            </button>
+          ))}
+        </div>
       </fieldset>
 
       <fieldset className={styles.formCard}>
         <legend>Mecánica y valor comercial</legend>
-        <SelectField label="Tipo" name="type" onChange={(event) => setType(event.target.value as PromotionMechanic["type"])} value={type}>
-          {TYPES.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </SelectField>
+        <fieldset className={styles.mechanicTiles}>
+          <legend>Tipo</legend>
+          <div>
+            {TYPES.map((option) => (
+              <label className={option.value === type ? styles.mechanicTileActive : styles.mechanicTile} key={option.value}>
+                <input checked={option.value === type} name="type" onChange={() => setType(option.value)} type="radio" value={option.value} />
+                <strong>{option.label}</strong>
+                <small>{MECHANIC_HINT[option.value]}</small>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {type === "percent_off" ? (
           <TextField inputMode="decimal" label="Descuento (%)" max={100} min={0.01} name="percentOff" onChange={(event) => setPercentOff(event.target.value)} step="0.01" type="number" value={percentOff} />
         ) : null}

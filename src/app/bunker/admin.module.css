@@ -2091,3 +2091,274 @@
 .quickToggle {
   border-left: 0;
 }
+
+/* Form details from the new-product and new-promotion captures. */
+.pageBar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: calc(0.75rem + env(safe-area-inset-top)) 0 0.75rem;
+  background: var(--color-glass);
+  box-shadow: 0 0 0 100vmax var(--color-glass);
+  clip-path: inset(0 -100vmax);
+}
+
+.pageBar h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-primary);
+  font-size: var(--text-headline);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageBack {
+  display: grid;
+  flex: 0 0 auto;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-foreground);
+}
+
+.pageLogo {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+/* A screen with its own bar replaces the panel header. */
+.adminViewport:has([data-page-bar]) .adminHeader {
+  display: none;
+}
+
+.cardTitle {
+  margin: 0;
+}
+
+.dropzone {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  text-align: center;
+}
+
+.dropzone strong {
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.field input[type="file"] {
+  min-height: 7rem;
+  border: 2px dashed var(--color-border-strong);
+  text-align: center;
+}
+
+.prefixed {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.875rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+}
+
+.field .prefixed input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+}
+
+.choicePills,
+.mechanicTiles {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choicePills legend,
+.mechanicTiles legend {
+  margin-bottom: 0.45rem;
+  padding: 0;
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.choicePills > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+}
+
+.choicePill,
+.choicePillActive {
+  position: relative;
+  display: grid;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.choicePillActive {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.choicePill input,
+.choicePillActive input,
+.mechanicTile input,
+.mechanicTileActive input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.choicePill:has(input:focus-visible),
+.choicePillActive:has(input:focus-visible),
+.mechanicTile:has(input:focus-visible),
+.mechanicTileActive:has(input:focus-visible) {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.optionPrice {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+
+.defaults .checkField {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.defaults .checkField span {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.selectionTag {
+  grid-column: 2;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.mechanicTiles > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.mechanicTile,
+.mechanicTileActive {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 0.15rem;
+  min-height: 6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+.mechanicTileActive {
+  border: 2px solid var(--color-primary);
+  background: var(--color-accent-soft);
+}
+
+.mechanicTile strong,
+.mechanicTileActive strong {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+
+.mechanicTile small,
+.mechanicTileActive small {
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.badgeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: -0.4rem;
+}
+
+.badgeChips button {
+  min-height: var(--spacing-tap);
+  padding: 0 0.85rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-foreground);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.badgeChips button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}

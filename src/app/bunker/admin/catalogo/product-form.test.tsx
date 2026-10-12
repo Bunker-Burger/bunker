@@ -27,7 +27,7 @@ describe("ProductForm", () => {
     render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
     expect(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ })).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Categoría" }), "c-drinks");
+    await userEvent.click(screen.getByRole("radio", { name: /Bebidas/ }));
     expect(screen.queryByRole("checkbox", { name: /Ofrecer Tamaño/ })).not.toBeInTheDocument();
     expect(screen.getByText("No hay grupos de opciones para este tipo de producto.")).toBeInTheDocument();
     expect(screen.getByText("Las bebidas se guardan siempre sin alcohol.")).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe("ProductForm", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
     const size = screen.getByRole("group", { name: "Por defecto en Tamaño" });
     expect(within(size).getAllByRole("radio")).toHaveLength(2);
-    expect(within(size).getByRole("radio", { name: "Triple (+$ 1.600)" })).toBeInTheDocument();
+    expect(within(size).getByRole("radio", { name: "Triple +$ 1.600" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
     const extras = screen.getByRole("group", { name: "Por defecto en Extras" });
@@ -58,10 +58,10 @@ describe("ProductForm", () => {
       />
     );
     expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("Smash");
-    expect(screen.getByRole("spinbutton", { name: "Precio" })).toHaveValue(7800);
+    expect(screen.getByRole("spinbutton", { name: "Precio base" })).toHaveValue(7800);
     expect(screen.getByRole("checkbox", { name: /Con stock/ })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Publicado/ })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Triple (+$ 1.600)" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Triple +$ 1.600" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Guardar producto" })).toBeInTheDocument();
   });
 

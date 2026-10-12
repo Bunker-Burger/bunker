@@ -96,12 +96,20 @@ function useFieldA11y(name: string, hint?: string) {
 
 // Hints and errors sit outside the <label> so they describe the field instead of renaming it.
 
-export function TextField({ name, label, hint, ...input }: FieldProps & Omit<ComponentProps<"input">, "name">) {
+export function TextField({ name, label, hint, prefix, ...input }: FieldProps & { prefix?: string } & Omit<ComponentProps<"input">, "name" | "prefix">) {
   const { inputId, invalid, errorId, hintId, describedBy } = useFieldA11y(name, hint);
+  const field = <input aria-describedby={describedBy} aria-invalid={invalid || undefined} id={inputId} name={name} {...input} />;
   return (
     <div className={styles.field}>
       <label htmlFor={inputId}>{label}</label>
-      <input aria-describedby={describedBy} aria-invalid={invalid || undefined} id={inputId} name={name} {...input} />
+      {prefix ? (
+        <span className={styles.prefixed}>
+          <span aria-hidden="true">{prefix}</span>
+          {field}
+        </span>
+      ) : (
+        field
+      )}
       {hint ? <small className={styles.hint} id={hintId}>{hint}</small> : null}
       <FieldError id={errorId} name={name} />
     </div>

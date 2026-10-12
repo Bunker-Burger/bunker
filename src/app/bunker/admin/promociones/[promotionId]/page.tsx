@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { AdminForm } from "../../admin-form";
+import { AdminPageBar } from "../../page-bar";
 import { ADMIN_PROMOTIONS_PATH } from "../../paths";
 import { deletePromotionAction } from "../actions";
 import { PromotionForm } from "../promotion-form";
@@ -17,7 +17,7 @@ export default async function EditPromotionPage({ params, searchParams }: { para
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="promotion-title">
-        <h1 id="promotion-title">Promoción</h1>
+        <AdminPageBar backHref={ADMIN_PROMOTIONS_PATH} backLabel="Volver a promociones" title="Promoción" titleId="promotion-title" />
         <p className={styles.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -28,10 +28,7 @@ export default async function EditPromotionPage({ params, searchParams }: { para
 
   return (
     <section className={styles.adminPanel} aria-labelledby="promotion-title">
-      <Link className={styles.backLink} href={ADMIN_PROMOTIONS_PATH}>
-        ← Volver a promociones
-      </Link>
-      <h1 id="promotion-title">{rule.name}</h1>
+      <AdminPageBar backHref={ADMIN_PROMOTIONS_PATH} backLabel="Volver a promociones" title={rule.name} titleId="promotion-title" />
       {creada === "1" ? (
         <p className={styles.success} role="status">
           Promoción creada.

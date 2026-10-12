@@ -3,7 +3,7 @@
 import { useState } from "react";
 import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
-import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "../admin-form";
+import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
 
 export interface ProductFormCategory {
   id: string;
@@ -80,13 +80,18 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
         <legend>
           Información básica <small className={styles.requiredTag}>Requerido *</small>
         </legend>
-        <SelectField label="Categoría" name="categoryId" onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name === category.tabLabel ? category.name : `${category.tabLabel} · ${category.name}`}
-            </option>
-          ))}
-        </SelectField>
+        <fieldset className={styles.choicePills}>
+          <legend>Categoría</legend>
+          <FieldError id="categoryId-error" name="categoryId" />
+          <div>
+            {categories.map((category) => (
+              <label className={category.id === categoryId ? styles.choicePillActive : styles.choicePill} key={category.id}>
+                <input checked={category.id === categoryId} name="categoryId" onChange={() => setCategoryId(category.id)} type="radio" value={category.id} />
+                {category.name === category.tabLabel ? category.name : `${category.tabLabel} · ${category.name}`}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <TextField defaultValue={product?.name} label="Nombre" maxLength={100} name="name" required />
         <TextField defaultValue={product?.slug} hint="Aparece en el enlace del producto. Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
@@ -95,9 +100,10 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
           defaultValue={product?.price}
           hint="En pesos, sin separador de miles. Mayor a cero para publicar."
           inputMode="decimal"
-          label="Precio"
+          label="Precio base"
           min={0}
           name="price"
+          prefix="$"
           required
           step="0.01"
           type="number"
@@ -126,6 +132,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                 <label htmlFor={`offer-${group.id}`}>
                   Ofrecer <strong>{group.name}</strong>
                 </label>
+                <span className={styles.selectionTag} aria-hidden="true">{group.selectionMode === "single" ? "Selección única" : "Opcional"}</span>
                 <small className={styles.hint} id={`rule-${group.id}`}>{rule(group)}</small>
               </div>
               {isAssigned ? (
@@ -148,9 +155,10 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                       />
                       <span>
                         {option.name}
-                        {option.priceDelta ? ` (+${option.priceDelta})` : null}
                         {option.available ? null : " — sin stock"}
                       </span>
+                      {" "}
+                      <strong className={styles.optionPrice}>{option.priceDelta ? `+${option.priceDelta}` : "$ 0"}</strong>
                     </label>
                   ))}
                 </fieldset>
