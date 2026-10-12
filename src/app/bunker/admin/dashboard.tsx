@@ -38,6 +38,9 @@ export interface DashboardPromotion {
   valueLabel: string;
   /** Applies to an order right now. */
   running: boolean;
+  /** The banner photo (issue #54), cropped where the admin left it; the flame without one. */
+  imageUrl: string | null;
+  imageStyle?: CSSProperties | undefined;
 }
 
 export interface DashboardStore {
@@ -205,6 +208,8 @@ function PromotionRows({ promotions, sortable }: { promotions: DashboardPromotio
               description={promotion.explanation}
               href={promotionEditPath(promotion.id)}
               icon={Flame}
+              imageStyle={promotion.imageStyle}
+              imageUrl={promotion.imageUrl}
               name={promotion.name}
               tag={promotion.badgeText}
             />

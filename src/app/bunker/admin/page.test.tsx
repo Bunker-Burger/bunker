@@ -170,6 +170,15 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     expect(sentProducts.getAll("productId")).toEqual([burgerIds[1], burgerIds[0], ...burgerIds.slice(2)]);
   });
 
+  it("shows a promotion's photo, cropped where it was framed, instead of the flame (issue #54)", async () => {
+    const framed = { ...promotion, imageUrl: "https://cdn.test/catalog/s1/promotions/martes.webp", imageFocalPoint: { x: 30, y: 70 } };
+    const view = (await vi.mocked(getStoreAdminView)()) as unknown as { value: Record<string, unknown> };
+    vi.mocked(getStoreAdminView).mockResolvedValue({ ok: true, value: { ...view.value, catalog: { ...catalog, promotions: [framed] } } } as never);
+    const { container } = render(await AdminHomePage());
+    const photo = container.querySelector('#lista-promociones img[src="https://cdn.test/catalog/s1/promotions/martes.webp"]');
+    expect(photo).toHaveStyle({ objectPosition: "30% 70%" });
+  });
+
   it("says so when the panel cannot be read", async () => {
     vi.mocked(getCatalogAdminView).mockResolvedValue({ ok: false, error: { code: "unavailable" } } as never);
     render(await AdminHomePage());
