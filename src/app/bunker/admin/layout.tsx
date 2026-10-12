@@ -21,11 +21,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <Link className={styles.brand} href="/" aria-label="Búnker Burger, volver al menú">
           {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
           <img alt="" height={40} src="/assets/bunker-logo.webp" width={40} />
-          <strong>BÚNKER BURGER</strong>
+          <span className={styles.brandText}>
+            <strong>BÚNKER BURGER</strong>
+            <small>
+              Panel de control · <span>{role}</span>
+            </small>
+          </span>
         </Link>
         <div className={styles.adminActions}>
-          <span className={styles.role}>{role}</span>
-          <LogoutForm buttonClassName={styles.secondaryAction} />
+          <LogoutForm buttonClassName={styles.logoutAction} icon />
         </div>
       </header>
       <div className={styles.adminContent}>

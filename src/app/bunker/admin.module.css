@@ -1177,3 +1177,624 @@
 .adminPanel > p:not(.eyebrow) {
   margin: 0 0 1rem;
 }
+
+/* Full width like the storefront: the header band runs edge to edge, content lines up below it. */
+.adminHeader {
+  box-shadow: 0 0 0 100vmax var(--color-glass);
+  clip-path: inset(0 -100vmax);
+}
+
+@media (min-width: 64rem) {
+  .adminHeader,
+  .adminContent {
+    max-width: 64rem;
+  }
+}
+
+/* Header of the capture: brand with "Panel de control" under it and a round sign-out button. */
+.brandText {
+  display: grid;
+  line-height: 1;
+}
+
+.brandText small {
+  margin-top: 0.2rem;
+  color: var(--color-secondary);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.logoutAction {
+  display: grid;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.logoutAction:hover {
+  color: var(--color-danger-text);
+}
+
+/* Control panel (admin_configuraci_n_precios). */
+.dashboard {
+  display: grid;
+  gap: 1.5rem;
+  padding-top: 0.25rem;
+}
+
+.statusCard,
+.deliveryCard {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.statusHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.statusTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.statusTitle svg {
+  color: var(--color-primary);
+}
+
+.state_open,
+.state_paused,
+.state_closed {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.state_open {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.state_paused {
+  border: 1px solid var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+}
+
+.state_closed {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.statusReason {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+}
+
+.statusForm,
+.deliveryForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusForm select {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+}
+
+.smallAction {
+  min-height: var(--spacing-tap);
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.smallAction:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.quickError {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--text-body-sm);
+}
+
+.toolbar {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  padding: 0 1rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-field);
+  color: var(--color-muted);
+}
+
+.searchField:focus-within {
+  border-color: var(--color-primary);
+}
+
+.searchField input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  outline: none;
+}
+
+.toolbarActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.addPrimary,
+.addSecondary {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-body-sm);
+  font-weight: 800;
+  letter-spacing: var(--tracking-label);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.addPrimary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.addSecondary {
+  border: 1px solid var(--color-accent-border);
+  background: var(--color-surface-high);
+  color: var(--color-primary);
+}
+
+.prices {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pricesHead {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.pricesHead h2,
+.deliveryCard h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.pricesHead p,
+.deliveryCard p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.segmented {
+  display: inline-flex;
+  width: fit-content;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+}
+
+.segmented button {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.segmented button span {
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.25);
+}
+
+.quickList {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quickRow {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.quickRowOff {
+  border-color: var(--color-danger);
+  background: linear-gradient(var(--color-danger-soft), var(--color-danger-soft)), var(--color-surface);
+}
+
+.quickRowPromo {
+  border-color: var(--color-accent-border);
+  background: linear-gradient(var(--color-accent-soft), var(--color-accent-soft)), var(--color-surface);
+}
+
+.quickInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.quickThumb {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-high);
+  color: var(--color-primary);
+}
+
+.quickThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.quickThumb > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 0.25rem;
+  border-top-left-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quickText {
+  display: grid;
+  min-width: 0;
+}
+
+.quickTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.quickTitle a {
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 600;
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.quickTitle > span {
+  margin-left: 0;
+}
+
+.quickDescription {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.priceInput {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: var(--spacing-tap);
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.priceInput:focus-within {
+  border-color: var(--color-primary);
+}
+
+.priceInput input {
+  width: 5.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  font: inherit;
+  outline: none;
+}
+
+.quickToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  margin-left: auto;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickToggle input {
+  position: relative;
+  width: 2.75rem;
+  height: 1.6rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.quickToggle input::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.quickToggle input:checked {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.quickToggle input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.15rem);
+}
+
+.quickToggle input:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.deliveryForm label {
+  flex-basis: 100%;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+@media (min-width: 40rem) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .toolbarActions {
+    grid-template-columns: auto auto;
+  }
+
+  .addPrimary,
+  .addSecondary {
+    padding: 0 1rem;
+  }
+
+  .pricesHead {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .quickRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .quickControls {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+@media (min-width: 64rem) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+  }
+
+  .dashboardSide {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1;
+    gap: 1rem;
+    align-content: start;
+  }
+
+  .prices {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .deliveryCard {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolbarActions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Phones and tablets: the side cards stay in the capture's order (status, search, list, delivery). */
+@media (max-width: 63.99rem) {
+  .dashboardSide {
+    display: contents;
+  }
+}
+
+@media (min-width: 64rem) {
+  /* Row 1 is as tall as the side column; the delivery card sits right under it. */
+  .dashboard {
+    grid-template-rows: auto 1fr;
+  }
+
+  .deliveryCard {
+    align-self: start;
+  }
+}
+
+/* The brand text is not the old square "BB" mark. */
+.brand > .brandText {
+  display: grid;
+  width: auto;
+  height: auto;
+  place-items: start;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.brand > .brandText strong {
+  white-space: nowrap;
+}
+
+/* Phones: price, save and the switch on one line; the switch's word is read, not shown. */
+@media (max-width: 30rem) {
+  .priceInput input {
+    width: 4.25rem;
+  }
+
+  .quickToggle {
+    padding-left: 0.5rem;
+  }
+
+  .quickToggle > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .quickControls {
+    flex-wrap: nowrap;
+  }
+}

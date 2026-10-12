@@ -6,17 +6,10 @@ import styles from "../../admin.module.css";
 import { AdminForm } from "../admin-form";
 import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "../paths";
 import { deletePromotionAction, movePromotionAction, setPromotionActiveAction } from "./actions";
-import { promotionPhase, type PromotionPhase } from "./promotion-props";
+import { PHASE, promotionPhase } from "./promotion-props";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-const PHASE: Record<PromotionPhase, { label: string; className: "badge" | "badgeMuted" | "badgeWarning" }> = {
-  running: { label: "En vigencia ahora", className: "badge" },
-  waiting_window: { label: "Activa, fuera de franja", className: "badgeMuted" },
-  scheduled: { label: "Programada", className: "badgeMuted" },
-  expired: { label: "Vencida", className: "badgeWarning" },
-  paused: { label: "Pausada", className: "badgeMuted" }
-};
 
 function dateLabel(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat("es-AR", { timeZone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);

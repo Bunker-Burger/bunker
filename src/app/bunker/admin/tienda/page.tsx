@@ -1,4 +1,3 @@
-import type { StoreState, StoreStatus } from "@/domain/store-status";
 import { offeredPaymentOptions, PAYMENT_METHOD_NAME, PUBLIC_PAYMENT_OPTIONS } from "@/domain/public-payment-options";
 import type { PaymentMethodSetting } from "@/domain/types";
 import { formatArs } from "@/lib/money";
@@ -8,33 +7,9 @@ import { AdminForm, CheckboxField, SelectField, TextField } from "../admin-form"
 import { pesos } from "../catalogo/product-props";
 import { addShiftAction, deleteShiftAction, savePaymentMethodAction, saveStoreContactAction, setStoreStatusAction } from "./actions";
 import { PublicStatusText } from "./public-status-text";
+import { OVERRIDE_OPTIONS, REASON, STATE_LABEL, when } from "./status-labels";
 
 const WEEKDAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-
-const STATE_LABEL: Record<StoreState, string> = { open: "Abierto", paused: "Pausado", closed: "Cerrado" };
-
-const REASON: Record<StoreStatus["reason"], string> = {
-  schedule: "según los horarios",
-  manual_open: "abierto manualmente",
-  manual_paused: "pausado manualmente",
-  manual_closed: "cerrado manualmente",
-  delivery_fee_missing: "sin tarifa de delivery: los pedidos están deshabilitados"
-};
-
-const OVERRIDE_OPTIONS = [
-  { value: "auto", label: "Seguir los horarios" },
-  { value: "open", label: "Abierto (ignora los horarios)" },
-  { value: "paused", label: "Pausado" },
-  { value: "closed", label: "Cerrado" }
-] as const;
-
-/** "miércoles 00:00" in the store's time zone. */
-function when(date: Date, timeZone: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("es-AR", { timeZone, weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date).map((part) => [part.type, part.value])
-  );
-  return `${parts.weekday} ${parts.hour}:${parts.minute}`;
-}
 
 export default async function StoreAdminPage() {
   const view = await getStoreAdminView();
