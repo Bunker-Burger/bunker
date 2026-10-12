@@ -275,7 +275,8 @@ describe("prebuilt: el artefacto es un build de preview, sin entorno ni enlaces 
 });
 
 describe("workflows: el código de la PR nunca corre con credenciales (R1 H1)", () => {
-  const read = (name: string) => readFileSync(path.resolve(__dirname, "../../.github/workflows", name), "utf8");
+  // Line endings normalized: a Windows checkout (autocrlf) must not change what the YAML says.
+  const read = (name: string) => readFileSync(path.resolve(__dirname, "../../.github/workflows", name), "utf8").replace(/\r\n/g, "\n");
   const build = read("vercel-preview.yml");
   const deploy = read("vercel-preview-deploy.yml");
 

@@ -123,6 +123,12 @@ Antes de abrir un PR: `pnpm run lint`, `pnpm run typecheck`, `pnpm test` y las p
 - **Sin aprobar todavía:** las páginas muestran "Texto en revisión" y el titular como pendiente hasta que el dueño apruebe por escrito. Aprobaciones, preguntas legales y para el contador, e inventario de activos: `docs/legal/bb-18-lanzamiento.md`.
 - **Menú demo sólo sin Supabase y fuera de Vercel** (`allowsDemoCatalog`): un despliegue que no puede leer la carta muestra "No pudimos cargar la carta", nunca productos ni fotos de ejemplo. El menú demo no tiene fotos (las de Stitch no estaban autorizadas).
 
+## Release y producción (BB-19)
+
+- **Producción automática:** después de cada merge a `main` con CI en verde, `vercel-production.yml` revisa las variables de Production en Vercel (`scripts/ci/vercel-production-guard.mjs`: sólo las que la app lee, con las obligatorias), publica con la CLI y corre el smoke test (`scripts/ci/smoke-production.mjs`). Si algo falla, no publica o deja el run en rojo.
+- **Previews:** ver `docs/runbooks/vercel-preview.md`. **Un solo Supabase**, que es producción: las previews no tienen base.
+- **Variables por entorno, callbacks, rotación, migraciones, backup, observabilidad y rollback:** `docs/runbooks/release.md`. **Manual del dueño:** `docs/manual-operacion.md`.
+
 ## UI
 
 Tailwind CSS 4.3 se carga desde `src/app/globals.css`, que es la única fuente de tokens (colores, tipografía, radios, sombras, `tap` de 44 px y ancho `content` de 1280 px). La paleta por defecto de Tailwind está deshabilitada: usar solo utilidades de tokens (`bg-surface`, `text-primary`, `text-headline-md`, `rounded-lg`, `min-h-tap`…) o `var(--color-*)` en CSS. Oswald (títulos y precios) y Space Grotesk (cuerpo y controles) se cargan con `next/font`.

@@ -1,0 +1,104 @@
+name: Vercel Production
+
+# Production deploy after every merge to main (owner's decision, BB-19; docs/runbooks/release.md).
+# Runs when CI finished green for a push to main: the YAML and the code are main's, never a PR's.
+# Fails closed, without deploying, when the Vercel Production variables are missing, unexpected or
+# malformed; a smoke test checks the live site afterwards. Rollback is manual (runbook §Rollback).
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@60.0.0
+  VERCEL_TELEMETRY_DISABLED: "1"
+  PRODUCTION_URL: https://bunker-burger.vercel.app
+
+jobs:
+  deploy:
+    name: Vercel Production
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    # VERCEL_* secrets live in `main`, an environment only the main branch may use.
+    environment:
+      name: main
+      url: ${{ env.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - id: latest
+        name: Sólo el último commit de main
+        shell: bash
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # A slower run must never replace a newer deploy: the newer commit's run deploys it.
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [ "$head" = "$SHA" ]; then echo "deploy=true" >> "$GITHUB_OUTPUT"; else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "\`$SHA\` ya no es el HEAD de main (\`$head\`): lo despliega el run de ese commit." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.latest.outputs.deploy == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.latest.outputs.deploy == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.latest.outputs.deploy == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.latest.outputs.deploy == 'true'
+        name: Variables de Production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" > "$RUNNER_TEMP/env.json"
+          node scripts/ci/vercel-production-guard.mjs names "$RUNNER_TEMP/env.json"
+          pnpm dlx "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+          node scripts/ci/vercel-production-guard.mjs values .vercel/.env.production.local
+      - if: steps.latest.outputs.deploy == 'true'
+        name: Build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: pnpm dlx "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+      - if: steps.latest.outputs.deploy == 'true'
+        id: deploy
+        name: Deploy (Production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=$(pnpm dlx "$VERCEL_CLI" deploy --prebuilt --prod --meta "githubCommitSha=$SHA" --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Production de \`$SHA\`: $url (alias $PRODUCTION_URL)" >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.latest.outputs.deploy == 'true'
+        name: Smoke test del sitio publicado
+        run: node scripts/ci/smoke-production.mjs "$PRODUCTION_URL"
