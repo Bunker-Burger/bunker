@@ -1,3 +1,4 @@
+export const ADMIN_PANEL_PATH = "/bunker/admin";
 export const ADMIN_STORE_PATH = "/bunker/admin/tienda";
 export const ADMIN_PROMOTIONS_PATH = "/bunker/admin/promociones";
 export const promotionEditPath = (promotionId: string) => `${ADMIN_PROMOTIONS_PATH}/${promotionId}`;
@@ -8,7 +9,6 @@ export const promotionEditPath = (promotionId: string) => `${ADMIN_PROMOTIONS_PA
  * not the array.
  */
 export const ADMIN_SECTIONS = [
-  { href: "/bunker/admin/catalogo", label: "Catálogo" },
   { href: ADMIN_STORE_PATH, label: "Tienda" },
   { href: ADMIN_PROMOTIONS_PATH, label: "Promociones" }
 ] as const;

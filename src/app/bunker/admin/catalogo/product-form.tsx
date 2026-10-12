@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
-import { ADMIN_CATALOG_PATH } from "./form-state";
 import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
 import { PriceField, QuickForm } from "../quick-form";
 import { reorderOptionsAction, saveOptionAction } from "./actions";
@@ -186,9 +185,6 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                 </label>
                 <span className={styles.selectionTag} aria-hidden="true">{group.selectionMode === "single" ? "Selección única" : "Opcional"}</span>
                 <small className={styles.hint} id={`rule-${group.id}`}>{rule(group)}</small>
-                <a className={styles.editPricesLink} href={`${ADMIN_CATALOG_PATH}#opciones-${group.id}`}>
-                  Editar opciones y precios
-                </a>
               </div>
               {isAssigned ? (
                 <fieldset className={styles.defaults}>
@@ -257,6 +253,17 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                         {option.available ? null : <span className={styles.badgeMuted}>Sin stock</span>}
                       </span>
                       <PriceField defaultValue={option.price} form={`option-${option.id}`} label={`Precio extra de ${option.name}`} name="price" />
+                      <label className={styles.variantAvailable}>
+                        <input
+                          aria-label={`${option.name} disponible`}
+                          defaultChecked={option.available}
+                          form={`option-${option.id}`}
+                          name="available"
+                          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                          type="checkbox"
+                          value="true"
+                        />
+                      </label>
                       <button aria-label={`Guardar ${option.name}`} className={styles.smallAction} form={`option-${option.id}`} type="submit">
                         Guardar
                       </button>
@@ -309,7 +316,6 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
             <QuickForm action={saveOptionAction} id={`option-${option.id}`} key={option.id} label={`Precio de ${option.name}`}>
               <input name="groupId" type="hidden" value={group.id} />
               <input name="optionId" type="hidden" value={option.id} />
-              {option.available ? <input name="available" type="hidden" value="true" /> : null}
             </QuickForm>
           ))}
           <QuickForm action={saveOptionAction} id={`new-option-${group.id}`} label={`Nueva opción en ${group.name}`}>

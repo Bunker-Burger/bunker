@@ -3,7 +3,7 @@ import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } 
 import styles from "../../../../admin.module.css";
 import { deleteProductAction } from "../../actions";
 import { AdminForm } from "../../../admin-form";
-import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
+import { ADMIN_PANEL_PATH } from "../../../paths";
 import { ImageForm } from "../../image-form";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups, formValues } from "../../product-props";
@@ -20,7 +20,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="product-title">
-        <AdminPageBar backHref={ADMIN_CATALOG_PATH} backLabel="Volver al catálogo" title="Producto" titleId="product-title" />
+        <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Producto" titleId="product-title" />
         <p className={styles.error} role="alert">No pudimos cargar el catálogo. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -29,12 +29,10 @@ export default async function EditProductPage({ params, searchParams }: { params
   const product = view.value.catalog.products.find((candidate) => candidate.id === productId);
   if (!product) notFound();
   const category = view.value.catalog.categories.find((candidate) => candidate.id === product.categoryId);
-  const tab = category ? tabForType(category.type) : undefined;
-  const backHref = tab ? `${ADMIN_CATALOG_PATH}?tipo=${tab.slug}` : ADMIN_CATALOG_PATH;
 
   return (
     <section className={styles.adminPanel} aria-labelledby="product-title">
-      <AdminPageBar backHref={backHref} backLabel="Volver al catálogo" title={product.name} titleId="product-title" />
+      <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title={product.name} titleId="product-title" />
       <p>
         {product.published ? "Publicado" : "Borrador"}
         {category ? ` · ${category.name}` : null}
@@ -80,7 +78,6 @@ export default async function EditProductPage({ params, searchParams }: { params
           <AdminForm action={deleteProductAction} pendingLabel="Eliminando…" submitLabel={`Eliminar ${product.name}`} submitVariant="danger">
             <input name="productId" type="hidden" value={product.id} />
             <input name="from" type="hidden" value="edit" />
-            {tab ? <input name="tab" type="hidden" value={tab.slug} /> : null}
           </AdminForm>
         </details>
       </section>

@@ -67,14 +67,10 @@ describe("catalog admin actions", () => {
     expect(redirect).toHaveBeenCalledTimes(1);
   });
 
-  it("returns to the product's tab after deleting from its page, ignoring an unsafe tab", async () => {
+  it("returns to the control panel after deleting from its page (the catalog lives there)", async () => {
     vi.mocked(deleteProduct).mockResolvedValue({ ok: true, message: "eliminado", value: undefined });
     const fromEdit = new FormData();
     fromEdit.set("from", "edit");
-    fromEdit.set("tab", "bebidas");
-    await expect(deleteProductAction(IDLE_FORM_STATE, fromEdit)).rejects.toThrow("NEXT_REDIRECT:/bunker/admin/catalogo?tipo=bebidas");
-
-    fromEdit.set("tab", "https://evil.example");
-    await expect(deleteProductAction(IDLE_FORM_STATE, fromEdit)).rejects.toThrow("NEXT_REDIRECT:/bunker/admin/catalogo");
+    await expect(deleteProductAction(IDLE_FORM_STATE, fromEdit)).rejects.toThrow("NEXT_REDIRECT:/bunker/admin");
   });
 });

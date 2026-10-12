@@ -8,7 +8,9 @@ import {
   deleteProductImage,
   moveCategory,
   moveProduct,
+  reorderCategories,
   reorderOptions,
+  reorderProducts,
   saveOption,
   saveProduct,
   saveProductImage,
@@ -487,5 +489,21 @@ describe("options and their price (issue #54)", () => {
       const refused = await reorderOptions(deps(), form({ groupId: SIZE, optionId }));
       expect(refused.ok).toBe(false);
     }
+  });
+});
+
+describe("drag-and-drop order from the panel (issue #54)", () => {
+  it("orders the menu's sections with every category once", async () => {
+    expect((await reorderCategories(deps(), form({ categoryId: [DRINKS, BURGERS, SANDWICHES] }))).ok).toBe(true);
+    const order = [...repository.categories].sort((a, b) => a.sortOrder - b.sortOrder).map((category) => category.id);
+    expect(order).toEqual([DRINKS, BURGERS, SANDWICHES]);
+    expect((await reorderCategories(deps(), form({ categoryId: [DRINKS, BURGERS] }))).ok).toBe(false);
+  });
+
+  it("orders the products of one category and refuses products of another category or store", async () => {
+    expect((await reorderProducts(deps(), form({ categoryId: BURGERS, productId: [OKLAHOMA, SMASH] }))).ok).toBe(true);
+    const burgers = repository.products.filter((product) => product.categoryId === BURGERS && product.storeId === STORE).sort((a, b) => a.sortOrder - b.sortOrder);
+    expect(burgers.map((product) => product.id)).toEqual([OKLAHOMA, SMASH]);
+    expect((await reorderProducts(deps(), form({ categoryId: BURGERS, productId: [OKLAHOMA, FOREIGN] }))).ok).toBe(false);
   });
 });

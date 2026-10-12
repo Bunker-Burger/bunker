@@ -1,18 +1,20 @@
 "use client";
 
-import { CirclePlus, CupSoda, Flame, Hamburger, Popcorn, Sandwich, Search, Store, Tag, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { CirclePlus, CupSoda, Flame, GripVertical, Hamburger, Popcorn, Sandwich, Search, Store, Tag, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type CSSProperties } from "react";
 import { AdminNav } from "./admin-nav";
 import { normalizeSearch } from "@/components/storefront/menu-sections";
 import type { ProductType } from "@/domain/types";
 import styles from "../admin.module.css";
-import { saveProductAction } from "./catalogo/actions";
+import { CategoryTools, useOrderSaver, type DashboardCategory } from "./category-tools";
+import { reorderProductsAction, saveProductAction } from "./catalogo/actions";
 import type { ProductFormValues } from "./catalogo/product-form";
 import { ADMIN_CATALOG_PATH, productEditPath } from "./catalogo/form-state";
 import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "./paths";
 import { setPromotionActiveAction } from "./promociones/actions";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
+import { useDragOrder } from "./use-drag-order";
 import { saveStoreContactAction, setStoreStatusAction } from "./tienda/actions";
 
 export interface DashboardProduct {
@@ -54,14 +56,25 @@ const ICONS: Record<ProductType, LucideIcon> = { burger: Hamburger, sandwich: Sa
  * delivery fee. Every change goes through the admin Server Actions the full screens already use.
  * No metrics: the scope excludes orders, sales and KPIs.
  */
-export function AdminDashboard({ products, promotions, store }: { products: DashboardProduct[]; promotions: DashboardPromotion[]; store: DashboardStore }) {
+export function AdminDashboard({
+  products,
+  promotions,
+  store,
+  categories
+}: {
+  products: DashboardProduct[];
+  promotions: DashboardPromotion[];
+  store: DashboardStore;
+  categories: DashboardCategory[];
+}) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const needle = normalizeSearch(query);
-  const categories = [...new Set(products.map((product) => product.categoryName).filter(Boolean))];
   const shownProducts = products.filter(
-    (product) => (category === null || product.categoryName === category) && normalizeSearch(`${product.form.name} ${product.description}`).includes(needle)
+    (product) => (category === null || product.form.categoryId === category) && normalizeSearch(`${product.form.name} ${product.description}`).includes(needle)
   );
+  // Products are ordered within their category, so dragging is offered with one category and no search.
+  const sortable = category !== null && needle === "";
   const shownPromotions = promotions.filter((promotion) => normalizeSearch(`${promotion.name} ${promotion.explanation}`).includes(needle));
 
   return (
@@ -106,23 +119,14 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
           <input onChange={(event) => setQuery(event.target.value)} placeholder="Buscar producto o promo…" type="search" value={query} />
         </label>
         <div className={styles.toolbarActions}>
-          <Link className={styles.addPrimary} href={`${ADMIN_CATALOG_PATH}/productos/nuevo`}>
+          <Link className={styles.addPrimary} href={`${ADMIN_CATALOG_PATH}/productos/nuevo${category ? `?categoria=${category}` : ""}`}>
             <CirclePlus aria-hidden="true" size={18} /> Producto
           </Link>
           <Link className={styles.addSecondary} href={`${ADMIN_PROMOTIONS_PATH}/nueva`}>
             <CirclePlus aria-hidden="true" size={18} /> Promoción
           </Link>
         </div>
-        <div aria-label="Categorías" className={styles.categoryPills} role="group">
-          <button aria-pressed={category === null} onClick={() => setCategory(null)} type="button">
-            Todas ({products.length})
-          </button>
-          {categories.map((name) => (
-            <button aria-pressed={category === name} key={name} onClick={() => setCategory(name)} type="button">
-              {name}
-            </button>
-          ))}
-        </div>
+        <CategoryTools categories={categories} onSelect={setCategory} selected={category} totalProducts={products.length} />
       </div>
       </div>
 
@@ -142,35 +146,7 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
           </nav>
         </div>
 
-        <ul aria-label="Productos" className={styles.quickList} id="lista-productos">
-            {shownProducts.length === 0 ? <li className={styles.empty}>No hay productos que coincidan.</li> : null}
-            {shownProducts.map((product) => (
-              <li className={product.form.inStock ? styles.quickRow : `${styles.quickRow} ${styles.quickRowOff}`} key={product.form.id}>
-                <QuickRowInfo
-                  badges={[
-                    product.form.featured ? { label: "Destacado", className: "badge" as const } : null,
-                    product.form.inStock ? null : { label: "Sin stock", className: "badgeWarning" as const },
-                    product.form.published ? null : { label: "Borrador", className: "badgeMuted" as const }
-                  ]}
-                  description={product.description}
-                  href={productEditPath(product.form.id)}
-                  icon={ICONS[product.type]}
-                  imageStyle={product.imageStyle}
-                  imageUrl={product.imageUrl}
-                  name={product.form.name}
-                  tag={product.categoryName}
-                />
-                <QuickForm action={saveProductAction} className={styles.quickControls} label={`Precio y stock de ${product.form.name}`}>
-                  <ProductHiddenFields form={product.form} />
-                  <PriceField defaultValue={product.form.price} label={`Precio de ${product.form.name}`} name="price" />
-                  <QuickSubmit ariaLabel={`Guardar precio de ${product.form.name}`} className={styles.smallAction}>
-                    Guardar
-                  </QuickSubmit>
-                  <QuickToggle defaultChecked={product.form.inStock} label={`${product.form.name} disponible`} name="inStock" offLabel="Pausado" onLabel="Disponible" />
-                </QuickForm>
-              </li>
-            ))}
-        </ul>
+        <ProductRows categoryId={category} products={shownProducts} sortable={sortable} />
 
         <h3 className={styles.promosTitle} id="promos-title">
           <Tag aria-hidden="true" size={20} /> Promociones &amp; combos activos
@@ -214,10 +190,64 @@ export function AdminDashboard({ products, promotions, store }: { products: Dash
       </section>
 
       <div className={styles.moreSettings}>
-        <p>Categorías, horarios, WhatsApp y medios de pago:</p>
+        <p>Horarios, WhatsApp, medios de pago y promociones:</p>
         <AdminNav />
       </div>
     </div>
+  );
+}
+
+/** The price-and-stock rows; with one category chosen they can be dragged into the menu's order. */
+function ProductRows({ products, sortable, categoryId }: { products: DashboardProduct[]; sortable: boolean; categoryId: string | null }) {
+  const { saveOrder, message } = useOrderSaver(reorderProductsAction);
+  const rows = products.map((product) => ({ id: product.form.id, product }));
+  const { list, rowProps, handleProps } = useDragOrder(rows, (ids) => saveOrder({ categoryId: categoryId ?? "", productId: ids }));
+  return (
+    <>
+      {message ? (
+        <p className={styles.quickError} role="alert">
+          {message}
+        </p>
+      ) : null}
+      <ul aria-label="Productos" className={styles.quickList} id="lista-productos">
+        {list.length === 0 ? <li className={styles.empty}>No hay productos que coincidan.</li> : null}
+        {list.map(({ product }, index) => (
+          <li
+            className={product.form.inStock ? styles.quickRow : `${styles.quickRow} ${styles.quickRowOff}`}
+            key={product.form.id}
+            {...(sortable ? rowProps(product.form.id, index) : {})}
+          >
+            {sortable ? (
+              <button className={styles.rowGrip} {...handleProps(product.form.id, index, `Mover ${product.form.name}`)}>
+                <GripVertical aria-hidden="true" size={18} />
+              </button>
+            ) : null}
+            <QuickRowInfo
+              badges={[
+                product.form.featured ? { label: "Destacado", className: "badge" as const } : null,
+                product.form.inStock ? null : { label: "Sin stock", className: "badgeWarning" as const },
+                product.form.published ? null : { label: "Borrador", className: "badgeMuted" as const }
+              ]}
+              description={product.description}
+              href={productEditPath(product.form.id)}
+              icon={ICONS[product.type]}
+              imageStyle={product.imageStyle}
+              imageUrl={product.imageUrl}
+              name={product.form.name}
+              tag={product.categoryName}
+            />
+            <QuickForm action={saveProductAction} className={styles.quickControls} label={`Precio y stock de ${product.form.name}`}>
+              <ProductHiddenFields form={product.form} />
+              <PriceField defaultValue={product.form.price} label={`Precio de ${product.form.name}`} name="price" />
+              <QuickSubmit ariaLabel={`Guardar precio de ${product.form.name}`} className={styles.smallAction}>
+                Guardar
+              </QuickSubmit>
+              <QuickToggle defaultChecked={product.form.inStock} label={`${product.form.name} disponible`} name="inStock" offLabel="Pausado" onLabel="Disponible" />
+            </QuickForm>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

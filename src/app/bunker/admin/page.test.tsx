@@ -6,12 +6,19 @@ import { evaluateStoreStatus, toPublicStoreStatus } from "@/domain/store-status"
 import type { Catalog, PromotionRule, StoreSettings } from "@/domain/types";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
-import { saveProductAction } from "./catalogo/actions";
+import { reorderCategoriesAction, reorderProductsAction, saveProductAction } from "./catalogo/actions";
 import AdminHomePage from "./page";
 
 vi.mock("@/server/catalog-admin", () => ({ getCatalogAdminView: vi.fn() }));
 vi.mock("@/server/store-admin", () => ({ getStoreAdminView: vi.fn() }));
-vi.mock("./catalogo/actions", () => ({ saveProductAction: vi.fn(async () => ({ status: "success", message: "Producto guardado." })) }));
+vi.mock("./catalogo/actions", () => ({
+  saveProductAction: vi.fn(async () => ({ status: "success", message: "Producto guardado." })),
+  reorderCategoriesAction: vi.fn(),
+  reorderProductsAction: vi.fn(),
+  createCategoryAction: vi.fn(),
+  updateCategoryAction: vi.fn(),
+  deleteCategoryAction: vi.fn()
+}));
 vi.mock("./tienda/actions", () => ({ setStoreStatusAction: vi.fn(), saveStoreContactAction: vi.fn() }));
 vi.mock("./promociones/actions", () => ({ setPromotionActiveAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/bunker/admin" }));
@@ -85,7 +92,6 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     // The other admin screens stay one click away, plus the public menu.
     const nav = screen.getByRole("navigation", { name: "Administración" });
     expect(within(nav).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
-      ["Catálogo", "/bunker/admin/catalogo"],
       ["Tienda", "/bunker/admin/tienda"],
       ["Promociones", "/bunker/admin/promociones"],
       ["Ver menú", "/"]
@@ -136,6 +142,33 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     const wasOpen = (storeSwitch as HTMLInputElement).checked;
     await user.click(storeSwitch);
     expect(vi.mocked(setStoreStatusAction).mock.calls.at(-1)![1].get("statusOverride")).toBe(wasOpen ? "closed" : "open");
+  });
+
+  it("orders the menu's sections and a category's products from the panel (no catalog screen)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(reorderCategoriesAction).mockResolvedValue({ status: "success", message: "ok" });
+    vi.mocked(reorderProductsAction).mockResolvedValue({ status: "success", message: "ok" });
+    render(await AdminHomePage());
+
+    const pills = screen.getByRole("group", { name: "Categorías de la carta, en su orden" });
+    const first = within(pills).getAllByRole("button", { name: /^Mover / })[0]!;
+    first.focus();
+    await user.keyboard("{ArrowRight}");
+    const sentCategories = vi.mocked(reorderCategoriesAction).mock.calls.at(-1)![1].getAll("categoryId");
+    const sorted = [...fixtureCategories].sort((a, b) => a.sortOrder - b.sortOrder).map((category) => category.id);
+    expect(sentCategories).toEqual([sorted[1], sorted[0], ...sorted.slice(2)]);
+
+    // Choosing a category opens its editor and lets its products be dragged into order.
+    const burgers = fixtureCategories.find((category) => category.type === "burger")!;
+    await user.click(within(pills).getByRole("button", { name: burgers.name }));
+    expect(screen.getByRole("textbox", { name: `Nombre de ${burgers.name}` })).toHaveValue(burgers.name);
+    const handles = within(screen.getByRole("list", { name: "Productos" })).getAllByRole("button", { name: /^Mover / });
+    handles[0]!.focus();
+    await user.keyboard("{ArrowDown}");
+    const sentProducts = vi.mocked(reorderProductsAction).mock.calls.at(-1)![1];
+    expect(sentProducts.get("categoryId")).toBe(burgers.id);
+    const burgerIds = fixtureProducts.filter((product) => product.categoryId === burgers.id).map((product) => product.id);
+    expect(sentProducts.getAll("productId")).toEqual([burgerIds[1], burgerIds[0], ...burgerIds.slice(2)]);
   });
 
   it("says so when the panel cannot be read", async () => {

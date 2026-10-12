@@ -10,6 +10,9 @@ import { AdminDashboard } from "./dashboard";
 import { PHASE, promotionPhase } from "./promociones/promotion-props";
 import { STATE_LABEL, statusReason } from "./tienda/status-labels";
 
+/** `categories.kind` for each product type (the admin's new-category form speaks kinds). */
+const KIND_BY_TYPE: Record<string, string> = { burger: "burger", sandwich: "sandwich", fries: "side", beverage: "drink" };
+
 /** What the promotion is worth, shown where a product shows its price. */
 function valueLabel(mechanic: PromotionMechanic) {
   switch (mechanic.type) {
@@ -54,6 +57,16 @@ export default async function AdminHomePage() {
     <section className={styles.adminPanel} aria-labelledby="admin-title">
       <h1 className="sr-only" id="admin-title">Panel administrativo</h1>
       <AdminDashboard
+        categories={[...catalog.categories]
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((category) => ({
+            id: category.id,
+            name: category.name,
+            slug: category.slug,
+            visible: category.visible,
+            kind: KIND_BY_TYPE[category.type] ?? "burger",
+            productCount: catalog.products.filter((product) => product.categoryId === category.id).length
+          }))}
         products={catalog.products.map((product) => ({
           form: formValues(product),
           type: product.type,

@@ -45,7 +45,7 @@ describe("ProductForm", () => {
 
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
     const extras = screen.getByRole("group", { name: "Por defecto en Extras" });
-    expect(within(extras).getByRole("checkbox", { name: /Bacon/ })).toBeEnabled();
+    expect(within(extras).getByRole("checkbox", { name: "Bacon por defecto" })).toBeEnabled();
     expect(within(extras).getByRole("checkbox", { name: /Pepinillos.*sin stock/ })).toBeDisabled();
   });
 

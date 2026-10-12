@@ -2751,3 +2751,216 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
     grid-column: 3;
   }
 }
+
+/* Categories in the panel: draggable pills, "+ Categoría", edit bar (issue #54). */
+.categoryTools {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.categoryPills {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+}
+
+.categoryPill[data-dragging] {
+  opacity: 0.5;
+  outline: 2px dashed var(--color-primary);
+}
+
+.categoryPill[data-hidden] > button[aria-pressed] {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.categoryPills .categoryPill > button[aria-pressed] {
+  padding-left: 0.25rem;
+}
+
+.categoryPills .pillGrip {
+  display: grid;
+  min-height: 2.5rem;
+  padding: 0 0 0 0.6rem;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.categoryPills .addCategory {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px dashed var(--color-accent-border);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.categoryForm,
+.categoryEdit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.categoryEdit {
+  display: grid;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.categorySelect {
+  min-height: var(--spacing-tap);
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+}
+
+.visibleCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--spacing-tap);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.visibleCheck input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-primary);
+}
+
+.smallAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.dangerSmall {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.categoryDelete {
+  display: block;
+}
+
+.rowGrip {
+  display: grid;
+  width: 2rem;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.quickRow:has(> .rowGrip) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.quickRow:has(> .rowGrip) > .quickControls {
+  grid-column: 1 / -1;
+}
+
+.quickRow[data-dragging] {
+  border-color: var(--color-primary);
+  opacity: 0.6;
+}
+
+@media (min-width: 40rem) {
+  .quickRow:has(> .rowGrip) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .quickRow:has(> .rowGrip) > .quickControls {
+    grid-column: auto;
+  }
+}
+
+/* Pause an option from its row: a small switch next to the save button. */
+.variantRow {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+}
+
+.variantAvailable {
+  display: grid;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  cursor: pointer;
+}
+
+.variantAvailable input {
+  position: relative;
+  width: 2.5rem;
+  height: 1.45rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.variantAvailable input::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.variantAvailable input:checked {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.variantAvailable input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.05rem);
+}
+
+.variantAvailable input:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  }
+}

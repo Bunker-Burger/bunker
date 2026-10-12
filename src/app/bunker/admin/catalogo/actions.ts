@@ -12,7 +12,9 @@ import {
   moveCategory,
   moveProduct,
   saveProduct,
+  reorderCategories,
   reorderOptions,
+  reorderProducts,
   saveOption,
   saveProductImage,
   updateCategory,
@@ -45,6 +47,7 @@ async function perform<T>(operation: UseCase<T>, form: FormData): Promise<{ stat
   }
   updateTag(CATALOG_CACHE_TAG);
   revalidatePath(ADMIN_CATALOG_PATH, "layout");
+  revalidatePath("/bunker/admin");
   return { state: { status: "success", message: outcome.message }, value: outcome.value };
 }
 
@@ -87,9 +90,9 @@ export async function saveProductAction(_previous: AdminFormState, form: FormDat
 /** After deleting, the product page no longer exists: back to the catalog tab. */
 export async function deleteProductAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   const { state } = await perform(deleteProduct, form);
-  const tab = form.get("tab");
   if (state.status === "success" && form.get("from") === "edit") {
-    redirect(`${ADMIN_CATALOG_PATH}${typeof tab === "string" && /^[a-z]+$/.test(tab) ? `?tipo=${tab}` : ""}`);
+    // The catalog lives in the control panel (issue #54).
+    redirect("/bunker/admin");
   }
   return state;
 }
@@ -102,4 +105,14 @@ export async function saveOptionAction(_previous: AdminFormState, form: FormData
 /** New order of a group's options, dragged in the product form (issue #54). */
 export async function reorderOptionsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   return (await perform(reorderOptions, form)).state;
+}
+
+/** New order of the menu's sections, dragged in the panel (issue #54). */
+export async function reorderCategoriesAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderCategories, form)).state;
+}
+
+/** New order of one category's products, dragged in the panel (issue #54). */
+export async function reorderProductsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderProducts, form)).state;
 }

@@ -429,3 +429,45 @@ export function reorderOptions(deps: CatalogAdminDependencies, form: FormData) {
     return success(`Orden de ${group.name} guardado.`, undefined);
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Drag-and-drop order from the control panel (issue #54): the whole list, each id once.
+
+function sameSet(ids: string[], current: string[]) {
+  const known = new Set(current);
+  return ids.length === known.size && new Set(ids).size === ids.length && ids.every((id) => known.has(id));
+}
+
+const listedIds = (form: FormData, field: string) => form.getAll(field).map((value) => (typeof value === "string" ? value.toLowerCase() : ""));
+
+/** The order of the menu's sections, as dragged in the panel. */
+export function reorderCategories(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderCategories", async (storeId) => {
+    const ids = listedIds(form, "categoryId");
+    const categories = await deps.repository.listCategories(storeId);
+    if (!categories.ok) return failure(deps, "reorderCategories", categories.error);
+    if (!sameSet(ids, categories.value.map((category) => category.id))) {
+      return invalid({ categoryId: "Las categorías cambiaron mientras las ordenabas. Recargá la página." });
+    }
+    const saved = await deps.repository.setCategoryOrder(storeId, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderCategories", saved.error);
+    return success("Orden de la carta guardado.", undefined);
+  });
+}
+
+/** The order of the products of one category, as dragged in the panel. */
+export function reorderProducts(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderProducts", async (storeId) => {
+    const categoryId = parseId(form, "categoryId");
+    if (!categoryId.ok) return invalid(categoryId.error);
+    const ids = listedIds(form, "productId");
+    const products = await deps.repository.listProducts(storeId, categoryId.value);
+    if (!products.ok) return failure(deps, "reorderProducts", products.error);
+    if (products.value.length === 0 || !sameSet(ids, products.value.map((product) => product.id))) {
+      return invalid({ productId: "Los productos cambiaron mientras los ordenabas. Recargá la página." });
+    }
+    const saved = await deps.repository.setProductOrder(storeId, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderProducts", saved.error);
+    return success("Orden de productos guardado.", undefined);
+  });
+}

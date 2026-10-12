@@ -1,7 +1,7 @@
 import { Camera } from "lucide-react";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
-import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
+import { ADMIN_PANEL_PATH } from "../../../paths";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups } from "../../product-props";
 import { AdminPageBar } from "../../../page-bar";
@@ -16,7 +16,7 @@ export default async function NewProductPage({ searchParams }: { searchParams: S
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="product-title">
-        <AdminPageBar backHref={ADMIN_CATALOG_PATH} backLabel="Volver al catálogo" title="Nuevo producto" titleId="product-title" />
+        <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Nuevo producto" titleId="product-title" />
         <p className={styles.error} role="alert">No pudimos cargar el catálogo. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -24,12 +24,10 @@ export default async function NewProductPage({ searchParams }: { searchParams: S
 
   const categories = formCategories(view.value.catalog.categories);
   const preselected = categories.find((category) => category.id === categoria);
-  const tab = preselected ? tabForType(preselected.type) : undefined;
-  const backHref = tab ? `${ADMIN_CATALOG_PATH}?tipo=${tab.slug}` : ADMIN_CATALOG_PATH;
 
   return (
     <section className={styles.adminPanel} aria-labelledby="product-title">
-      <AdminPageBar backHref={backHref} backLabel="Volver al catálogo" title="Nuevo producto" titleId="product-title" />
+      <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Nuevo producto" titleId="product-title" />
       {categories.length === 0 ? (
         <p className={styles.empty}>Primero creá una categoría de Hamburguesas, Sándwiches, Papas o Bebidas.</p>
       ) : (
