@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { openScreen } from "./screens";
 
 const WCAG_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -58,14 +59,14 @@ test("a populated drawer and checkout stay accessible and announce cart changes"
   await page.getByRole("button", { name: "Ver Smash Búnker Doble" }).click();
 
   const drawer = page.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
-  await expect(drawer.getByRole("button", { name: "Cerrar personalizador" })).toBeFocused();
+  await expect(drawer.getByRole("button", { name: "Seguir pidiendo" })).toBeFocused();
   const drawerAudit = await new AxeBuilder({ page }).include("[role=dialog]").withTags(WCAG_AA).analyze();
   expect(drawerAudit.violations).toEqual([]);
 
   await drawer.getByRole("button", { name: /Agregar 1 al carrito/ }).click();
   await expect(page.getByRole("status")).toHaveText("Smash Búnker Doble se agregó al carrito.");
 
-  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
+  const checkout = await openScreen(page, "checkout");
   await checkout.getByRole("radio", { name: /Delivery/ }).check();
   const checkoutAudit = await new AxeBuilder({ page }).withTags(WCAG_AA).analyze();
   expect(checkoutAudit.violations).toEqual([]);

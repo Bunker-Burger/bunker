@@ -785,3 +785,333 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/*
+ * Issue #54 — composition of the canonical admin captures (admin_agregar_nuevo_producto,
+ * admin_configuraci_n_precios, admin_crear_promoci_n_ofertas): a single column of cards with
+ * uppercase display titles, pill calls to action, toggles for state, and the shared bottom nav.
+ * Only presentation: forms, fields and actions are unchanged.
+ */
+
+.brand > img {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.brand strong {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.adminViewport {
+  padding: 0 1rem var(--fixed-bottom-clearance);
+}
+
+.adminHeader {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  max-width: 48rem;
+  margin: 0 -1rem;
+  padding: calc(0.75rem + env(safe-area-inset-top)) 1rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-glass);
+  backdrop-filter: blur(16px);
+}
+
+.adminContent {
+  max-width: 48rem;
+}
+
+@media (min-width: 48rem) {
+  .adminHeader {
+    margin: 0 auto;
+    padding-inline: 0;
+  }
+}
+
+.secondaryAction {
+  border-radius: var(--radius-full);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+/* Section tabs: the segmented pill bar of the price capture ("Productos · Promociones"). */
+.adminNav,
+.tabs {
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 1.25rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  scrollbar-width: none;
+}
+
+.tab {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tab[aria-current="page"] {
+  box-shadow: var(--shadow-glow);
+}
+
+/* Page: no outer box; the title is the large amber display heading of the captures. */
+.adminPanel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.adminPanel h1 {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--color-primary);
+  font-size: var(--text-headline-lg);
+  line-height: var(--text-headline-lg--line-height);
+  letter-spacing: var(--tracking-display);
+}
+
+.backLink {
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-foreground);
+}
+
+/* Each section and each group of fields is a card with an uppercase title row. */
+.tabPanel,
+.formCard {
+  gap: 1rem;
+  min-width: 0;
+  margin: 1rem 0 0;
+  padding: 1.25rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.formCard {
+  display: grid;
+  margin: 0;
+}
+
+.adminPanel h2,
+.formCard > legend {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  line-height: var(--text-headline-md--line-height);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.formCard > legend {
+  display: flex;
+  float: left;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+.formCard > legend + * {
+  clear: both;
+}
+
+.requiredTag {
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+}
+
+.adminForm {
+  gap: 1rem;
+}
+
+.field > label {
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-height: 3rem;
+  font-size: var(--text-body-lg);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary);
+  outline: 1px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+/* Main call to action: the wide amber pill at the end of each capture. */
+.primaryAction,
+.primaryLink {
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  box-shadow: var(--shadow-glow);
+}
+
+.adminForm > .primaryAction {
+  justify-self: stretch;
+}
+
+.dangerAction,
+.iconAction {
+  border-radius: var(--radius-full);
+}
+
+/* State and stock: rows with a description and a toggle on the right. */
+.checkGroup {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.checkGroup .checkField {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.15rem 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.checkGroup .checkField > label {
+  grid-column: 1;
+  grid-row: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.checkGroup .checkField > .hint,
+.checkGroup .checkField > .fieldError {
+  grid-column: 1;
+}
+
+.checkGroup .checkField > input {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: relative;
+  width: 3rem;
+  height: 1.75rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+  transition: background-color 0.15s;
+}
+
+.checkGroup .checkField > input::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.checkGroup .checkField > input:checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.checkGroup .checkField > input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.2rem);
+}
+
+.optionGroup {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.defaults {
+  margin-left: 0;
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+/* Product and promotion rows: the cards of the price capture (photo, name, badges, price). */
+.categoryCard {
+  background: var(--color-surface);
+}
+
+.categoryCard h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.productRow,
+.orderList > li,
+.promotionRow {
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.thumb {
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.productInfo > a {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.productInfo > span:nth-of-type(1) {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.disclosure {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.sectionLinks .primaryLink {
+  justify-content: center;
+  width: 100%;
+}

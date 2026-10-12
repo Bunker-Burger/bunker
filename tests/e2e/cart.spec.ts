@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openScreen } from "./screens";
 
 test.describe("BB-06: Persisted Cart and Multi-tab Synchronization", () => {
   test.use({ serviceWorkers: "block" });
@@ -22,6 +23,7 @@ test.describe("BB-06: Persisted Cart and Multi-tab Synchronization", () => {
 
     // Verify Tab 2 immediately loaded the persisted cart
     await expect(page2.getByLabel("Carrito, 1 productos")).toBeVisible();
+    await openScreen(page2, "carrito");
     await expect(page2.locator("#carrito").getByText("Smash Búnker Doble")).toBeVisible();
 
     // Tab 2: Increase quantity in cart
@@ -44,6 +46,7 @@ test.describe("BB-06: Persisted Cart and Multi-tab Synchronization", () => {
 
     // Verify Tab 1 synced the empty cart
     await expect(page1.getByLabel("Carrito, 0 productos")).toBeVisible();
+    await openScreen(page1, "carrito");
     await expect(page1.getByText("Tu carrito está vacío")).toBeVisible();
 
     await page1.close();
@@ -77,6 +80,7 @@ test.describe("BB-06: Persisted Cart and Multi-tab Synchronization", () => {
 
     // Cart shows 2 items
     await expect(page.getByLabel("Carrito, 2 productos")).toBeVisible();
+    await openScreen(page, "carrito");
     await expect(page.locator("#carrito").getByText("Sin pepinillos por favor")).toBeVisible();
 
     // Click Edit button

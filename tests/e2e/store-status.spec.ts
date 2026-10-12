@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openScreen } from "./screens";
 
 /*
  * BB-08: a paused or closed store blocks sending an order from the app, while the menu and the
@@ -30,15 +31,16 @@ const statuses = {
 
 async function fillCompleteOrder(page: Page) {
   await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
-  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
-  await checkout.getByText("Delivery", { exact: true }).click();
+  const checkout = await openScreen(page, "checkout");
+  await checkout.getByText("Delivery a domicilio", { exact: true }).click();
   return checkout;
 }
 
 async function expectNoSendAction(page: Page) {
   await expect(page.locator('a[href*="wa.me"], a[href*="whatsapp"]')).toHaveCount(0);
   const checkout = page.getByRole("region", { name: "Finalizar pedido" });
-  await expect(checkout.getByRole("link")).toHaveCount(0);
+  // Only in-page navigation (the back arrow to the cart) may be a link in the checkout screen.
+  await expect(checkout.locator('a:not([href^="#"])')).toHaveCount(0);
 }
 
 test.describe("with the status answered per state", () => {

@@ -19,9 +19,9 @@ test("a shared link opens the product, survives a reload, and closing returns to
 
   await page.reload();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Cerrar personalizador" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Seguir pidiendo" })).toBeFocused();
 
-  await dialog.getByRole("button", { name: "Cerrar personalizador" }).click();
+  await dialog.getByRole("button", { name: "Seguir pidiendo" }).click();
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("button", { name: "Ver Oklahoma Onion" })).toBeFocused();

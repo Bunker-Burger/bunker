@@ -368,7 +368,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
     expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
-    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    const cartSection = screen.getByRole("region", { name: "Tu pedido" });
     expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
   });
 
@@ -387,7 +387,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     });
 
     expect(screen.getByLabelText("Carrito, 1 productos")).toBeInTheDocument();
-    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    const cartSection = screen.getByRole("region", { name: "Tu pedido" });
     expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
   });
 
@@ -483,11 +483,11 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     localStorage.setItem("bunker-cart", serializeCart([oldPriceLine]));
 
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
-    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    const cartSection = screen.getByRole("region", { name: "Tu pedido" });
     await waitFor(() => {
       expect(within(cartSection).getAllByText("$ 7.800")).toHaveLength(2);
     });
-    expect(await screen.findByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.');
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent('"Smash Búnker Doble" actualizó su precio de $ 5.000 a $ 7.800.'));
   });
 
   it("revalida y poda opciones cuando un grupo de opciones opcional desaparece del catálogo verificado", async () => {
@@ -501,9 +501,9 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     localStorage.setItem("bunker-cart", serializeCart([lineWithCustomGroup]));
 
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
-    const cartSection = screen.getByRole("region", { name: "Carrito" });
+    const cartSection = screen.getByRole("region", { name: "Tu pedido" });
     expect(within(cartSection).getByText("Smash Búnker Doble")).toBeInTheDocument();
-    expect(await screen.findByRole("status")).toHaveTextContent('El grupo de opciones "og-retired-group" de "Smash Búnker Doble" ya no está disponible en la carta y fue retirado.');
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent('El grupo de opciones "og-retired-group" de "Smash Búnker Doble" ya no está disponible en la carta y fue retirado.'));
   });
 
   describe("P1 A: Validación de DTO completo y preservación de líneas ante payloads incompletos", () => {
@@ -560,7 +560,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
       // Línea almacenada permanece intacta en el DOM y en localStorage
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
 
@@ -623,7 +623,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
 
@@ -653,11 +653,11 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       await waitFor(() => {
         expect(within(cartSection).getAllByText("$ 9.800")).toHaveLength(2);
       });
-      expect(await screen.findByRole("status")).toHaveTextContent('"Edición Especial Búnker" actualizó su precio de $ 9.500 a $ 9.800.');
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent('"Edición Especial Búnker" actualizó su precio de $ 9.500 a $ 9.800.'));
     });
   });
 
@@ -701,7 +701,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
       // While fetch is pending, the line MUST NOT be wiped from the cart or localStorage
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
 
@@ -731,7 +731,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
       // Line is preserved intact
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
 
@@ -766,12 +766,12 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       // Line is kept and its price is safely updated to $ 9.900
       await waitFor(() => {
         expect(within(cartSection).getAllByText("$ 9.900")).toHaveLength(2);
       });
-      expect(await screen.findByRole("status")).toHaveTextContent('"Edición Especial Búnker" actualizó su precio de $ 9.500 a $ 9.900.');
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent('"Edición Especial Búnker" actualizó su precio de $ 9.500 a $ 9.900.'));
     });
 
     it("carreras foco / refetch: ediciones realizadas mientras el fetch está en vuelo se conservan intactas", async () => {
@@ -796,7 +796,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
 
       // User increments quantity to 2 while the fetch is still pending
@@ -871,7 +871,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       });
 
       // Request B resolves and applies price $ 9.900
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       await waitFor(() => {
         expect(within(cartSection).getAllByText("$ 9.900")).toHaveLength(2);
       });
@@ -901,7 +901,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       await waitFor(() => {
         expect(screen.queryByTestId("verification-status-note")).not.toBeInTheDocument();
       });
@@ -946,7 +946,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialCatalog={{ products: fallbackProducts, categories: fixtureCategories }} />);
 
       // After client mount and verification, the recovered line must remain intact
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       await waitFor(() => {
         expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       });
@@ -962,7 +962,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} initialCatalog={{ products: fallbackProducts, categories: fixtureCategories }} />);
 
       // Line is preserved in DOM and in storage:
-      const cartSection = screen.getByRole("region", { name: "Carrito" });
+      const cartSection = screen.getByRole("region", { name: "Tu pedido" });
       expect(within(cartSection).getByText("Edición Especial Búnker")).toBeInTheDocument();
       expect(localStorage.getItem("bunker-cart")).toContain("special-edition-burger");
 

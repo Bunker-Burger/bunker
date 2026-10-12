@@ -1,17 +1,21 @@
 "use client";
 
 import {
+  ArrowLeft,
+  ArrowRight,
   Banknote,
-  ChevronRight,
-  CircleDollarSign,
+  Check,
+  Hamburger,
+  Landmark,
   Minus,
+  NotebookPen,
   Plus,
-  Settings2,
-  ShoppingBag,
-  Store,
+  ReceiptText,
+  ScrollText,
+  ShoppingCart,
+  SlidersHorizontal,
   Truck,
-  UtensilsCrossed,
-  X
+  Wallet
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -41,7 +45,6 @@ import { STORE_TIMEZONE } from "@/data/catalog";
 import { ALLERGEN_NOTICE, LEGAL_PAGES, PAYMENT_DATA_RETENTION_NOTICE } from "@/content/legal";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
-import { useActiveSection } from "@/components/shell/use-active-section";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
 import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
 import {
@@ -58,13 +61,23 @@ import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatus
 import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
 import { Menu } from "./menu";
 import { OrderReturnModal } from "./order-return-modal";
+import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
+import { useStoreView, type StoreView } from "./use-store-view";
 import "./storefront.css";
 
-const SECTION_IDS = ["menu", "carrito", "checkout"] as const;
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
 const PENDING_PRODUCT_NOTICE = "Buscando el producto en la carta…";
 const UNVERIFIED_PRODUCT_NOTICE = "No pudimos confirmar ese producto con el local todavía. Reintentamos en un momento.";
 const DEFAULT_PAYMENT_METHODS: readonly PaymentMethodKind[] = ["cash", "bank_transfer", "mercado_pago"];
+
+const VIEW_TITLES: Record<StoreView, string> = { menu: "menu-title", carrito: "cart-title", checkout: "checkout-title" };
+
+/** A stable number for a text, so the same notice keeps its timer and a new one restarts it. */
+function textKey(text: string) {
+  let hash = 7;
+  for (let index = 0; index < text.length; index++) hash = (hash * 31 + text.charCodeAt(index)) | 0;
+  return Math.abs(hash) + 2;
+}
 
 function removeProductParam() {
   const url = new URL(window.location.href);
@@ -203,7 +216,10 @@ export function Storefront({
   // The product in the URL (or being edited). It is only judged against a verified catalog: a
   // server-rendered or fallback copy may be stale, so an unknown slug waits for the fresh read.
   const [activeSlug, setActiveSlug] = useState(initialProductSlug);
-  const [notice, setNotice] = useState("");
+  // One message at a time; every new one gets a new key so a repeated add restarts its timer.
+  const [notice, setNoticeMessage] = useState<ToastMessage | null>(null);
+  const setNotice = (text: string) =>
+    setNoticeMessage((previous) => ({ text, key: (previous?.key ?? 0) + 1, durationMs: TOAST_DURATION_MS }));
   const [revalidationNotice, setRevalidationNotice] = useRevalidationNotice();
   const onInvalidProductRef = useRef(onInvalidProduct);
 
@@ -296,43 +312,56 @@ export function Storefront({
   };
 
   const keyboardOpen = useVirtualKeyboardOpen();
-  const activeSection = useActiveSection(SECTION_IDS);
+  const view = useStoreView();
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
 
+  // A new screen starts at its top with focus on its title, as a page load would.
+  const shownView = useRef<StoreView>(view);
+  useEffect(() => {
+    if (shownView.current === view) return;
+    shownView.current = view;
+    window.scrollTo({ top: 0 });
+    document.getElementById(VIEW_TITLES[view])?.focus({ preventScroll: true });
+  }, [view]);
+
+  const toast: ToastMessage | null = revalidationNotice
+    ? { text: revalidationNotice, key: -textKey(revalidationNotice), durationMs: LONG_TOAST_DURATION_MS }
+    : notice ?? (linkNotice ? { text: linkNotice, key: -1, durationMs: null } : null);
+  const dismissToast = () => {
+    if (revalidationNotice) setRevalidationNotice("");
+    else setNoticeMessage(null);
+  };
+
   const navItems: BottomNavItem[] = [
-    { href: "#menu", label: "Menú", icon: UtensilsCrossed },
-    { href: "#carrito", label: "Carrito", icon: ShoppingBag, badge: itemCount },
-    { href: "#checkout", label: "Checkout", icon: CircleDollarSign },
-    ...(showAdminNav ? [{ href: "/bunker/admin", label: "Admin", icon: Settings2 }] : [])
+    { href: "#menu", label: "Menú", icon: Hamburger },
+    { href: "#carrito", label: "Carrito", icon: ShoppingCart, badge: itemCount, ariaLabel: `Carrito, ${itemCount} productos` },
+    { href: "#checkout", label: "Checkout", icon: ReceiptText },
+    ...(showAdminNav ? [{ href: "/bunker/admin", label: "Admin", icon: SlidersHorizontal }] : [])
   ];
 
   return (
     <AppShell
+      className="storefront"
       header={
-        <SiteHeader>
-          <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
-            <span className="brand-mark" aria-hidden="true">BB</span>
-            <span>BÚNKER BURGER</span>
-          </a>
-          <a className="header-cart" href="#carrito" aria-label={`Carrito, ${itemCount} productos`}>
-            <ShoppingBag size={20} aria-hidden="true" />
-            {itemCount > 0 ? <span>{itemCount}</span> : null}
-          </a>
-        </SiteHeader>
+        view === "menu" ? (
+          <SiteHeader>
+            <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
+              {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
+              <img alt="" className="brand-mark" height={40} src="/assets/bunker-logo.webp" width={40} />
+              <span>BÚNKER BURGER</span>
+            </a>
+          </SiteHeader>
+        ) : null
       }
-      bottomNav={<BottomNav activeHref={`#${activeSection}`} items={navItems} />}
+      bottomNav={<BottomNav activeHref={`#${view}`} items={navItems} />}
     >
-      {revalidationNotice || notice || linkNotice ? (
-        <div className="toast" role="status">{revalidationNotice || notice || linkNotice}</div>
-      ) : null}
+      <StoreToast message={toast} onDismiss={dismissToast} />
       <InstallPrompt engaged={addedThisVisit} />
 
-      <section className="menu-section" id="menu" aria-labelledby="menu-title">
-        <div className="menu-intro">
-          <p>Hechas al fuego. Sin vueltas.</p>
-          <h1 id="menu-title">LA CARTA DEL BÚNKER</h1>
-        </div>
+      <section aria-labelledby="menu-title" className="store-view menu-section" data-active={view === "menu"} id="menu">
+        {/* The captures open straight on the menu; the page title stays for screen readers and links. */}
+        <h1 className="sr-only" id="menu-title" tabIndex={-1}>LA CARTA DEL BÚNKER</h1>
 
         <Menu
           categories={categories}
@@ -342,16 +371,31 @@ export function Storefront({
           promotionFor={(product) => (cardContext ? promotionalPrice(product, promotions, cardContext) : null)}
           unavailable={catalogFallback === "empty" && initialCatalog === null && verifiedGeneration === 0}
         />
+
+        <footer className="store-legal">
+          <p>{ALLERGEN_NOTICE}</p>
+          {/* Quitar `hidden` de este contenedor cuando se quieran mostrar los enlaces. */}
+          <div hidden>
+            <nav aria-label="Textos legales">
+              {LEGAL_PAGES.map((page) => (
+                <a href={page.href} key={page.href}>{page.label}</a>
+              ))}
+            </nav>
+          </div>
+        </footer>
       </section>
 
       <CartSection
+        active={view === "carrito"}
         cart={cart}
         onChange={setCart}
         onEditLine={handleEditLine}
+        products={products}
         subtotal={subtotal}
         storageDegraded={storageDegraded}
       />
       <CheckoutSection
+        active={view === "checkout"}
         cart={cart}
         deliveryFeeCents={deliveryFeeCents}
         fulfilment={fulfilment}
@@ -369,22 +413,14 @@ export function Storefront({
         onCheckoutRedirect={onCheckoutRedirect}
       />
 
-      <footer className="store-legal">
-        <p>{ALLERGEN_NOTICE}</p>
-        {/* Quitar `hidden` de este contenedor cuando se quieran mostrar los enlaces. */}
-        <div hidden>
-          <nav aria-label="Textos legales">
-            {LEGAL_PAGES.map((page) => (
-              <a href={page.href} key={page.href}>{page.label}</a>
-            ))}
-          </nav>
-        </div>
-      </footer>
-
-      {itemCount > 0 && !keyboardOpen ? (
+      {itemCount > 0 && !keyboardOpen && view === "menu" ? (
         <a className="cart-tray" href="#carrito">
-          <span><strong>{itemCount}</strong> {itemCount === 1 ? "producto" : "productos"}</span>
-          <strong>{formatArs(subtotal)} <ChevronRight size={18} aria-hidden="true" /></strong>
+          <span className="cart-tray-icon" aria-hidden="true"><ShoppingCart size={18} /></span>
+          <span className="cart-tray-copy">
+            <small>{itemCount === 1 ? "1 producto" : `${itemCount} productos`}</small>
+            <strong>{formatArs(subtotal)}</strong>
+          </span>
+          <span className="cart-tray-action">Ver pedido <ArrowRight aria-hidden="true" size={16} /></span>
         </a>
       ) : null}
 
@@ -392,6 +428,7 @@ export function Storefront({
         <ProductDrawer
           // A different product (Back/Forward between two) is a new dialog with its own defaults.
           key={`${activeProduct.id}:${editingLine?.id ?? "new"}`}
+          cart={cart}
           initialLine={editingLine}
           onClose={closeProduct}
           onSubmit={(submittedLine) => {
@@ -445,8 +482,10 @@ export function Storefront({
   );
 }
 
-export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
+export function ProductDrawer({ product, initialLine, cart = [], onClose, onSubmit }: {
   product: Product;
+  /** The cart as it is now, for the order summary at the end (the line being edited is replaced). */
+  cart?: readonly CartLine[];
   initialLine?: CartLine | null;
   onClose: () => void;
   onSubmit: (line: CartLine) => void;
@@ -494,30 +533,49 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   const validation = validateOptionSelection(product, selected);
   const isValid = validation.ok;
   const unitPrice = calculateConfiguredUnitPrice(product, selected);
+  // Order summary as in the capture: this product as configured plus what is already in the cart.
+  const otherLines = cart.filter((line) => line.id !== initialLine?.id);
+  const chosen = applicableGroups.flatMap((group) =>
+    group.options.filter((option) => (selected[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => option.name)
+  );
+  const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity;
+  const summaryTotal = otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) + unitPrice * BigInt(quantity);
 
   return (
     <div className="drawer-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div aria-describedby={summaryId} aria-label={`Personalizar ${product.name}`} aria-modal="true" className="product-drawer" ref={dialogRef} role="dialog">
-        <div className="drawer-grabber" />
-        <button aria-label="Cerrar personalizador" className="close-button" onClick={onClose} ref={closeRef} type="button"><X /></button>
-        {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-        {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
+        <div className="drawer-bar">
+          <button className="drawer-back" onClick={onClose} ref={closeRef} type="button">
+            <ArrowLeft aria-hidden="true" size={20} /> Seguir pidiendo
+          </button>
+        </div>
         <div className="drawer-content">
-          <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
-          <p className="sr-only" id={summaryId}>
-            {`Precio ${formatArs(product.priceCents)}. ${product.inStock ? "Disponible." : "Agotado, no se puede agregar al carrito."}`}
-          </p>
-          {!product.inStock ? <p className="drawer-sold-out" aria-hidden="true">Agotado · no se puede agregar al carrito</p> : null}
-          <p>{product.description}</p>
+          <div className="drawer-card drawer-hero">
+            {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
+            {product.imageUrl ? <img alt={product.imageAlt ?? product.name} className="drawer-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
+            <div className="drawer-hero-copy">
+              <div className="drawer-title"><h2>{product.name}</h2><strong>{formatArs(product.priceCents)}</strong></div>
+              <p className="sr-only" id={summaryId}>
+                {`Precio ${formatArs(product.priceCents)}. ${product.inStock ? "Disponible." : "Agotado, no se puede agregar al carrito."}`}
+              </p>
+              {!product.inStock ? <p className="drawer-sold-out" aria-hidden="true">Agotado · no se puede agregar al carrito</p> : null}
+              <p>{product.description}</p>
+            </div>
+          </div>
 
           {applicableGroups.map((group) => {
             const groupSelections = selected[group.id] ?? [];
             const isOptionalSingle = group.selectionMode === "single" && !group.required;
+            // Few exclusive choices read as tiles side by side (size, medallions); the rest as a list.
+            const tiles = group.selectionMode === "single" && group.required && group.options.length <= 3;
             return (
-              <fieldset className="option-group" key={group.id}>
+              <fieldset className="drawer-card option-group" key={group.id}>
                 <legend>
-                  <span>{group.name}</span>
-                  <div className="option-group-meta">
+                  <span className="option-group-title">
+                    <span>{group.name}</span>
+                    <small>{group.selectionMode === "single" ? "Elegí una opción" : `Podés sumar hasta ${group.maxSelections}`}</small>
+                  </span>
+                  <span className="option-group-meta">
                     {isOptionalSingle && groupSelections.length > 0 ? (
                       <button
                         aria-label={`Limpiar ${group.name}`}
@@ -528,47 +586,75 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
                         Limpiar
                       </button>
                     ) : null}
-                    <small>{group.required ? "Requerido" : `Hasta ${group.maxSelections}`}</small>
-                  </div>
+                    <small className="option-badge">{group.required ? "Requerido" : `Hasta ${group.maxSelections}`}</small>
+                  </span>
                 </legend>
-                {group.options.map((option) => {
-                  const checked = groupSelections.includes(option.id);
-                  const inputType = group.selectionMode === "single" ? "radio" : "checkbox";
-                  const isAvailable = option.available;
-                  return (
-                    <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " opacity-50 cursor-not-allowed" : ""}`} key={option.id}>
-                      <span>{option.name}{!isAvailable ? <small> (Sin stock)</small> : null}</span>
-                      {option.priceDeltaCents > 0n ? <strong>+ {formatArs(option.priceDeltaCents)}</strong> : <small>Incluido</small>}
-                      <input
-                        checked={checked}
-                        disabled={!isAvailable}
-                        name={group.id}
-                        onChange={() => {
-                          if (!isAvailable) return;
-                          setSelected((current) =>
-                            toggleOption(current, group.id, option.id, group.maxSelections, isAvailable, group.selectionMode, group.required)
-                          );
-                        }}
-                        onClick={() => {
-                          if (isOptionalSingle && checked && isAvailable) {
+                <div className={tiles ? "option-tiles" : "option-list"}>
+                  {group.options.map((option) => {
+                    const checked = groupSelections.includes(option.id);
+                    const inputType = group.selectionMode === "single" ? "radio" : "checkbox";
+                    const isAvailable = option.available;
+                    return (
+                      <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " unavailable" : ""}`} key={option.id}>
+                        <span>{option.name}{!isAvailable ? <small> (Sin stock)</small> : null}</span>
+                        {option.priceDeltaCents > 0n ? <strong>+ {formatArs(option.priceDeltaCents)}</strong> : <small>Incluido</small>}
+                        <input
+                          checked={checked}
+                          disabled={!isAvailable}
+                          name={group.id}
+                          onChange={() => {
+                            if (!isAvailable) return;
                             setSelected((current) =>
                               toggleOption(current, group.id, option.id, group.maxSelections, isAvailable, group.selectionMode, group.required)
                             );
-                          }
-                        }}
-                        type={inputType}
-                      />
-                    </label>
-                  );
-                })}
+                          }}
+                          onClick={() => {
+                            if (isOptionalSingle && checked && isAvailable) {
+                              setSelected((current) =>
+                                toggleOption(current, group.id, option.id, group.maxSelections, isAvailable, group.selectionMode, group.required)
+                              );
+                            }
+                          }}
+                          type={inputType}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
               </fieldset>
             );
           })}
 
-          <label className="notes-field">
+          <label className="drawer-card notes-field">
             <span>Aclaraciones para la cocina</span>
-            <textarea aria-label="Aclaraciones para la cocina" maxLength={180} onChange={(event) => setNotes(event.target.value)} placeholder="Ej: sin cebolla, salsa aparte…" value={notes} />
+            <small>Aclaraciones (ej: sin pepinillos, aderezos aparte)</small>
+            <textarea aria-label="Aclaraciones para la cocina" maxLength={180} onChange={(event) => setNotes(event.target.value)} placeholder="Escribí acá tus preferencias para el equipo…" value={notes} />
           </label>
+
+          <section aria-labelledby={`${summaryId}-title`} className="drawer-card order-summary">
+            <header>
+              <NotebookPen aria-hidden="true" />
+              <h3 id={`${summaryId}-title`}>Resumen de tu pedido</h3>
+              <span className="option-badge">{summaryCount === 1 ? "1 item" : `${summaryCount} items`}</span>
+            </header>
+            <div className="order-summary-line current">
+              <span>
+                <strong>{quantity > 1 ? `${quantity}× ` : ""}{product.name}</strong>
+                <small>{chosen.length ? chosen.map((name) => `+ ${name}`).join(", ") : "Personalización estándar"}</small>
+              </span>
+              <strong>{formatArs(unitPrice * BigInt(quantity))}</strong>
+            </div>
+            {otherLines.map((line) => (
+              <div className="order-summary-line" key={line.id}>
+                <span>
+                  <strong>{line.quantity > 1 ? `${line.quantity}× ` : ""}{line.productName}</strong>
+                  <small>{line.notes || "En tu carrito"}</small>
+                </span>
+                <strong>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
+              </div>
+            ))}
+            <div className="order-summary-total"><span>Subtotal</span><strong>{formatArs(summaryTotal)}</strong></div>
+          </section>
         </div>
         <div className="drawer-footer">
           <div className="quantity-stepper">
@@ -599,88 +685,97 @@ export function ProductDrawer({ product, initialLine, onClose, onSubmit }: {
   );
 }
 
+/** Top bar of the cart and checkout screens: back arrow, store kicker and the screen title. */
+function ViewBar({ back, backLabel, title, titleId }: { back: string; backLabel: string; title: string; titleId: string }) {
+  return (
+    <div className="view-bar">
+      <a aria-label={backLabel} className="view-back" href={back}>
+        <ArrowLeft aria-hidden="true" size={20} />
+      </a>
+      <div>
+        <span>BÚNKER BURGER</span>
+        <h2 id={titleId} tabIndex={-1}>{title}</h2>
+      </div>
+    </div>
+  );
+}
+
+/** "+ Extra bacon, + Cheddar": the paid choices of a cart line, read from the catalog. */
+function chosenExtras(line: CartLine, products: readonly Product[]) {
+  const product = products.find((candidate) => candidate.id === line.productId);
+  if (!product) return [];
+  return getApplicableOptionGroups(product).flatMap((group) =>
+    group.options.filter((option) => (line.selectedOptions[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => `+ ${option.name}`)
+  );
+}
+
 function CartSection({
+  active,
   cart,
+  products,
   subtotal,
   onChange,
   onEditLine,
   storageDegraded
 }: {
+  active: boolean;
   cart: CartLine[];
+  products: readonly Product[];
   subtotal: bigint;
   onChange: (cart: CartLine[]) => void;
   onEditLine: (line: CartLine) => void;
   storageDegraded?: boolean;
 }) {
+  const count = cart.reduce((total, line) => total + line.quantity, 0);
   return (
-    <section className="order-section" id="carrito" aria-labelledby="cart-title">
-      <div className="section-heading"><div><span>TU PEDIDO</span><h2 id="cart-title">Carrito</h2></div><ShoppingBag /></div>
+    <section aria-labelledby="cart-title" className="store-view order-section" data-active={active} id="carrito">
+      <ViewBar back="#menu" backLabel="Seguir pidiendo" title="Tu pedido" titleId="cart-title" />
       {storageDegraded ? (
-        <div
-          className="storage-degraded-banner"
-          data-testid="storage-degraded-banner"
-          role="status"
-          style={{
-            padding: "0.75rem 1rem",
-            marginBottom: "1rem",
-            borderRadius: "var(--radius-md)",
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border-strong)",
-            fontSize: "var(--text-body-sm)",
-            color: "var(--color-muted)"
-          }}
-        >
-          ⚠️ El almacenamiento local no está disponible en este navegador. Tu carrito se mantendrá durante esta sesión activa.
+        <div className="storage-degraded-banner" data-testid="storage-degraded-banner" role="status">
+          El almacenamiento local no está disponible en este navegador. Tu carrito se mantendrá durante esta sesión activa.
         </div>
       ) : null}
       {cart.length === 0 ? (
-        <div className="empty-state"><ShoppingBag /><h3>Tu carrito está vacío</h3><p>Elegí algo rico de la carta para empezar.</p><a href="#menu">Ver menú</a></div>
+        <div className="empty-state"><ShoppingCart /><h3>Tu carrito está vacío</h3><p>Elegí algo rico de la carta para empezar.</p><a href="#menu">Ver menú</a></div>
       ) : (
-        <div className="cart-panel">
-          {cart.map((line) => (
-            <div className="cart-line" key={line.id}>
-              <div>
-                <strong>{line.productName}</strong>
-                <small>{line.notes || "Personalización estándar"}</small>
-                <span>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</span>
-              </div>
-              <div className="cart-line-actions">
-                <div className="quantity-stepper compact">
-                  <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
-                  <strong>{line.quantity}</strong>
-                  <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+        <div className="drawer-card order-summary cart-panel">
+          <header>
+            <NotebookPen aria-hidden="true" />
+            <h3>Resumen de tu pedido</h3>
+            <span className="option-badge">{count === 1 ? "1 item" : `${count} items`}</span>
+          </header>
+          {cart.map((line) => {
+            const extras = chosenExtras(line, products);
+            return (
+              <div className="cart-line" key={line.id}>
+                <div className="cart-line-copy">
+                  <strong>{line.productName}</strong>
+                  <small>{[extras.join(", "), line.notes].filter(Boolean).join(" · ") || "Personalización estándar"}</small>
                 </div>
-                <button
-                  aria-label={`Editar ${line.productName}`}
-                  className="cart-action-btn"
-                  onClick={() => onEditLine(line)}
-                  type="button"
-                >
-                  Editar
-                </button>
-                <button
-                  aria-label={`Quitar ${line.productName} del carrito`}
-                  className="cart-action-btn text-danger"
-                  onClick={() => onChange(removeCartLine(cart, line.id))}
-                  type="button"
-                >
-                  Eliminar
-                </button>
+                <strong className="cart-line-price">{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
+                <div className="cart-line-actions">
+                  <div className="quantity-stepper compact">
+                    <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
+                    <strong>{line.quantity}</strong>
+                    <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+                  </div>
+                  <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
+                    Editar
+                  </button>
+                  <button aria-label={`Quitar ${line.productName} del carrito`} className="cart-action-btn text-danger" onClick={() => onChange(removeCartLine(cart, line.id))} type="button">
+                    Eliminar
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+          <div className="order-summary-total"><span>Subtotal</span><strong>{formatArs(subtotal)}</strong></div>
+          <a className="primary-action wide" href="#checkout">Continuar al checkout <ArrowRight aria-hidden="true" /></a>
           <div className="cart-actions-row">
-            <button
-              aria-label="Vaciar carrito completo"
-              className="clear-cart-btn"
-              onClick={() => onChange(clearCart())}
-              type="button"
-            >
+            <button aria-label="Vaciar carrito completo" className="clear-cart-btn" onClick={() => onChange(clearCart())} type="button">
               Vaciar carrito
             </button>
           </div>
-          <div className="cart-total"><span>Subtotal</span><strong>{formatArs(subtotal)}</strong></div>
-          <a className="primary-action wide" href="#checkout">Continuar al checkout <ChevronRight /></a>
         </div>
       )}
     </section>
@@ -718,6 +813,7 @@ const CHECKOUT_ERRORS: Record<string, string> = {
 };
 
 function CheckoutSection({
+  active,
   cart,
   products,
   verificationStatus,
@@ -734,6 +830,7 @@ function CheckoutSection({
   timezone,
   onCheckoutRedirect
 }: {
+  active: boolean;
   cart: CartLine[];
   products: readonly Product[];
   verificationStatus: CatalogVerificationStatus;
@@ -930,22 +1027,32 @@ function CheckoutSection({
                 : "Pagar con Mercado Pago";
 
   return (
-    <section className="order-section checkout" id="checkout" aria-labelledby="checkout-title">
-      <div className="section-heading"><div><span>ÚLTIMO PASO</span><h2 id="checkout-title">Finalizar pedido</h2></div><CircleDollarSign /></div>
+    <section aria-labelledby="checkout-title" className="store-view order-section checkout" data-active={active} id="checkout">
+      <ViewBar back="#carrito" backLabel="Volver al carrito" title="Finalizar pedido" titleId="checkout-title" />
       <div className="checkout-layout">
         <div className="checkout-form">
           <fieldset className="choice-group">
-            <legend>Tipo de entrega</legend>
+            <legend><span className="checkout-heading"><Truck aria-hidden="true" /> Tipo de entrega</span><small>Seleccioná una</small></legend>
             <div className="choice-grid">
-              <label className={fulfilment === "delivery" ? "choice-card active" : "choice-card"}><input checked={fulfilment === "delivery"} name="fulfilment" onChange={() => setFulfilment("delivery")} type="radio" /><Truck /><span>Delivery</span><strong>{deliveryFeeCents === null ? "A confirmar" : formatArs(deliveryFeeCents)}</strong></label>
-              <label className={fulfilment === "pickup" ? "choice-card active" : "choice-card"}><input checked={fulfilment === "pickup"} name="fulfilment" onChange={() => setFulfilment("pickup")} type="radio" /><Store /><span>Retiro en local</span><strong>Gratis</strong></label>
+              <label className={fulfilment === "delivery" ? "choice-card active" : "choice-card"}>
+                <input checked={fulfilment === "delivery"} name="fulfilment" onChange={() => setFulfilment("delivery")} type="radio" />
+                <span className="choice-title">Delivery a domicilio</span>
+                <span className="choice-check" aria-hidden="true"><Check size={14} /></span>
+                <span className="choice-cost"><small>Costo</small><strong>{deliveryFeeCents === null ? "A confirmar" : formatArs(deliveryFeeCents)}</strong></span>
+              </label>
+              <label className={fulfilment === "pickup" ? "choice-card active" : "choice-card"}>
+                <input checked={fulfilment === "pickup"} name="fulfilment" onChange={() => setFulfilment("pickup")} type="radio" />
+                <span className="choice-title">Retiro en local</span>
+                <span className="choice-check" aria-hidden="true"><Check size={14} /></span>
+                <span className="choice-cost"><small>Costo</small><strong>$0</strong></span>
+              </label>
             </div>
           </fieldset>
 
           <fieldset className="choice-group payment-group">
-            <legend>Método de pago</legend>
+            <legend><span className="checkout-heading"><Wallet aria-hidden="true" /> Método de pago</span></legend>
             {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note={PUBLIC_PAYMENT_NOTE.mercado_pago} onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
-            {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia" note={PUBLIC_PAYMENT_NOTE.bank_transfer} onChange={() => setPayment("transfer")} value="transfer" /> : null}
+            {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia bancaria" note={PUBLIC_PAYMENT_NOTE.bank_transfer} onChange={() => setPayment("transfer")} value="transfer" /> : null}
             {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note={PUBLIC_PAYMENT_NOTE.cash} onChange={() => setPayment("cash")} value="cash" /> : null}
           </fieldset>
 
@@ -990,19 +1097,29 @@ function CheckoutSection({
           </p>
         </div>
 
-        <div className="summary-card">
-          <h3>Resumen de la orden</h3>
-          {cart.map((line) => <div className="summary-line" key={line.id}><span>{line.quantity}× {line.productName}</span><strong>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong></div>)}
-          <div className="summary-rule" />
-          <div className="summary-line muted"><span>Subtotal</span><strong>{formatArs(totals.subtotalCents)}</strong></div>
-          <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending && !confirmed ? "A confirmar" : totals.deliveryCents === 0n ? "$0" : formatArs(totals.deliveryCents)}</strong></div>
-          {promotion ? (
-            <div className="summary-promotion" data-testid="applied-promotion">
-              <div className="summary-line"><span>Promoción: {promotion.name}</span><strong>-{formatArs(totals.discountCents)}</strong></div>
-              <small>{promotion.explanation}. No se acumula con otras promociones.</small>
+        <div className="summary-block">
+          <h3 className="checkout-heading"><ScrollText aria-hidden="true" /> Resumen de la orden</h3>
+          <div className="summary-card">
+            {cart.map((line) => (
+              <div className="summary-line item" key={line.id}>
+                <span><b className="qty-badge">{line.quantity}x</b> {line.productName}</span>
+                <strong>{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
+              </div>
+            ))}
+            {cart.length > 0 ? <div className="summary-rule" /> : null}
+            <div className="summary-line muted"><span>Subtotal productos</span><strong>{formatArs(totals.subtotalCents)}</strong></div>
+            <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending && !confirmed ? "A confirmar" : totals.deliveryCents === 0n ? "$0" : formatArs(totals.deliveryCents)}</strong></div>
+            {promotion ? (
+              <div className="summary-promotion" data-testid="applied-promotion">
+                <div className="summary-line"><span>Promoción: {promotion.name}</span><strong>-{formatArs(totals.discountCents)}</strong></div>
+                <small>{promotion.explanation}. No se acumula con otras promociones.</small>
+              </div>
+            ) : null}
+            <div className="summary-total" data-testid="checkout-total">
+              <span>{confirmed ? "Total" : "Total estimado"}<small>{confirmed ? "Calculado por el local" : "El local confirma el total final"}</small></span>
+              <strong>{formatArs(totals.totalCents)}</strong>
             </div>
-          ) : null}
-          <div className="summary-total" data-testid="checkout-total"><span>{confirmed ? "Total" : "Total estimado"}</span><strong>{formatArs(totals.totalCents)}</strong></div>
+          </div>
           <p aria-live="polite" className="store-status-note" data-testid="store-status">{describeStoreStatus(storeStatus)}</p>
           {!online ? (
             <p aria-live="polite" className="store-status-note text-warning" data-testid="offline-note">
@@ -1051,7 +1168,7 @@ function CheckoutSection({
               {blockedLabel}
             </button>
           )}
-          <small>
+          <small className="checkout-footnote">
             {payment === "mercado-pago"
               ? "Serás redirigido al sitio seguro de Mercado Pago. Al finalizar el pago volverás a esta página para coordinar la entrega por WhatsApp."
               : confirmed
@@ -1064,12 +1181,15 @@ function CheckoutSection({
   );
 }
 
+const PAYMENT_ICONS: Record<PaymentMethod, typeof Banknote> = { "mercado-pago": Wallet, transfer: Landmark, cash: Banknote };
+
 function PaymentChoice({ checked, label, note, onChange, value }: { checked: boolean; label: string; note: string; onChange: () => void; value: PaymentMethod }) {
+  const Icon = PAYMENT_ICONS[value];
   return (
     <label className={checked ? "payment-choice active" : "payment-choice"}>
       <input checked={checked} name="payment" onChange={onChange} type="radio" value={value} />
-      <Banknote aria-hidden="true" />
       <span><strong>{label}</strong><small>{note}</small></span>
+      <Icon aria-hidden="true" />
     </label>
   );
 }

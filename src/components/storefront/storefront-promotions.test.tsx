@@ -148,7 +148,7 @@ const summary = () => within(screen.getByRole("heading", { name: "Resumen de la 
 const estimatedTotal = () => summary().getByText("Total estimado").nextElementSibling;
 // As rendered text: formatArs separates the sign with a no-break space.
 const displayed = (cents: bigint) => formatArs(cents).replace(/\s/g, " ");
-const subtotal = () => summary().getByText("Subtotal").nextElementSibling;
+const subtotal = () => summary().getByText("Subtotal productos").nextElementSibling;
 
 /** What the server would charge for one Smash Búnker Doble, from the same database. */
 async function authoritativeQuote(fulfilment: "pickup" | "delivery"): Promise<PaymentQuote> {

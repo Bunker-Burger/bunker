@@ -166,7 +166,7 @@ describe("drawer de producto", () => {
     const dialog = screen.getByRole("dialog", { name: "Personalizar Oklahoma Onion" });
     expect(new URL(window.location.href).searchParams.get("producto")).toBe("oklahoma-onion");
     expect(dialog).toHaveAccessibleDescription(/^Precio \$\s?7\.200\. Disponible\.$/);
-    expect(within(dialog).getByRole("button", { name: "Cerrar personalizador" })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Seguir pidiendo" })).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -204,7 +204,7 @@ describe("drawer de producto", () => {
     const user = userEvent.setup();
     renderStorefront({ initialProductSlug: "gaseosa-lata" });
     const dialog = screen.getByRole("dialog", { name: "Personalizar Gaseosa Lata 354ml" });
-    const close = within(dialog).getByRole("button", { name: "Cerrar personalizador" });
+    const close = within(dialog).getByRole("button", { name: "Seguir pidiendo" });
     const submit = within(dialog).getByRole("button", { name: /Agregar 1 al carrito/ });
 
     expect(close).toHaveFocus();
@@ -223,7 +223,7 @@ describe("drawer de producto", () => {
     window.history.replaceState({}, "", "/?producto=limonada-de-la-casa");
     renderStorefront({ initialProductSlug: "limonada-de-la-casa" });
 
-    await user.click(within(screen.getByRole("dialog", { name: "Personalizar Limonada de la Casa" })).getByRole("button", { name: "Cerrar personalizador" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Personalizar Limonada de la Casa" })).getByRole("button", { name: "Seguir pidiendo" }));
 
     expect(screen.getByRole("button", { name: "Ver Limonada de la Casa" })).toHaveFocus();
     expect(window.location.search).toBe("");

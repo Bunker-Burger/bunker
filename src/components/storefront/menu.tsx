@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, Plus, Search, UtensilsCrossed, X } from "lucide-react";
+import { CupSoda, Flame, Hamburger, Plus, Popcorn, Sandwich, Search, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import { useId, useMemo, useRef, useState, type FocusEvent } from "react";
-import type { Category, Product } from "@/domain/types";
+import type { Category, Product, ProductType } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
 import { formatArs } from "@/lib/money";
 import { focalStyle } from "./focal-style";
@@ -14,6 +14,29 @@ function revealInScroller(event: FocusEvent<HTMLElement>) {
 }
 
 const plural = (count: number) => (count === 1 ? "1 producto" : `${count} productos`);
+
+/** Card layouts of the canonical menu capture: large (most ordered), row (burgers, sandwiches), compact (sides, drinks). */
+type CardLayout = "hero" | "row" | "compact";
+const layoutFor = (product: Product, featured: boolean): CardLayout =>
+  featured ? "hero" : product.type === "fries" || product.type === "beverage" ? "compact" : "row";
+
+const PLACEHOLDER_ICONS: Record<ProductType, LucideIcon> = {
+  burger: Hamburger,
+  sandwich: Sandwich,
+  fries: Popcorn,
+  beverage: CupSoda,
+  other: UtensilsCrossed
+};
+
+/** A product without a photo: the approved dark tile with its category's icon, never a grey block. */
+function ProductPlaceholder({ type }: { type: ProductType }) {
+  const Icon = PLACEHOLDER_ICONS[type];
+  return (
+    <span className="product-placeholder" aria-hidden="true">
+      <Icon />
+    </span>
+  );
+}
 
 interface MenuProps {
   products: readonly Product[];
@@ -46,6 +69,7 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
   // A filter whose category disappeared from the catalog falls back to the full menu.
   const activeFilter = filters.some((option) => option.id === filter) ? filter : "all";
   const sections = buildMenuSections(products, sectionCategories, activeFilter, query);
+  const categoryNames = useMemo(() => new Map(sectionCategories.map((category) => [category.id, category.name])), [sectionCategories]);
   const shown = sections.reduce((total, section) => total + section.products.length, 0);
   const published = products.some((product) => product.published);
   const narrowed = activeFilter !== "all" || query.trim() !== "";
@@ -134,17 +158,15 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
 
       {sections.map((section) => (
         <section aria-labelledby={`seccion-${section.id}`} className="menu-category" key={section.id}>
-          <div className="section-heading">
-            <div>
-              <span>{section.eyebrow}</span>
-              <h2 id={`seccion-${section.id}`}>{section.title}</h2>
-            </div>
-            <span>{plural(section.products.length)}</span>
+          <div className="menu-heading">
+            <h2 id={`seccion-${section.id}`}>{section.title}</h2>
+            {section.featured ? null : <p>{section.eyebrow}</p>}
           </div>
           <div className={section.featured ? "product-grid featured-grid" : "product-grid"}>
             {section.products.map((product) => (
               <ProductCard
-                featured={section.featured}
+                categoryName={categoryNames.get(product.categoryId) ?? null}
+                layout={layoutFor(product, section.featured)}
                 key={product.id}
                 onAdd={() => onAdd(product)}
                 onOpen={() => onOpen(product)}
@@ -159,17 +181,19 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
   );
 }
 
-function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
+function ProductCard({ product, promotion, layout, categoryName, onOpen, onAdd }: {
   product: Product;
   promotion: PromotionalPrice | null;
-  featured: boolean;
+  layout: CardLayout;
+  categoryName: string | null;
   onOpen: () => void;
   onAdd: () => void;
 }) {
   const id = useId();
   const priceCents = promotion?.priceCents ?? product.priceCents;
+  const compact = layout === "compact";
   return (
-    <article className={`product-card${featured ? " featured" : ""}${!product.inStock ? " sold-out" : ""}`}>
+    <article className={`product-card ${layout}${!product.inStock ? " sold-out" : ""}`}>
       <button
         aria-describedby={`${id}-label ${id}-price ${id}-stock ${id}-desc`}
         aria-label={`Ver ${product.name}`}
@@ -180,8 +204,8 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
       >
         <div className="product-image-wrap">
           {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
-          {product.featured ? <span className="featured-dot" aria-hidden="true"><Check size={16} /></span> : null}
+          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} style={focalStyle(product)} /> : <ProductPlaceholder type={product.type} />}
+          {product.featured && layout === "hero" ? <span className="featured-dot" aria-hidden="true"><Flame size={18} /></span> : null}
           {!product.inStock ? <span className="sold-out-badge" aria-hidden="true">Agotado</span> : null}
         </div>
         <div className="product-copy">
@@ -195,18 +219,19 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
           </div>
           {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
           <p id={`${id}-desc`}>{product.description}</p>
+          {!compact && categoryName ? <span className="product-meta" aria-hidden="true">{categoryName}</span> : null}
           <span className="sr-only" id={`${id}-label`}>Precio</span>
           <span className="sr-only" id={`${id}-stock`}>{product.inStock ? "Disponible." : "Agotado, no se puede pedir."}</span>
         </div>
       </button>
       <button
         aria-label={product.inStock ? `Agregar ${product.name}` : `${product.name} agotado`}
-        className="add-button"
+        className={compact ? "add-button round" : "add-button"}
         disabled={!product.inStock}
         onClick={onAdd}
         type="button"
       >
-        {product.inStock ? <>Agregar <Plus aria-hidden="true" size={16} /></> : "Sin stock"}
+        {compact ? <Plus aria-hidden="true" size={18} /> : product.inStock ? <>Agregar <Plus aria-hidden="true" size={16} /></> : "Sin stock"}
       </button>
     </article>
   );

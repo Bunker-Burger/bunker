@@ -76,38 +76,36 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     <AdminForm action={action} submitLabel={product ? "Guardar producto" : "Crear producto"}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
 
-      <SelectField label="Categoría" name="categoryId" onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
-        {categories.map((category) => (
-          <option key={category.id} value={category.id}>
-            {category.name === category.tabLabel ? category.name : `${category.tabLabel} · ${category.name}`}
-          </option>
-        ))}
-      </SelectField>
+      <fieldset className={styles.formCard}>
+        <legend>
+          Información básica <small className={styles.requiredTag}>Requerido *</small>
+        </legend>
+        <SelectField label="Categoría" name="categoryId" onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name === category.tabLabel ? category.name : `${category.tabLabel} · ${category.name}`}
+            </option>
+          ))}
+        </SelectField>
 
-      <TextField defaultValue={product?.name} label="Nombre" maxLength={100} name="name" required />
-      <TextField defaultValue={product?.slug} hint="Aparece en el enlace del producto. Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
-      <TextAreaField defaultValue={product?.description} hint="Obligatoria para publicar." label="Descripción" maxLength={1000} name="description" rows={3} />
-      <TextField
-        defaultValue={product?.price}
-        hint="En pesos, sin separador de miles. Mayor a cero para publicar."
-        inputMode="decimal"
-        label="Precio"
-        min={0}
-        name="price"
-        required
-        step="0.01"
-        type="number"
-      />
+        <TextField defaultValue={product?.name} label="Nombre" maxLength={100} name="name" required />
+        <TextField defaultValue={product?.slug} hint="Aparece en el enlace del producto. Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
+        <TextAreaField defaultValue={product?.description} hint="Obligatoria para publicar." label="Descripción" maxLength={1000} name="description" rows={3} />
+        <TextField
+          defaultValue={product?.price}
+          hint="En pesos, sin separador de miles. Mayor a cero para publicar."
+          inputMode="decimal"
+          label="Precio"
+          min={0}
+          name="price"
+          required
+          step="0.01"
+          type="number"
+        />
+      </fieldset>
 
-      <div className={styles.checkGroup}>
-        <CheckboxField defaultChecked={product?.inStock ?? true} label="Con stock" name="inStock" hint="Sin stock se muestra como agotado." />
-        <CheckboxField defaultChecked={product?.featured ?? false} label="Destacado" name="featured" />
-        <CheckboxField defaultChecked={product?.published ?? false} hint="Sólo se publica si la configuración es válida." label="Publicado" name="published" />
-      </div>
-      {type === "beverage" ? <p className={styles.hint}>Las bebidas se guardan siempre sin alcohol.</p> : null}
-
-      <fieldset className={styles.fieldset}>
-        <legend>Opciones</legend>
+      <fieldset className={styles.formCard}>
+        <legend>Opciones de personalización</legend>
         <FieldError id="optionGroups-error" name="optionGroups" />
         {applicable.length === 0 ? <p className={styles.hint}>No hay grupos de opciones para este tipo de producto.</p> : null}
         {applicable.map((group) => {
@@ -160,6 +158,16 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
             </div>
           );
         })}
+      </fieldset>
+
+      <fieldset className={styles.formCard}>
+        <legend>Estado y stock en cocina</legend>
+        <div className={styles.checkGroup}>
+          <CheckboxField defaultChecked={product?.inStock ?? true} label="Con stock" name="inStock" hint="Sin stock se muestra como agotado." />
+          <CheckboxField defaultChecked={product?.featured ?? false} label="Destacado" name="featured" />
+          <CheckboxField defaultChecked={product?.published ?? false} hint="Sólo se publica si la configuración es válida." label="Publicado" name="published" />
+        </div>
+        {type === "beverage" ? <p className={styles.hint}>Las bebidas se guardan siempre sin alcohol.</p> : null}
       </fieldset>
     </AdminForm>
   );

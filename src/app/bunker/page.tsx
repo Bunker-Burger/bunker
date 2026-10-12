@@ -15,7 +15,8 @@ export default async function BunkerLoginPage() {
     <main className={styles.viewport}>
       <section aria-labelledby="admin-login-title" className={styles.card}>
         <Link aria-label="Búnker Burger, volver al menú" className={styles.brand} href="/">
-          <span aria-hidden="true">BB</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
+          <img alt="" height={40} src="/assets/bunker-logo.webp" width={40} />
           <strong>BÚNKER BURGER</strong>
         </Link>
         <div className={styles.heading}>

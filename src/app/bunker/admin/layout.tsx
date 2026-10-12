@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { ADMIN_LOGIN_PATH } from "../paths";
+import { AdminBottomNav } from "./admin-bottom-nav";
 import { AdminNav } from "./admin-nav";
 import { LogoutForm } from "./logout-form";
 import styles from "../admin.module.css";
@@ -18,7 +19,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <main className={styles.adminViewport}>
       <header className={styles.adminHeader}>
         <Link className={styles.brand} href="/" aria-label="Búnker Burger, volver al menú">
-          <span aria-hidden="true">BB</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
+          <img alt="" height={40} src="/assets/bunker-logo.webp" width={40} />
           <strong>BÚNKER BURGER</strong>
         </Link>
         <div className={styles.adminActions}>
@@ -30,6 +32,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <AdminNav />
         {children}
       </div>
+      <AdminBottomNav />
     </main>
   );
 }
