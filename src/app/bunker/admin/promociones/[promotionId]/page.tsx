@@ -4,7 +4,7 @@ import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { AdminForm } from "../../admin-form";
 import { AdminPageBar } from "../../page-bar";
-import { ADMIN_PROMOTIONS_PATH } from "../../paths";
+import { ADMIN_PANEL_PATH } from "../../paths";
 import { deletePromotionAction } from "../actions";
 import { PromotionForm } from "../promotion-form";
 import { formProducts, promotionValues } from "../promotion-props";
@@ -18,7 +18,7 @@ export default async function EditPromotionPage({ params, searchParams }: { para
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="promotion-title">
-        <AdminPageBar backHref={ADMIN_PROMOTIONS_PATH} backLabel="Volver a promociones" title="Promoción" titleId="promotion-title" />
+        <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Promoción" titleId="promotion-title" />
         <p className={styles.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -29,7 +29,7 @@ export default async function EditPromotionPage({ params, searchParams }: { para
 
   return (
     <section className={styles.adminPanel} aria-labelledby="promotion-title">
-      <AdminPageBar backHref={ADMIN_PROMOTIONS_PATH} backLabel="Volver a promociones" title={rule.name} titleId="promotion-title" />
+      <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title={rule.name} titleId="promotion-title" />
       {creada === "1" && foto === "0" ? (
         <p className={styles.error} role="alert">
           Promoción creada, pero la foto no se pudo subir. Probá de nuevo desde “Foto de la promo”.

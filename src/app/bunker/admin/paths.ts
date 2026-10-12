@@ -9,6 +9,5 @@ export const promotionEditPath = (promotionId: string) => `${ADMIN_PROMOTIONS_PA
  * not the array.
  */
 export const ADMIN_SECTIONS = [
-  { href: ADMIN_STORE_PATH, label: "Tienda" },
-  { href: ADMIN_PROMOTIONS_PATH, label: "Promociones" }
+  { href: ADMIN_STORE_PATH, label: "Tienda" }
 ] as const;

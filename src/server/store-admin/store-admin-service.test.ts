@@ -8,6 +8,7 @@ import {
   deletePromotion,
   deleteShift,
   movePromotion,
+  reorderPromotions,
   savePaymentMethod,
   savePromotion,
   saveStoreContact,
@@ -333,6 +334,20 @@ describe("promotions", () => {
       });
       expect(repository.writes).toEqual(["movePromotion:P3=20,P2=10"]);
       expect(repository.promotions.map((p) => [p.name, p.priority])).toEqual([["P1", 30], ["P2", 10], ["P3", 20]]);
+    });
+
+    it("puts the promotions in the dragged order, one neighbour swap at a time (issue #54)", async () => {
+      const id = (n: number) => `0d000000-0000-4000-8000-00000000000${n}`;
+      expect(await reorderPromotions(deps(), form({ promotionId: [id(3), id(1), id(2)] }))).toMatchObject({ ok: true, message: "Orden de promociones guardado." });
+      const byPriority = [...repository.promotions].sort((a, b) => b.priority - a.priority).map((p) => p.name);
+      expect(byPriority).toEqual(["P3", "P1", "P2"]);
+      expect(repository.writes).toHaveLength(2);
+    });
+
+    it("refuses an order that does not list exactly the store's promotions", async () => {
+      const id = (n: number) => `0d000000-0000-4000-8000-00000000000${n}`;
+      expect(await reorderPromotions(deps(), form({ promotionId: [id(1), id(2)] }))).toMatchObject({ ok: false, fieldErrors: { promotionId: expect.stringContaining("Recargá") } });
+      expect(repository.writes).toEqual([]);
     });
 
     it.each([

@@ -80,5 +80,7 @@ export interface StoreAdminRepository {
   setPromotionActive(storeId: string, promotionId: string, active: boolean): Promise<AdminResult<void>>;
   /** Swaps priorities with the neighbour in one transaction; `moved: false` at the end of the list. */
   movePromotion(storeId: string, promotionId: string, direction: "up" | "down"): Promise<AdminResult<{ moved: boolean }>>;
+  /** Ids of the store's promotions, highest priority (tried first) first. */
+  listPromotionOrder(storeId: string): Promise<AdminResult<string[]>>;
   deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>>;
 }

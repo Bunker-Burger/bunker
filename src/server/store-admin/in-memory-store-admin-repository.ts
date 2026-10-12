@@ -148,6 +148,14 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return ok({ moved: true });
   }
 
+  async listPromotionOrder(storeId: string) {
+    const ordered = this.promotions
+      .filter((promotion) => promotion.storeId === storeId)
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
+      .map((promotion) => promotion.id);
+    return this.fail("listPromotionOrder") ?? ok(ordered);
+  }
+
   async deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>> {
     const failed = this.fail("deletePromotion");
     if (failed) return failed;

@@ -20,7 +20,7 @@ vi.mock("./catalogo/actions", () => ({
   deleteCategoryAction: vi.fn()
 }));
 vi.mock("./tienda/actions", () => ({ setStoreStatusAction: vi.fn(), saveStoreContactAction: vi.fn() }));
-vi.mock("./promociones/actions", () => ({ setPromotionActiveAction: vi.fn() }));
+vi.mock("./promociones/actions", () => ({ setPromotionActiveAction: vi.fn(), reorderPromotionsAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/bunker/admin" }));
 
 const store = {
@@ -93,7 +93,6 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     const nav = screen.getByRole("navigation", { name: "Administración" });
     expect(within(nav).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
       ["Tienda", "/bunker/admin/tienda"],
-      ["Promociones", "/bunker/admin/promociones"],
       ["Ver menú", "/"]
     ]);
   });

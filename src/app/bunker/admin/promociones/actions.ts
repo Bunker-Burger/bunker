@@ -2,10 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { catalogAdminDependencies, deletePromotionImage, savePromotionImage } from "@/server/catalog-admin";
-import { deletePromotion, movePromotion, savePromotion, setPromotionActive, storeAdminDependencies } from "@/server/store-admin";
+import { deletePromotion, movePromotion, reorderPromotions, savePromotion, setPromotionActive, storeAdminDependencies } from "@/server/store-admin";
 import { performAdminAction } from "../admin-action";
 import type { AdminFormState } from "../form-state";
-import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "../paths";
+import { ADMIN_PANEL_PATH, promotionEditPath } from "../paths";
 
 /* Authorization and validation live in the use cases (gate + RLS); nothing here trusts the form. */
 
@@ -15,7 +15,7 @@ import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "../paths";
  */
 export async function savePromotionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   const isNew = !form.get("promotionId");
-  const { state, value } = await performAdminAction(storeAdminDependencies, savePromotion, form, ADMIN_PROMOTIONS_PATH);
+  const { state, value } = await performAdminAction(storeAdminDependencies, savePromotion, form, ADMIN_PANEL_PATH);
   if (state.status !== "success" || !value) return state;
   const photo = await savePhoto(value.promotionId, form);
   if (isNew) redirect(`${promotionEditPath(value.promotionId)}?creada=1${photo?.status === "error" ? "&foto=0" : ""}`);
@@ -31,26 +31,31 @@ async function savePhoto(promotionId: string, form: FormData): Promise<AdminForm
   const data = new FormData();
   data.set("promotionId", promotionId);
   if (form.get("removeImage") === "true" && !hasFile) {
-    return (await performAdminAction(catalogAdminDependencies, deletePromotionImage, data, ADMIN_PROMOTIONS_PATH)).state;
+    return (await performAdminAction(catalogAdminDependencies, deletePromotionImage, data, ADMIN_PANEL_PATH)).state;
   }
   if (!hasFile && form.get("photoMoved") !== "true") return null;
   if (hasFile) data.set("image", file);
   for (const field of ["focalX", "focalY"]) data.set(field, String(form.get(field) ?? "50"));
-  return (await performAdminAction(catalogAdminDependencies, savePromotionImage, data, ADMIN_PROMOTIONS_PATH)).state;
+  return (await performAdminAction(catalogAdminDependencies, savePromotionImage, data, ADMIN_PANEL_PATH)).state;
 }
 
 export async function setPromotionActiveAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await performAdminAction(storeAdminDependencies, setPromotionActive, form, ADMIN_PROMOTIONS_PATH)).state;
+  return (await performAdminAction(storeAdminDependencies, setPromotionActive, form, ADMIN_PANEL_PATH)).state;
 }
 
 export async function movePromotionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await performAdminAction(storeAdminDependencies, movePromotion, form, ADMIN_PROMOTIONS_PATH)).state;
+  return (await performAdminAction(storeAdminDependencies, movePromotion, form, ADMIN_PANEL_PATH)).state;
 }
 
-/** Deleting from the edit page goes back to the list (the page no longer exists). */
+/** Drag and drop in the panel: the first one is tried first (issue #54). */
+export async function reorderPromotionsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await performAdminAction(storeAdminDependencies, reorderPromotions, form, ADMIN_PANEL_PATH)).state;
+}
+
+/** Deleting from the edit page goes back to the panel (the page no longer exists). */
 export async function deletePromotionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  const { state } = await performAdminAction(storeAdminDependencies, deletePromotion, form, ADMIN_PROMOTIONS_PATH);
-  if (state.status === "success" && form.get("from") === "edit") redirect(ADMIN_PROMOTIONS_PATH);
+  const { state } = await performAdminAction(storeAdminDependencies, deletePromotion, form, ADMIN_PANEL_PATH);
+  if (state.status === "success" && form.get("from") === "edit") redirect(ADMIN_PANEL_PATH);
   return state;
 }
 

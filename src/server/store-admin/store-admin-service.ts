@@ -170,6 +170,31 @@ export function movePromotion(deps: StoreAdminDependencies, form: FormData) {
   });
 }
 
+/**
+ * Puts the promotions in the dragged order (first = tried first, issue #54). Priorities only
+ * change by swapping neighbours in the database, so the new order is reached one swap at a time.
+ */
+export function reorderPromotions(deps: StoreAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderPromotions", async (storeId) => {
+    const wanted = form.getAll("promotionId").map((value) => (typeof value === "string" ? value.toLowerCase() : ""));
+    const listed = await deps.repository.listPromotionOrder(storeId);
+    if (!listed.ok) return writeFailure(deps, "reorderPromotions", listed.error);
+    const current = [...listed.value];
+    const known = new Set(current);
+    if (wanted.length !== known.size || new Set(wanted).size !== wanted.length || !wanted.every((id) => known.has(id))) {
+      return invalid({ promotionId: "Las promociones cambiaron mientras las ordenabas. Recargá la página." });
+    }
+    for (const [target, id] of wanted.entries()) {
+      for (let at = current.indexOf(id); at > target; at -= 1) {
+        const moved = await deps.repository.movePromotion(storeId, id, "up");
+        if (!moved.ok) return writeFailure(deps, "reorderPromotions", moved.error, { rejected: "No hay más prioridades disponibles: eliminá promociones viejas." });
+        [current[at - 1], current[at]] = [current[at]!, current[at - 1]!];
+      }
+    }
+    return success("Orden de promociones guardado.", undefined);
+  });
+}
+
 export function deletePromotion(deps: StoreAdminDependencies, form: FormData) {
   return asAdmin(deps, "deletePromotion", async (storeId) => {
     const id = parseId(form, "promotionId");

@@ -201,6 +201,16 @@ export function createSupabaseStoreAdminRepository(client: SupabaseClient<Databa
       return typeof moved.value === "boolean" ? ok({ moved: moved.value }) : catalogError("invalid_data", "admin_move_promotion: no result");
     },
 
+    async listPromotionOrder(storeId) {
+      const found = await rows(
+        "promotion_rules.select",
+        "promotion_rules",
+        z.object({ id: z.string() }),
+        q(client.from("promotion_rules").select("id").eq("store_id", storeId).order("priority", { ascending: false }).order("id"))
+      );
+      return found.ok ? ok(found.value.map((row) => row.id)) : found;
+    },
+
     deletePromotion(storeId, promotionId) {
       return writeOne("promotion_rules.delete", q(client.from("promotion_rules").delete().eq("store_id", storeId).eq("id", promotionId).select("id")));
     }
