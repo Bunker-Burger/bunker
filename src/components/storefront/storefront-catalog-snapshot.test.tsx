@@ -33,8 +33,6 @@ const productReads = () => vi.mocked(fetch).mock.calls.filter(([input]) => Strin
 
 const menu = () => within(document.getElementById("menu") as HTMLElement);
 const sectionTitles = () => menu().queryAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-const chipLabels = () =>
-  within(screen.getByRole("group", { name: "Secciones de la carta" })).getAllByRole("button").map((chip) => chip.textContent);
 const renderStorefront = (props: Partial<Parameters<typeof Storefront>[0]> = {}) =>
   render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} {...props} />);
 
@@ -240,26 +238,22 @@ describe("categorías en vivo (P2 C)", () => {
     await refetchCatalog();
 
     await waitFor(() => expect(sectionTitles()).toEqual(["De la casa", "Clásicas", "Veggie"]));
-    expect(chipLabels()).toEqual(["Todo", "De la casa", "Clásicas", "Veggie"]);
     expect(within(menu().getByRole("region", { name: "De la casa" })).getByRole("heading", { level: 3 })).toHaveTextContent("Especial");
     expect(within(menu().getByRole("region", { name: "Veggie" })).getByRole("heading", { level: 3 })).toHaveTextContent("Veggie Búnker");
   });
 
-  it("una categoría que el local oculta desaparece con sus productos, y su filtro vuelve a Todo", async () => {
-    const user = userEvent.setup();
+  it("una categoría que el local oculta desaparece con sus productos", async () => {
     answerProducts = serve(initial);
     renderStorefront({ initialCatalog: initial });
     await waitFor(() => expect(productReads()).toBe(1));
-    await user.click(screen.getByRole("button", { name: "Especiales" }));
-    expect(sectionTitles()).toEqual(["Especiales"]);
+    expect(sectionTitles()).toEqual(["Clásicas", "Especiales"]);
 
     // The server stops publishing a hidden category and its products (loadPublicCatalog).
     answerProducts = serve({ products: [products[0]!], categories: [burgerCategory("c-clasicas", "Clásicas", 10)] });
     await refetchCatalog();
 
     await waitFor(() => expect(sectionTitles()).toEqual(["Clásicas"]));
-    expect(chipLabels()).toEqual(["Todo", "Clásicas"]);
-    expect(screen.getByRole("button", { name: "Todo" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("heading", { level: 3, name: "Especial" })).toBeNull();
   });
 
   it("un producto cuya categoría no viene en el snapshot no se mueve a otra del mismo tipo", async () => {

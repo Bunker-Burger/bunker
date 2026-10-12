@@ -239,7 +239,6 @@ describe("checkout link freshness in the storefront", () => {
     // The cart and the menu keep working while the checkout is blocked.
     await user.click(screen.getByRole("button", { name: "Agregar uno de Smash Búnker Doble" }));
     expect(screen.getByLabelText("Carrito, 2 productos")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Papas" }));
     await user.click(screen.getByRole("button", { name: "Agregar Papas Búnker" }));
     expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
     expect(watcher.seen).toBe(false);

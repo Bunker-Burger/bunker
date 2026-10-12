@@ -31,13 +31,14 @@ describe("Storefront", () => {
     vi.unstubAllGlobals();
   });
 
-  it("filters the visible menu and keeps sold-out products visible", async () => {
+  it("searches the menu from the header and keeps sold-out products visible", async () => {
     const user = userEvent.setup();
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
 
-    await user.click(screen.getByRole("button", { name: "Papas" }));
+    await user.click(screen.getByRole("button", { name: "Buscar en la carta" }));
+    await user.type(screen.getByRole("searchbox", { name: "Buscar en la carta" }), "cebolla");
 
-    expect(screen.getByRole("heading", { name: "Papas Búnker" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Aros de Cebolla" })).toBeInTheDocument();
     expect(screen.getByText("Agotado")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Smash Búnker Doble" })).not.toBeInTheDocument();
   });

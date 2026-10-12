@@ -12,10 +12,12 @@ import {
   Plus,
   ReceiptText,
   ScrollText,
+  Search,
   ShoppingCart,
   SlidersHorizontal,
   Truck,
-  Wallet
+  Wallet,
+  X
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -313,6 +315,22 @@ export function Storefront({
 
   const keyboardOpen = useVirtualKeyboardOpen();
   const view = useStoreView();
+
+  // Search lives in the header (owner's call on issue #54): a magnifier that opens a field there.
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const searchWasOpen = useRef(false);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+    else if (searchWasOpen.current) searchButtonRef.current?.focus();
+    searchWasOpen.current = searchOpen;
+  }, [searchOpen]);
+  const closeSearch = () => {
+    setQuery("");
+    setSearchOpen(false);
+  };
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
 
@@ -346,11 +364,39 @@ export function Storefront({
       header={
         view === "menu" ? (
           <SiteHeader>
-            <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
-              {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
-              <img alt="" className="brand-mark" height={40} src="/assets/bunker-logo.webp" width={40} />
-              <span>BÚNKER BURGER</span>
-            </a>
+            {searchOpen ? (
+              <div className="header-search" role="search">
+                <Search aria-hidden="true" size={18} />
+                <label className="sr-only" htmlFor="menu-search">Buscar en la carta</label>
+                <input
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  id="menu-search"
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") closeSearch();
+                  }}
+                  placeholder="Buscar hamburguesas, papas, bebidas…"
+                  ref={searchInputRef}
+                  type="search"
+                  value={query}
+                />
+                <button aria-label="Cerrar búsqueda" className="header-icon" onClick={closeSearch} type="button">
+                  <X aria-hidden="true" size={20} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
+                  <img alt="" className="brand-mark" height={40} src="/assets/bunker-logo.webp" width={40} />
+                  <span>BÚNKER BURGER</span>
+                </a>
+                <button aria-label="Buscar en la carta" className="header-icon" onClick={() => setSearchOpen(true)} ref={searchButtonRef} type="button">
+                  <Search aria-hidden="true" size={20} />
+                </button>
+              </>
+            )}
           </SiteHeader>
         ) : null
       }
@@ -368,7 +414,9 @@ export function Storefront({
           onAdd={addDirect}
           onOpen={openProduct}
           products={products}
+          onClearQuery={closeSearch}
           promotionFor={(product) => (cardContext ? promotionalPrice(product, promotions, cardContext) : null)}
+          query={query}
           unavailable={catalogFallback === "empty" && initialCatalog === null && verifiedGeneration === 0}
         />
 

@@ -1115,3 +1115,65 @@
   justify-content: center;
   width: 100%;
 }
+
+/* Header on one row at phone width: role and sign out stay beside the brand. */
+.adminActions {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.adminHeader {
+  align-items: center;
+}
+
+.adminHeader .secondaryAction {
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 26rem) {
+  .brand strong {
+    font-size: var(--text-title);
+  }
+
+  .role {
+    display: none;
+  }
+}
+
+.tab {
+  padding: 0 0.85rem;
+}
+
+/* A category's products are the cards; the category itself is a plain group inside its section. */
+.tabPanel .categoryCard {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Product rows keep the photo beside the name at every width, as in the price capture. */
+.productRow {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.productRow .productInfo {
+  flex: 1 1 auto;
+  flex-basis: auto;
+}
+
+.productRow .moveButtons {
+  flex-direction: column;
+  margin-left: 0;
+}
+
+.checkGroup.fieldset > legend {
+  margin-bottom: 0.25rem;
+}
+
+.adminPanel > p:not(.eyebrow) {
+  margin: 0 0 1rem;
+}

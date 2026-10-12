@@ -143,7 +143,6 @@ describe("checkout with the real store status", () => {
 
     // The cart stays persisted and the menu stays usable.
     expect(localStorage.getItem("bunker-cart")).toContain("smash-doble");
-    await user.click(screen.getByRole("button", { name: "Papas" }));
     expect(screen.getByRole("heading", { name: "Papas Búnker" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Agregar Papas Búnker" }));
     expect(screen.getByLabelText("Carrito, 2 productos")).toBeInTheDocument();

@@ -14,22 +14,13 @@
 
 /* Menu */
 .menu-section { padding: 1rem 0 1.5rem; }
-.menu-search { display: flex; align-items: center; gap: .5rem; min-height: var(--spacing-tap); padding: 0 .35rem 0 .9rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-field); color: var(--color-muted); }
-.menu-search:focus-within { border-color: var(--color-primary); outline: 1px solid var(--color-primary); }
-.menu-search input { flex: 1; min-width: 0; min-height: var(--spacing-tap); border: 0; background: transparent; color: var(--color-foreground); font-size: var(--text-body); outline: none; }
-.menu-search input::-webkit-search-cancel-button { display: none; }
-.menu-search-clear { display: grid; place-items: center; width: var(--spacing-tap); height: var(--spacing-tap); border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-muted); cursor: pointer; }
-.menu-search-clear:hover { color: var(--color-foreground); }
-/* The section chips stay reachable while scrolling a long menu. */
-/* Pinned bands (chips, screen bar) paint edge to edge whatever the content width: the shadow widens the background and the clip keeps it to the band's own height. */
-.menu-tools, .view-bar { box-shadow: 0 0 0 100vmax var(--color-glass); clip-path: inset(0 -100vmax); }
-.menu-tools { position: sticky; top: calc(var(--header-height) + env(safe-area-inset-top)); z-index: 20; margin: 0 0 1.25rem; padding: .6rem 0 .5rem; background: var(--color-glass); }
-.category-tabs { display: flex; gap: .5rem; overflow-x: auto; margin: 0 -1rem; padding: 0 1rem .1rem; scrollbar-width: none; }
-/* The header lines up with the screen below it. */
-.storefront > header > div { max-width: 32rem; }
-.category-tab { flex: 0 0 auto; min-height: var(--spacing-tap); padding: .5rem 1rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-surface); color: var(--color-muted); font-size: var(--text-body-sm); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; cursor: pointer; }
-.category-tab.active { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
-.menu-results { scroll-margin-top: calc(var(--header-height) + 5rem); margin: 0 0 1rem; color: var(--color-muted); font-size: var(--text-body-sm); }
+.header-icon { display: grid; flex: 0 0 auto; place-items: center; width: var(--spacing-tap); height: var(--spacing-tap); border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-foreground); cursor: pointer; }
+.header-icon:hover { background: var(--color-surface-high); }
+/* The open search takes the whole header row. */
+.header-search { display: flex; flex: 1; align-items: center; gap: .5rem; min-height: var(--spacing-tap); padding-left: .9rem; border: 1px solid var(--color-primary); border-radius: var(--radius-full); background: var(--color-field); color: var(--color-muted); }
+.header-search input { flex: 1; min-width: 0; min-height: var(--spacing-tap); border: 0; background: transparent; color: var(--color-foreground); font-size: var(--text-body-lg); outline: none; }
+.header-search input::-webkit-search-cancel-button { display: none; }
+.menu-results { margin: 0 0 1rem; color: var(--color-muted); font-size: var(--text-body-sm); }
 .menu-empty { margin-bottom: 1.5rem; }
 .menu-unpublished { margin-top: 1.25rem; }
 .menu-category { scroll-margin-top: calc(var(--header-height) + 5rem); margin-bottom: 2.5rem; }
@@ -58,7 +49,7 @@
 .promo-note { display: block; margin-top: .2rem; color: var(--color-primary); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .product-copy p { display: -webkit-box; overflow: hidden; margin: .3rem 0 0; color: var(--color-muted); font-size: var(--text-body-sm); line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 /* Footer line of the card: the category on the left, the add button (absolutely placed) on the right. */
-.product-meta { display: flex; align-items: center; min-height: 2.75rem; margin-top: .75rem; padding-top: .35rem; padding-right: 7.5rem; border-top: 1px solid var(--color-border); color: var(--color-muted); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); text-transform: uppercase; }
+.product-meta { display: flex; align-items: center; min-height: 3.5rem; margin-top: .75rem; padding-top: .75rem; padding-right: 7.5rem; border-top: 1px solid var(--color-border); color: var(--color-muted); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); text-transform: uppercase; }
 .add-button { position: absolute; right: 1rem; bottom: 1rem; display: inline-flex; align-items: center; gap: .3rem; min-height: var(--spacing-tap); padding: .35rem 1rem; border: 0; border-radius: var(--radius-full); background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; box-shadow: var(--shadow-glow); cursor: pointer; }
 .add-button:hover { background: var(--color-primary-hover); }
 .add-button:disabled { background: var(--color-surface-high); color: var(--color-muted); box-shadow: none; cursor: not-allowed; }
@@ -70,7 +61,13 @@
 .product-card.hero .product-image-wrap::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--color-surface), transparent 55%, rgb(0 0 0 / .3)); pointer-events: none; }
 /* Row card (burgers, sandwiches): photo on the left. */
 .product-card.row .product-main { grid-template-columns: 8rem minmax(0, 1fr); min-height: 11rem; }
-.product-card.row .product-title-row { flex-wrap: wrap; }
+.product-card.row .product-title-row { flex-wrap: nowrap; }
+.product-card.row .product-title-row h3 { min-width: 0; }
+/* Narrow phones: the price drops under the title instead of being clipped. */
+@media (max-width: 24rem) {
+  .product-card.row .product-main { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .product-card.row .product-title-row { flex-wrap: wrap; }
+}
 .product-card.row .product-copy { padding: .9rem .9rem 1rem; }
 .product-card.row .product-meta { margin-top: auto; padding-right: 0; padding-bottom: 3rem; border-top: 0; }
 .product-card.row .add-button { right: .9rem; bottom: .9rem; }
@@ -93,6 +90,8 @@
 
 /* Cart and checkout screens */
 .order-section { padding: 0 0 1.5rem; }
+/* The pinned screen bar paints edge to edge whatever the content width: the shadow widens its background, the clip keeps it to the bar's height. */
+.view-bar { box-shadow: 0 0 0 100vmax var(--color-glass); clip-path: inset(0 -100vmax); }
 .view-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; margin: 0 0 1rem; padding: calc(.75rem + env(safe-area-inset-top)) 0 .75rem; background: var(--color-glass); }
 .view-back { display: grid; flex: 0 0 auto; place-items: center; width: var(--spacing-tap); height: var(--spacing-tap); border-radius: var(--radius-full); background: var(--color-surface-high); color: var(--color-foreground); }
 .view-bar span { display: block; color: var(--color-primary); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); text-transform: uppercase; }
@@ -257,7 +256,6 @@ body.drawer-open { overflow: hidden; }
 @media (min-width: 48rem) {
   .store-view { max-width: 44rem; }
   .storefront > header > div { max-width: 44rem; padding-inline: 0; }
-  .category-tabs { margin-inline: 0; padding-inline: 0; }
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #carrito.store-view { max-width: 36rem; }
 }
@@ -266,8 +264,6 @@ body.drawer-open { overflow: hidden; }
   .store-view { max-width: 64rem; }
   .storefront > header > div { max-width: 64rem; }
   .menu-section { padding-top: 1.5rem; }
-  .menu-search { max-width: 28rem; }
-  .category-tabs { margin: 0; padding-inline: 0; }
   .featured-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .checkout-layout { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, .8fr); }
   .cart-tray { right: var(--bottom-nav-offset); left: auto; width: 25rem; margin: 0; }

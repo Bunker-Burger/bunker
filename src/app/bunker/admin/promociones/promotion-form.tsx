@@ -163,49 +163,72 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   return (
     <AdminForm action={action} submitLabel={defaults.id ? "Guardar promoción" : "Crear promoción"}>
       {defaults.id ? <input name="promotionId" type="hidden" value={defaults.id} /> : null}
-      <TextField defaultValue={defaults.name} label="Nombre" maxLength={60} name="name" required />
-      <TextField defaultValue={defaults.slug} hint="Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
-      <TextAreaField defaultValue={defaults.description} label="Descripción" maxLength={1000} name="description" rows={2} />
-      <TextField defaultValue={defaults.badgeText} hint="Etiqueta corta en la carta (opcional)." label="Badge" maxLength={24} name="badgeText" />
-
-      <SelectField label="Tipo" name="type" onChange={(event) => setType(event.target.value as PromotionMechanic["type"])} value={type}>
-        {TYPES.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </SelectField>
-      {type === "percent_off" ? (
-        <TextField inputMode="decimal" label="Descuento (%)" max={100} min={0.01} name="percentOff" onChange={(event) => setPercentOff(event.target.value)} step="0.01" type="number" value={percentOff} />
-      ) : null}
-      {type === "fixed_price" ? (
-        <TextField inputMode="decimal" label="Precio del combo" min={0} name="fixedPrice" onChange={(event) => setFixedPrice(event.target.value)} step="0.01" type="number" value={fixedPrice} />
-      ) : null}
-      {type === "buy_x_get_y" ? (
-        <div className={styles.focalInputs}>
-          <TextField label="Pagás" max={99} min={1} name="buyQuantity" onChange={(event) => setBuyQuantity(event.target.value)} type="number" value={buyQuantity} />
-          <TextField label="Gratis" max={99} min={1} name="getQuantity" onChange={(event) => setGetQuantity(event.target.value)} type="number" value={getQuantity} />
-        </div>
-      ) : null}
-
-      <fieldset className={styles.fieldset}>
-        <legend>Canales</legend>
-        <FieldError id="channel-error" name="channel" />
-        {(["delivery", "pickup"] as const).map((channel) => (
-          <div className={styles.checkField} key={channel}>
-            <input checked={channels.includes(channel)} id={`channel-${channel}`} name="channel" onChange={(event) => toggleChannel(channel, event.target.checked)} type="checkbox" value={channel} />
-            <label htmlFor={`channel-${channel}`}>{channel === "delivery" ? "Delivery" : "Retiro en el local"}</label>
-          </div>
-        ))}
+      <fieldset className={styles.formCard}>
+        <legend>
+          Datos de la promoción <small className={styles.requiredTag}>Requerido *</small>
+        </legend>
+        <TextField defaultValue={defaults.name} label="Nombre" maxLength={60} name="name" required />
+        <TextField defaultValue={defaults.slug} hint="Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
+        <TextAreaField defaultValue={defaults.description} label="Descripción" maxLength={1000} name="description" rows={2} />
+        <TextField defaultValue={defaults.badgeText} hint="Etiqueta corta en la carta (opcional)." label="Badge" maxLength={24} name="badgeText" />
       </fieldset>
 
-      <div className={styles.focalInputs}>
-        <TextField defaultValue={defaults.startsAt} hint={`Hora de ${timezone}.`} label="Desde" name="startsAt" required type="datetime-local" />
-        <TextField defaultValue={defaults.endsAt} label="Hasta" name="endsAt" required type="datetime-local" />
-      </div>
+      <fieldset className={styles.formCard}>
+        <legend>Mecánica y valor comercial</legend>
+        <SelectField label="Tipo" name="type" onChange={(event) => setType(event.target.value as PromotionMechanic["type"])} value={type}>
+          {TYPES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+        {type === "percent_off" ? (
+          <TextField inputMode="decimal" label="Descuento (%)" max={100} min={0.01} name="percentOff" onChange={(event) => setPercentOff(event.target.value)} step="0.01" type="number" value={percentOff} />
+        ) : null}
+        {type === "fixed_price" ? (
+          <TextField inputMode="decimal" label="Precio del combo" min={0} name="fixedPrice" onChange={(event) => setFixedPrice(event.target.value)} step="0.01" type="number" value={fixedPrice} />
+        ) : null}
+        {type === "buy_x_get_y" ? (
+          <div className={styles.focalInputs}>
+            <TextField label="Pagás" max={99} min={1} name="buyQuantity" onChange={(event) => setBuyQuantity(event.target.value)} type="number" value={buyQuantity} />
+            <TextField label="Gratis" max={99} min={1} name="getQuantity" onChange={(event) => setGetQuantity(event.target.value)} type="number" value={getQuantity} />
+          </div>
+        ) : null}
+
+        <section aria-labelledby="preview-title" className={styles.preview}>
+          <h3 id="preview-title">Vista previa de precios</h3>
+          {rows.length === 0 ? (
+            <p className={styles.hint}>
+              {mechanic ? (type === "free_delivery" ? "Configurá la tarifa de delivery para ver el ahorro." : "Elegí productos para ver los precios.") : "Completá los datos del descuento para ver los precios."}
+            </p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Pedido</th>
+                  <th scope="col">Precio normal</th>
+                  <th scope="col">Con la promo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.label}>
+                    <th scope="row">{row.label}</th>
+                    <td>{formatArs(row.normalCents)}</td>
+                    <td>
+                      <strong>{formatArs(row.promoCents)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className={styles.hint}>Calculado con el mismo motor que el checkout; no considera fechas ni franjas.</p>
+        </section>
+      </fieldset>
 
       {type !== "free_delivery" ? (
-        <fieldset className={styles.fieldset}>
+        <fieldset className={styles.formCard}>
           <legend>{type === "fixed_price" ? "Productos del combo" : "Productos (vacío = todos)"}</legend>
           <FieldError id="items-error" name="items" />
           {items.map((item, index) => (
@@ -244,67 +267,59 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         </fieldset>
       ) : null}
 
-      <fieldset className={styles.fieldset}>
-        <legend>Franjas semanales (vacío = todo el período)</legend>
-        <FieldError id="schedule-error" name="schedule" />
-        {schedule.map((window, index) => (
-          <div className={styles.rowFields} key={index}>
-            <SelectField
-              label={`Día ${index + 1}`}
-              name="scheduleDay"
-              onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, dayOfWeek: event.target.value } : row)))}
-              value={window.dayOfWeek}
-            >
-              {WEEKDAYS.map((day, dayIndex) => (
-                <option key={day} value={dayIndex}>
-                  {day}
-                </option>
-              ))}
-            </SelectField>
-            <TextField label="Desde" name="scheduleStart" onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, startsAt: event.target.value } : row)))} type="time" value={window.startsAt} />
-            <TextField label="Hasta" name="scheduleEnd" onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, endsAt: event.target.value } : row)))} type="time" value={window.endsAt} />
-            <button aria-label={`Quitar franja ${index + 1}`} className={styles.iconAction} onClick={() => setSchedule((current) => current.filter((_, i) => i !== index))} type="button">
-              ✕
-            </button>
-          </div>
-        ))}
-        <button className={styles.secondaryAction} onClick={() => setSchedule((current) => [...current, { dayOfWeek: "1", startsAt: "19:00", endsAt: "23:00" }])} type="button">
-          Agregar franja
-        </button>
+      <fieldset className={styles.formCard}>
+        <legend>Reglas de activación y vigencia</legend>
+        <div className={styles.focalInputs}>
+          <TextField defaultValue={defaults.startsAt} hint={`Hora de ${timezone}.`} label="Desde" name="startsAt" required type="datetime-local" />
+          <TextField defaultValue={defaults.endsAt} label="Hasta" name="endsAt" required type="datetime-local" />
+        </div>
+
+        <fieldset className={styles.fieldset}>
+          <legend>Franjas semanales (vacío = todo el período)</legend>
+          <FieldError id="schedule-error" name="schedule" />
+          {schedule.map((window, index) => (
+            <div className={styles.rowFields} key={index}>
+              <SelectField
+                label={`Día ${index + 1}`}
+                name="scheduleDay"
+                onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, dayOfWeek: event.target.value } : row)))}
+                value={window.dayOfWeek}
+              >
+                {WEEKDAYS.map((day, dayIndex) => (
+                  <option key={day} value={dayIndex}>
+                    {day}
+                  </option>
+                ))}
+              </SelectField>
+              <TextField label="Desde" name="scheduleStart" onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, startsAt: event.target.value } : row)))} type="time" value={window.startsAt} />
+              <TextField label="Hasta" name="scheduleEnd" onChange={(event) => setSchedule((current) => current.map((row, i) => (i === index ? { ...row, endsAt: event.target.value } : row)))} type="time" value={window.endsAt} />
+              <button aria-label={`Quitar franja ${index + 1}`} className={styles.iconAction} onClick={() => setSchedule((current) => current.filter((_, i) => i !== index))} type="button">
+                ✕
+              </button>
+            </div>
+          ))}
+          <button className={styles.secondaryAction} onClick={() => setSchedule((current) => [...current, { dayOfWeek: "1", startsAt: "19:00", endsAt: "23:00" }])} type="button">
+            Agregar franja
+          </button>
+        </fieldset>
       </fieldset>
 
-      <CheckboxField defaultChecked={defaults.active} hint="Una promoción pausada no se aplica aunque esté en fecha." label="Activa" name="active" />
-
-      <section aria-labelledby="preview-title" className={styles.preview}>
-        <h3 id="preview-title">Vista previa de precios</h3>
-        {rows.length === 0 ? (
-          <p className={styles.hint}>
-            {mechanic ? (type === "free_delivery" ? "Configurá la tarifa de delivery para ver el ahorro." : "Elegí productos para ver los precios.") : "Completá los datos del descuento para ver los precios."}
-          </p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Pedido</th>
-                <th scope="col">Precio normal</th>
-                <th scope="col">Con la promo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.label}>
-                  <th scope="row">{row.label}</th>
-                  <td>{formatArs(row.normalCents)}</td>
-                  <td>
-                    <strong>{formatArs(row.promoCents)}</strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <p className={styles.hint}>Calculado con el mismo motor que el checkout; no considera fechas ni franjas.</p>
-      </section>
+      <fieldset className={styles.formCard}>
+        <legend>Estado y canales de venta</legend>
+        <div className={styles.checkGroup}>
+          <CheckboxField defaultChecked={defaults.active} hint="Una promoción pausada no se aplica aunque esté en fecha." label="Activa" name="active" />
+        </div>
+        <fieldset className={`${styles.fieldset} ${styles.checkGroup}`}>
+          <legend>Canales de venta</legend>
+          <FieldError id="channel-error" name="channel" />
+          {(["delivery", "pickup"] as const).map((channel) => (
+            <div className={styles.checkField} key={channel}>
+              <input checked={channels.includes(channel)} id={`channel-${channel}`} name="channel" onChange={(event) => toggleChannel(channel, event.target.checked)} type="checkbox" value={channel} />
+              <label htmlFor={`channel-${channel}`}>{channel === "delivery" ? "Delivery" : "Retiro en el local"}</label>
+            </div>
+          ))}
+        </fieldset>
+      </fieldset>
     </AdminForm>
   );
 }
