@@ -1,0 +1,74 @@
+name: Vercel Preview
+
+# Preview deployments with the Vercel CLI from Actions (docs/runbooks/vercel-preview.md): the Vercel
+# Hobby plan cannot deploy a private repository of a GitHub organization through its Git
+# integration. Only Preview: production deploys are not part of this workflow.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_CLI: vercel@60.0.0
+
+jobs:
+  preview:
+    name: Vercel Preview
+    # Forks never receive secrets; their pull requests get no preview.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Secretos de Vercel del entorno preview
+        shell: bash
+        run: |
+          missing=0
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Falta el secreto $name en el entorno 'preview' del repo."; missing=1; fi
+          done
+          exit "$missing"
+      - name: Variables de Preview
+        run: pnpm dlx "$VERCEL_CLI" pull --yes --environment=preview --token="$VERCEL_TOKEN"
+      - name: Sin secretos de producción en Preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=.vercel/.env.preview.local
+          [ -f "$file" ] || { echo "::error::vercel pull no generó $file"; exit 1; }
+          # Production-only values never reach a preview build (BB-19: previews without dangerous resources).
+          for name in SUPABASE_SERVICE_ROLE_KEY MERCADO_PAGO_ACCESS_TOKEN MERCADO_PAGO_WEBHOOK_SECRET; do
+            if grep -Eq "^${name}=\"?[^\"]" "$file"; then echo "::error::$name está cargada para Preview en Vercel; quitála."; exit 1; fi
+          done
+          if grep -Eq '^SUPABASE_PROJECT_ENV="?production' "$file"; then
+            echo "::error::SUPABASE_PROJECT_ENV=production en Preview; una preview usa el proyecto de desarrollo."; exit 1
+          fi
+      - name: Build
+        run: pnpm dlx "$VERCEL_CLI" build --token="$VERCEL_TOKEN"
+      - id: deploy
+        name: Deploy (Preview)
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=$(pnpm dlx "$VERCEL_CLI" deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview de \`${{ github.event.pull_request.head.sha }}\`: $url" >> "$GITHUB_STEP_SUMMARY"
