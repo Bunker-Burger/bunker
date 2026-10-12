@@ -28,4 +28,13 @@ describe("admin authentication Playwright isolation", () => {
     expect(adminAuthConfig.preserveOutput).toBe("never");
     expect(adminAuthConfig.use).toMatchObject({ trace: "off", screenshot: "off", video: "off" });
   });
+
+  it("configures the public runner to fail on flaky retries and retain failure evidence", () => {
+    expect(defaultConfig.retries).toBe(0);
+    expect(defaultConfig.preserveOutput).toBe("failures-only");
+    expect(defaultConfig.use).toMatchObject({
+      screenshot: "only-on-failure",
+      trace: "retain-on-failure"
+    });
+  });
 });
