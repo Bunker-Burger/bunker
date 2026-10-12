@@ -176,7 +176,15 @@ describe("validateAcceptanceMatrix", () => {
     ["a statically skipped test.skipIf(true)", `test.skipIf(true)("${TEST_TITLE}", () => {});\n`],
     ["a statically skipped it.skipIf(true)", `it.skipIf(true)("${TEST_TITLE}", () => {});\n`],
     ["a statically inert test.runIf(false)", `test.runIf(false)("${TEST_TITLE}", () => {});\n`],
-    ["a statically inert it.runIf(false)", `it.runIf(false)("${TEST_TITLE}", () => {});\n`]
+    ["a statically inert it.runIf(false)", `it.runIf(false)("${TEST_TITLE}", () => {});\n`],
+    ["an empty test.each([]) table", `test.each([])("${TEST_TITLE}", () => {});\n`],
+    ["an empty it.each([]) table", `it.each([])("${TEST_TITLE}", () => {});\n`],
+    ["an empty describe.each([]) suite", `describe.each([])("suite", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["an empty test.describe.each([]) suite", `test.describe.each([])("suite", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["an empty tagged template table (it.each``)", "it.each``(\"" + TEST_TITLE + "\", () => {});\n"],
+    ["an empty tagged template table with only headers", "it.each`\n  a | b\n`(\"" + TEST_TITLE + "\", () => {});\n"],
+    ["an empty tagged template describe suite", "describe.each``(\"suite\", () => { test(\"" + TEST_TITLE + "\", () => {}); });\n"],
+    ["an empty tagged template test.describe suite", "test.describe.each``(\"suite\", () => { test(\"" + TEST_TITLE + "\", () => {}); });\n"]
   ])("rejects automated evidence where the test is declared inside %s", async (_kind, source) => {
     const matrix = completeMatrix();
     await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
@@ -208,6 +216,30 @@ describe("validateAcceptanceMatrix", () => {
     expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
   });
 
+  it("detects a removed executable test even if an empty .each([]) table retains it", async () => {
+    const matrix = completeMatrix();
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+    await writeFile(
+      path.join(rootDir, "sample.test.ts"),
+      `test.each([])("${TEST_TITLE}", () => {});\ndescribe.each([])("suite", () => { test("${TEST_TITLE}", () => {}); });\n`,
+      "utf8"
+    );
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("detects a removed executable test even if an empty tagged template table retains it", async () => {
+    const matrix = completeMatrix();
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+    await writeFile(
+      path.join(rootDir, "sample.test.ts"),
+      `it.each\`\n  a | b\n\`("${TEST_TITLE}", () => {});\n`,
+      "utf8"
+    );
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
   it("accepts legitimate test registrations in active describe blocks and declarative loops", async () => {
     const matrix = completeMatrix();
     const source = `
@@ -228,6 +260,38 @@ describe("validateAcceptanceMatrix", () => {
     matrix.requirements[1]!.evidence[0]!.test = "BB07-AC2 test";
     matrix.requirements[2]!.evidence[0]!.test = "BB07-AC3 test";
     matrix.requirements[3]!.evidence[0]!.test = "BB07-AC4 test";
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+  });
+
+  it("accepts active parameterized tables via test.each([[1]]), it.each([1]), describe.each([[1]]), and tagged tables", async () => {
+    const matrix = completeMatrix();
+    const source = `
+      test.each([[1]])("${TEST_TITLE} %i", () => {});
+      it.each([1])("BB07-AC2 %i test", () => {});
+      describe.each([[1]])("parameterized suite", () => {
+        test("BB07-AC3 test", () => {});
+      });
+      test.describe.each([["ctx"]])("playwright parameterized suite", () => {
+        test("BB07-AC4 test", () => {});
+      });
+      it.each\`
+        col1 | col2
+        \${1} | \${2}
+      \`("BB08-AC1 tagged test", () => {});
+      describe.each\`
+        col
+        \${1}
+      \`("tagged describe suite", () => {
+        test("BB08-AC2 tagged describe test", () => {});
+      });
+    `;
+    await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
+    matrix.requirements[0]!.evidence[0]!.test = `${TEST_TITLE} %i`;
+    matrix.requirements[1]!.evidence[0]!.test = "BB07-AC2 %i test";
+    matrix.requirements[2]!.evidence[0]!.test = "BB07-AC3 test";
+    matrix.requirements[3]!.evidence[0]!.test = "BB07-AC4 test";
+    matrix.requirements[4]!.evidence[0]!.test = "BB08-AC1 tagged test";
+    matrix.requirements[5]!.evidence[0]!.test = "BB08-AC2 tagged describe test";
     await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
   });
 

@@ -73,6 +73,12 @@ function isStaticallyEmptyIterable(expr: ts.Expression): boolean {
   return false;
 }
 
+function isStaticallyEmptyTaggedTable(expr: ts.TaggedTemplateExpression): boolean {
+  if (ts.isNoSubstitutionTemplateLiteral(expr.template)) return true;
+  if (ts.isTemplateExpression(expr.template) && expr.template.templateSpans.length === 0) return true;
+  return false;
+}
+
 function getStaticNumericValue(expr: ts.Expression): number | null {
   if (ts.isNumericLiteral(expr)) return Number(expr.text);
   if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(expr.operand)) {
@@ -115,7 +121,10 @@ function isTestCall(expression: ts.LeftHandSideExpression): boolean {
   if (ts.isCallExpression(expression) && ts.isPropertyAccessExpression(expression.expression)) {
     const { expression: root, name } = expression.expression;
     if (ts.isIdentifier(root) && JS_TEST_ROOTS.has(root.text)) {
-      if (name.text === "each") return true;
+      if (name.text === "each") {
+        const table = expression.arguments[0];
+        return Boolean(table && !isStaticallyEmptyIterable(table));
+      }
       if (name.text === "skipIf") {
         const cond = expression.arguments[0];
         return !cond || !isStaticallyTruthy(cond);
@@ -130,7 +139,10 @@ function isTestCall(expression: ts.LeftHandSideExpression): boolean {
   // Vitest tagged tables: it.each`...\`("title", fn).
   if (ts.isTaggedTemplateExpression(expression) && ts.isPropertyAccessExpression(expression.tag)) {
     const { expression: root, name } = expression.tag;
-    return name.text === "each" && ts.isIdentifier(root) && JS_TEST_ROOTS.has(root.text);
+    if (name.text === "each" && ts.isIdentifier(root) && JS_TEST_ROOTS.has(root.text)) {
+      return !isStaticallyEmptyTaggedTable(expression);
+    }
+    return false;
   }
 
   return false;
@@ -189,6 +201,12 @@ function getDescribeKind(expr: ts.LeftHandSideExpression): "active" | "skipped" 
       if (name === "runIf" && expr.arguments[0] && isStaticallyFalsy(expr.arguments[0])) {
         return "skipped";
       }
+      if (name === "each") {
+        const table = expr.arguments[0];
+        if (!table || isStaticallyEmptyIterable(table)) {
+          return "skipped";
+        }
+      }
       return "active";
     }
   }
@@ -198,6 +216,9 @@ function getDescribeKind(expr: ts.LeftHandSideExpression): "active" | "skipped" 
       const chain = getPropertyChain(expr.tag);
       if (chain && isDescribeChain(chain)) {
         if (chain.some((part) => SKIPPED_SUITE_MODIFIERS.has(part))) return "skipped";
+        if (chain.includes("each") && isStaticallyEmptyTaggedTable(expr)) {
+          return "skipped";
+        }
         return "active";
       }
     }
