@@ -1,0 +1,65 @@
+name: Vercel Preview
+
+# Unprivileged half of the preview pipeline (docs/runbooks/vercel-preview.md): builds the pull
+# request's exact HEAD with the Vercel CLI and NO credential at all. It cannot deploy: the token
+# lives in the `preview` environment, which only the main branch may use. A maintainer publishes the
+# artifact with "Vercel Preview — deploy autorizado" (vercel-preview-deploy.yml), from main.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_CLI: vercel@60.0.0
+  VERCEL_TELEMETRY_DISABLED: "1"
+
+jobs:
+  build:
+    name: Vercel Preview (build)
+    runs-on: ubuntu-latest
+    steps:
+      # The PR's HEAD, not the merge ref: what the maintainer reviews is what gets built and deployed.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Sin credenciales en el build
+        run: node scripts/ci/vercel-preview-guard.mjs build-env
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Proyecto de Vercel local, sin ids reales ni variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          # Settings only: `vercel build` needs no API call with them. The real ids and the token stay
+          # in the deploy workflow; Preview has no variables (vercel-preview-guard preview-env).
+          printf '%s\n' '{"projectId":"prj_unlinked","orgId":"team_unlinked","settings":{"framework":"nextjs","installCommand":null,"buildCommand":null,"outputDirectory":null,"rootDirectory":null,"devCommand":null,"nodeVersion":"22.x"}}' > .vercel/project.json
+      - name: Build (target preview)
+        run: pnpm dlx "$VERCEL_CLI" build --yes --target preview
+      - name: Empaquetar el output
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # tar keeps the links between functions; the deploy workflow rejects any that leaves the output.
+          tar -czf "$RUNNER_TEMP/vercel-output.tgz" -C .vercel output
+          echo "Build de preview del HEAD \`$HEAD_SHA\` de la PR #$PR_NUMBER. Para publicarlo: Actions → Vercel Preview — deploy autorizado, con ese SHA." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vercel-preview-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/vercel-output.tgz
+          retention-days: 5
+          if-no-files-found: error
