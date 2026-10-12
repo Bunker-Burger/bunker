@@ -116,24 +116,172 @@ function hasTitleFragment(title: ts.Expression, fragment: string): boolean {
   return false;
 }
 
+const SKIPPED_SUITE_MODIFIERS = new Set(["skip", "todo", "fixme"]);
+
+function getPropertyChain(expr: ts.Expression): string[] | null {
+  const parts: string[] = [];
+  let current: ts.Expression = expr;
+  while (ts.isPropertyAccessExpression(current)) {
+    parts.unshift(current.name.text);
+    current = current.expression;
+  }
+  if (ts.isIdentifier(current)) {
+    parts.unshift(current.text);
+    return parts;
+  }
+  return null;
+}
+
+function isDescribeChain(chain: string[]): boolean {
+  return chain[0] === "describe" || (chain[0] === "test" && chain[1] === "describe");
+}
+
+function getDescribeKind(expr: ts.LeftHandSideExpression): "active" | "skipped" | null {
+  if (ts.isIdentifier(expr)) {
+    return expr.text === "describe" ? "active" : null;
+  }
+
+  if (ts.isPropertyAccessExpression(expr)) {
+    const chain = getPropertyChain(expr);
+    if (!chain || !isDescribeChain(chain)) return null;
+    return chain.some((part) => SKIPPED_SUITE_MODIFIERS.has(part)) ? "skipped" : "active";
+  }
+
+  if (ts.isCallExpression(expr)) {
+    if (ts.isPropertyAccessExpression(expr.expression)) {
+      const chain = getPropertyChain(expr.expression);
+      if (!chain || !isDescribeChain(chain)) return null;
+      if (chain.some((part) => SKIPPED_SUITE_MODIFIERS.has(part))) return "skipped";
+      return "active";
+    }
+  }
+
+  if (ts.isTaggedTemplateExpression(expr)) {
+    if (ts.isPropertyAccessExpression(expr.tag)) {
+      const chain = getPropertyChain(expr.tag);
+      if (chain && isDescribeChain(chain)) {
+        if (chain.some((part) => SKIPPED_SUITE_MODIFIERS.has(part))) return "skipped";
+        return "active";
+      }
+    }
+  }
+
+  return null;
+}
+
+function getDescribeCallback(call: ts.CallExpression): ts.ArrowFunction | ts.FunctionExpression | null {
+  for (const arg of call.arguments) {
+    if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
+      return arg;
+    }
+  }
+  return null;
+}
+
+function isStaticallyFalsy(expr: ts.Expression): boolean {
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return true;
+  if (ts.isNumericLiteral(expr) && expr.text === "0") return true;
+  if (ts.isStringLiteral(expr) && expr.text === "") return true;
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return true;
+  if (ts.isIdentifier(expr) && expr.text === "undefined") return true;
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
+    return isStaticallyTruthy(expr.operand);
+  }
+  return false;
+}
+
+function isStaticallyTruthy(expr: ts.Expression): boolean {
+  if (expr.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (ts.isNumericLiteral(expr) && expr.text !== "0") return true;
+  if (ts.isStringLiteral(expr) && expr.text !== "") return true;
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
+    return isStaticallyFalsy(expr.operand);
+  }
+  return false;
+}
+
 function checkJsTestDeclaration(source: string, testTitle: string, file: string): boolean {
   const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   let found = false;
 
-  const visit = (node: ts.Node): void => {
+  function visitActiveNode(node: ts.Node): void {
     if (found) return;
-    if (ts.isCallExpression(node) && isTestCall(node.expression)) {
-      const [title, implementation] = node.arguments;
-      if (title && hasTitleFragment(title, testTitle)
-        && implementation && (ts.isArrowFunction(implementation) || ts.isFunctionExpression(implementation))) {
-        found = true;
+
+    if (ts.isSourceFile(node) || ts.isBlock(node)) {
+      for (const statement of node.statements) {
+        visitActiveNode(statement);
+        if (found) return;
+      }
+      return;
+    }
+
+    if (ts.isExpressionStatement(node)) {
+      visitActiveNode(node.expression);
+      return;
+    }
+
+    if (ts.isLabeledStatement(node)) {
+      visitActiveNode(node.statement);
+      return;
+    }
+
+    if (ts.isTryStatement(node)) {
+      visitActiveNode(node.tryBlock);
+      if (node.finallyBlock) visitActiveNode(node.finallyBlock);
+      return;
+    }
+
+    if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node) || ts.isDoStatement(node)) {
+      visitActiveNode(node.statement);
+      return;
+    }
+
+    if (ts.isWhileStatement(node)) {
+      if (!isStaticallyFalsy(node.expression)) {
+        visitActiveNode(node.statement);
+      }
+      return;
+    }
+
+    if (ts.isIfStatement(node)) {
+      if (!isStaticallyFalsy(node.expression)) {
+        visitActiveNode(node.thenStatement);
+      }
+      if (!isStaticallyTruthy(node.expression) && node.elseStatement) {
+        visitActiveNode(node.elseStatement);
+      }
+      return;
+    }
+
+    if (ts.isCallExpression(node)) {
+      if (isTestCall(node.expression)) {
+        const [title, implementation] = node.arguments;
+        if (title && hasTitleFragment(title, testTitle)
+          && implementation && (ts.isArrowFunction(implementation) || ts.isFunctionExpression(implementation))) {
+          found = true;
+          return;
+        }
+        // Never traverse the test body (rejects nested tests inside test callbacks)
         return;
       }
-    }
-    ts.forEachChild(node, visit);
-  };
 
-  visit(parsed);
+      const describeKind = getDescribeKind(node.expression);
+      if (describeKind === "active") {
+        const callback = getDescribeCallback(node);
+        if (callback) {
+          visitActiveNode(callback.body);
+        }
+        return;
+      }
+      if (describeKind === "skipped") {
+        return;
+      }
+
+      return;
+    }
+  }
+
+  visitActiveNode(parsed);
   return found;
 }
 

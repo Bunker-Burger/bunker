@@ -158,6 +158,60 @@ describe("validateAcceptanceMatrix", () => {
     const errors = await validateAcceptanceMatrix(matrix, rootDir);
     expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
   });
+
+  it.each([
+    ["an uncalled function declaration", `function neverCalled() { test("${TEST_TITLE}", () => {}); }\n`],
+    ["an impossible if(false) branch", `if (false) { test("${TEST_TITLE}", () => {}); }\n`],
+    ["an impossible if(0) branch", `if (0) { test("${TEST_TITLE}", () => {}); }\n`],
+    ["an impossible if(!true) branch", `if (!true) { test("${TEST_TITLE}", () => {}); }\n`],
+    ["a skipped describe suite", `describe.skip("skipped group", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["a test.describe.skip suite", `test.describe.skip("skipped group", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["a describe.todo suite", `describe.todo("todo group", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["a test.describe.fixme suite", `test.describe.fixme("fixme group", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["a test nested inside another test callback", `test("outer test", () => { test("${TEST_TITLE}", () => {}); });\n`],
+    ["an inert unexecuted callback", `const dead = () => { test("${TEST_TITLE}", () => {}); };\n`],
+    ["an unexecuted array iteration callback", `[].forEach(() => { test("${TEST_TITLE}", () => {}); });\n`]
+  ])("rejects automated evidence where the test is declared inside %s", async (_kind, source) => {
+    const matrix = completeMatrix();
+    await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("detects a removed executable test even if an uncalled function or if(false) retains it", async () => {
+    const matrix = completeMatrix();
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+    await writeFile(
+      path.join(rootDir, "sample.test.ts"),
+      `function neverCalled() { test("${TEST_TITLE}", () => {}); }\nif (false) { test("${TEST_TITLE}", () => {}); }\n`,
+      "utf8"
+    );
+    const errors = await validateAcceptanceMatrix(matrix, rootDir);
+    expect(errors).toContain(`BB07-AC1: test title not found in sample.test.ts: ${TEST_TITLE}`);
+  });
+
+  it("accepts legitimate test registrations in active describe blocks and declarative loops", async () => {
+    const matrix = completeMatrix();
+    const source = `
+      describe("active group", () => {
+        test("${TEST_TITLE}", () => {});
+      });
+      test.describe("playwright active group", () => {
+        test("BB07-AC2 test", () => {});
+      });
+      for (const item of [1]) {
+        test("BB07-AC3 test", () => {});
+      }
+      for (let i = 0; i < 1; i++) {
+        test("BB07-AC4 test", () => {});
+      }
+    `;
+    await writeFile(path.join(rootDir, "sample.test.ts"), source, "utf8");
+    matrix.requirements[1]!.evidence[0]!.test = "BB07-AC2 test";
+    matrix.requirements[2]!.evidence[0]!.test = "BB07-AC3 test";
+    matrix.requirements[3]!.evidence[0]!.test = "BB07-AC4 test";
+    await expect(validateAcceptanceMatrix(matrix, rootDir)).resolves.toEqual([]);
+  });
   it("rejects automated evidence in SQL where the assertion only appears in a comment", async () => {
     const matrix = completeMatrix();
     matrix.requirements[0]!.evidence[0]!.file = "sample.sql";
