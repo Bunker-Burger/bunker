@@ -1,6 +1,7 @@
 "use client";
 
-import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck, X } from "lucide-react";
+import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck, X, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import styles from "../admin.module.css";
 import { useOrderSaver } from "./category-tools";
@@ -43,13 +44,8 @@ export interface StoreSettingsProps {
 export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, paymentMethods, mercadoPagoNote }: StoreSettingsProps) {
   return (
     <div className={styles.settingsColumn}>
-      <section aria-labelledby="delivery-title" className={styles.deliveryCard}>
-        <div>
-          <h2 id="delivery-title">
-            <Truck aria-hidden="true" size={20} /> Delivery y WhatsApp
-          </h2>
-          <p>Sin costo de delivery cargado, los pedidos quedan deshabilitados.</p>
-        </div>
+      <CollapsibleCard icon={Truck} summary={deliverySummary(deliveryFee, whatsapp)} title="Delivery y WhatsApp" titleId="delivery-title">
+        <p className={styles.hint}>Sin costo de delivery cargado, los pedidos quedan deshabilitados.</p>
         <QuickForm action={saveStoreContactAction} className={styles.settingsForm} label="Delivery y WhatsApp">
           <label htmlFor="quick-delivery">Costo de delivery</label>
           <PriceField defaultValue={deliveryFee} id="quick-delivery" name="deliveryFee" />
@@ -58,7 +54,7 @@ export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, payment
           <small className={styles.hint}>Con código de país, por ejemplo +54 9 381 555-1234. Los pedidos llegan a este número.</small>
           <QuickSubmit className={styles.smallAction}>Guardar</QuickSubmit>
         </QuickForm>
-      </section>
+      </CollapsibleCard>
 
       <OpeningHours shifts={shifts} timezone={timezone} />
 
@@ -69,6 +65,40 @@ export function StoreSettings({ deliveryFee, whatsapp, timezone, shifts, payment
       </Link>
     </div>
   );
+}
+
+/** Collapsed by default: icon and title, a one-line summary, and an arrow that opens it. */
+function CollapsibleCard({ icon: Icon, title, titleId, summary, children }: { icon: LucideIcon; title: string; titleId: string; summary: string; children: ReactNode }) {
+  return (
+    <details className={`${styles.deliveryCard} ${styles.collapsibleCard}`}>
+      <summary>
+        <span className={styles.collapsibleHead}>
+          <h2 id={titleId}>
+            <Icon aria-hidden="true" size={20} /> {title}
+          </h2>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown aria-hidden="true" className={styles.collapsibleArrow} size={22} />
+      </summary>
+      {children}
+    </details>
+  );
+}
+
+const ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+/** "$ 1.200 · +5491100000000", or that orders are off without a fee. */
+function deliverySummary(deliveryFee: string, whatsapp: string) {
+  const fee = deliveryFee === "" ? "Sin costo de delivery: no se toman pedidos" : `Envío $ ${ARS.format(Number(deliveryFee))}`;
+  return `${fee} · ${whatsapp}`;
+}
+
+/** "Efectivo y Transferencia", in the order customers see them. */
+function paymentsSummary(methods: SettingsPaymentMethod[]) {
+  const enabled = methods.filter((method) => method.enabled).map((method) => method.name);
+  if (enabled.length === 0) return "Ninguno habilitado";
+  const list = enabled.length === 1 ? enabled[0]! : `${enabled.slice(0, -1).join(", ")} y ${enabled.at(-1)}`;
+  return `${list} ${enabled.length === 1 ? "habilitado" : "habilitados"}`;
 }
 
 /** Monday first, as the week is read in Argentina. */
@@ -92,16 +122,7 @@ function hoursSummary(shifts: SettingsShift[]) {
 function OpeningHours({ shifts, timezone }: { shifts: SettingsShift[]; timezone: string }) {
   const city = (timezone.split("/").pop() ?? timezone).replace(/_/g, " ");
   return (
-    <details className={`${styles.deliveryCard} ${styles.collapsibleCard}`}>
-      <summary>
-        <span className={styles.collapsibleHead}>
-          <h2 id="hours-title">
-            <CalendarClock aria-hidden="true" size={20} /> Horarios
-          </h2>
-          <small>{hoursSummary(shifts)}</small>
-        </span>
-        <ChevronDown aria-hidden="true" className={styles.collapsibleArrow} size={22} />
-      </summary>
+    <CollapsibleCard icon={CalendarClock} summary={hoursSummary(shifts)} title="Horarios" titleId="hours-title">
 
       <p className={styles.hint}>Con el modo “Seguir los horarios”, el local abre y cierra solo. Hora de {city}.</p>
       <ul aria-label="Turnos" className={styles.weekList}>
@@ -159,7 +180,7 @@ function OpeningHours({ shifts, timezone }: { shifts: SettingsShift[]; timezone:
           <CirclePlus aria-hidden="true" size={14} /> Agregar turno
         </QuickSubmit>
       </QuickForm>
-    </details>
+    </CollapsibleCard>
   );
 }
 
@@ -170,13 +191,8 @@ function PaymentMethods({ methods, mercadoPagoNote }: { methods: SettingsPayment
     saveOrder({ method: ids, ...Object.fromEntries(methods.map((method) => [`enabled:${method.id}`, String(method.enabled)])) })
   );
   return (
-    <section aria-labelledby="payments-title" className={styles.deliveryCard}>
-      <div>
-        <h2 id="payments-title">
-          <CreditCard aria-hidden="true" size={20} /> Medios de pago
-        </h2>
-        <p>Arrastralos para elegir en qué orden los ve el cliente.</p>
-      </div>
+    <CollapsibleCard icon={CreditCard} summary={paymentsSummary(list)} title="Medios de pago" titleId="payments-title">
+      <p className={styles.hint}>Arrastralos para elegir en qué orden los ve el cliente.</p>
       {message ? (
         <p className={styles.quickError} role="alert">
           {message}
@@ -200,6 +216,6 @@ function PaymentMethods({ methods, mercadoPagoNote }: { methods: SettingsPayment
           </li>
         ))}
       </ul>
-    </section>
+    </CollapsibleCard>
   );
 }
