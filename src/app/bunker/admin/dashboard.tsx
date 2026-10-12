@@ -12,7 +12,7 @@ import type { ProductFormValues } from "./catalogo/product-form";
 import { ADMIN_CATALOG_PATH, productEditPath } from "./catalogo/form-state";
 import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "./paths";
 import { setPromotionActiveAction } from "./promociones/actions";
-import { QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
+import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
 import { saveStoreContactAction, setStoreStatusAction } from "./tienda/actions";
 
 export interface DashboardProduct {
@@ -301,33 +301,5 @@ function StoreSwitch({ open, reason }: { open: boolean; reason: string }) {
         type="checkbox"
       />
     </label>
-  );
-}
-
-const ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
-
-/** "7800" → "7.800"; what the admin parsers expect stays in the hidden field ("7800", "7800.5"). */
-function PriceField({ name, defaultValue, label, id }: { name: string; defaultValue: string; label?: string; id?: string }) {
-  const [plain, setPlain] = useState(defaultValue);
-  const [shown, setShown] = useState(() => (defaultValue === "" ? "" : ARS.format(Number(defaultValue))));
-  return (
-    <span className={styles.priceInput}>
-      <span aria-hidden="true">$</span>
-      <input
-        aria-label={label}
-        id={id}
-        inputMode="decimal"
-        onBlur={() => setShown(plain === "" ? "" : ARS.format(Number(plain)))}
-        onChange={(event) => {
-          // Dots are thousands, a comma is the decimal separator (es-AR).
-          const typed = event.target.value.replace(/[^\d,]/g, "");
-          setShown(event.target.value);
-          setPlain(typed.replace(",", "."));
-        }}
-        type="text"
-        value={shown}
-      />
-      <input name={name} type="hidden" value={plain} />
-    </span>
   );
 }

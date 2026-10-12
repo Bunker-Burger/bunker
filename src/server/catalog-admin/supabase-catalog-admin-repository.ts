@@ -317,6 +317,47 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
         : catalogError("unavailable", "product_option_groups: links read back differ from the requested ones");
     },
 
+    async createOption(groupId, fields) {
+      const price = toSafeNumber(fields.priceDeltaCents);
+      if (price === null) return err({ code: "rejected" as const, message: "options.insert: price out of range" });
+      const response = await write(
+        "options.insert",
+        client
+          .from("options")
+          .insert({ option_group_id: groupId, name: fields.name, price_delta_cents: price, is_available: fields.available, sort_order: fields.sortOrder })
+          .select("id")
+          .single() as PromiseLike<QueryResponse>
+      );
+      if (!response.ok) return response;
+      const id = (response.value as { id?: unknown } | null)?.id;
+      return typeof id === "string" ? ok({ id }) : catalogError("invalid_data", "options.insert: no id returned");
+    },
+
+    updateOption(groupId, optionId, fields) {
+      const price = toSafeNumber(fields.priceDeltaCents);
+      if (price === null) return Promise.resolve(err({ code: "rejected" as const, message: "options.update: price out of range" }));
+      return writeOne(
+        "options.update",
+        client
+          .from("options")
+          .update({ name: fields.name, price_delta_cents: price, is_available: fields.available })
+          .eq("option_group_id", groupId)
+          .eq("id", optionId)
+          .select("id") as PromiseLike<QueryResponse>
+      );
+    },
+
+    async setOptionOrder(groupId, rows) {
+      for (const row of rows) {
+        const saved = await writeOne(
+          "options.update",
+          client.from("options").update({ sort_order: row.sortOrder }).eq("option_group_id", groupId).eq("id", row.id).select("id") as PromiseLike<QueryResponse>
+        );
+        if (!saved.ok) return saved;
+      }
+      return ok(undefined);
+    },
+
     async setProductOrder(storeId, rows) {
       for (const row of rows) {
         const saved = await writeOne(

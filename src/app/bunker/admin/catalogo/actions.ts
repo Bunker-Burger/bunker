@@ -12,6 +12,8 @@ import {
   moveCategory,
   moveProduct,
   saveProduct,
+  reorderOptions,
+  saveOption,
   saveProductImage,
   updateCategory,
   type AdminOutcome,
@@ -90,4 +92,14 @@ export async function deleteProductAction(_previous: AdminFormState, form: FormD
     redirect(`${ADMIN_CATALOG_PATH}${typeof tab === "string" && /^[a-z]+$/.test(tab) ? `?tipo=${tab}` : ""}`);
   }
   return state;
+}
+
+/** Name, extra price and availability of an option, or a new option in a group (issue #54). */
+export async function saveOptionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(saveOption, form)).state;
+}
+
+/** New order of a group's options, dragged in the product form (issue #54). */
+export async function reorderOptionsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderOptions, form)).state;
 }

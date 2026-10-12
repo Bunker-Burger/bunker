@@ -26,6 +26,7 @@ export function formOptionGroups(groups: AdminOptionGroup[]): ProductFormOptionG
       id: option.id,
       name: option.name,
       priceDelta: option.priceDeltaCents > 0n ? formatArs(option.priceDeltaCents) : null,
+      price: pesos(option.priceDeltaCents),
       available: option.available
     }))
   }));

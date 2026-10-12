@@ -2464,3 +2464,290 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 .plainSection > h2 {
   margin: 0;
 }
+
+/* Product selector of the capture: one row, icon over the name, the chosen one in amber. */
+.choicePills legend {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.activeTag {
+  color: var(--color-primary);
+  font-size: var(--text-badge);
+  letter-spacing: var(--tracking-badge);
+}
+
+.choicePills > div {
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+}
+
+.choicePill,
+.choicePillActive {
+  gap: 0.3rem;
+  min-height: 3.75rem;
+}
+
+.choicePillActive {
+  box-shadow: var(--shadow-glow);
+}
+
+.choicePill,
+.choicePillActive {
+  font-size: 0.625rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* Pinned bars are opaque: nothing scrolling under them shows through. */
+.pageBar,
+.adminHeader {
+  background: var(--color-surface);
+  box-shadow: 0 0 0 100vmax var(--color-surface);
+  backdrop-filter: none;
+}
+
+/* A screen with its own bar starts right at the top. */
+.adminViewport:has([data-page-bar]) .adminContent {
+  margin-top: 0;
+}
+
+/* Options and extras with their price (issue #54). */
+.optionGroups {
+  display: grid;
+  gap: 1rem;
+}
+
+.optionGroupCard {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(var(--color-accent-soft), var(--color-accent-soft)), var(--color-surface);
+  scroll-margin-top: 5rem;
+}
+
+.optionGroupCard header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.optionGroupCard h3 {
+  margin: 0;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.optionRows {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.optionRow,
+.newOption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.newOption {
+  border-style: dashed;
+  border-color: var(--color-accent-border);
+}
+
+.optionName {
+  flex: 1 1 10rem;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
+.optionName:focus-visible {
+  border-color: var(--color-primary);
+  outline: 1px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+.addOptionAction {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.optionRow .quickToggle,
+.newOption .quickToggle {
+  margin-left: 0;
+}
+
+.editPricesLink {
+  grid-column: 2;
+  justify-self: start;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+/* Variants of a group in the product form, as the capture: choice, price, save; then "Añadir". */
+.variantRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.variantRow .checkField {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.variantRow .priceInput input[type="text"] {
+  width: 4.5rem;
+}
+
+.variantNew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-md);
+}
+
+/* The detached forms only show their messages. */
+.optionForms {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.optionForms form {
+  display: contents;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .variantRow .checkField {
+    grid-column: 1 / -1;
+  }
+}
+
+.variantRow {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.variantRow > input[type="radio"],
+.variantRow > input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.variantName {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.variantName .optionName {
+  flex: 1;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .variantRow .variantName {
+    grid-column: 2 / -1;
+  }
+
+  .variantRow .priceInput {
+    grid-column: 2;
+  }
+}
+
+/* Drag to order the options of a group. */
+.variantRow {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+}
+
+.variantRow[data-dragging] {
+  border-color: var(--color-primary);
+  opacity: 0.6;
+}
+
+.dragHandle {
+  display: grid;
+  width: 2rem;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.dragHandle:hover {
+  color: var(--color-primary);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .variantRow .variantName {
+    grid-column: 3 / -1;
+  }
+
+  .variantRow .priceInput {
+    grid-column: 3;
+  }
+}

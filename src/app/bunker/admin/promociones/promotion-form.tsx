@@ -180,7 +180,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           Datos de la promoción <small className={styles.requiredTag}>Requerido *</small>
         </legend>
         <TextField defaultValue={defaults.name} hint="Máx. 60 caracteres." label="Nombre de la promoción" maxLength={60} name="name" required />
-        <TextField defaultValue={defaults.slug} hint="Se genera del nombre si lo dejás vacío." label="Slug" maxLength={80} name="slug" />
+        {defaults.id ? <input name="slug" type="hidden" value={defaults.slug} /> : null}
         <TextAreaField defaultValue={defaults.description} label="Descripción" maxLength={1000} name="description" rows={2} />
         <TextField hint="Etiqueta corta en la carta (opcional)." label="Badge o tag de impacto" maxLength={24} name="badgeText" onChange={(event) => setBadge(event.target.value)} value={badge} />
         <div aria-label="Tags sugeridos" className={styles.badgeChips} role="group">

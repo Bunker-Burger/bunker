@@ -7,6 +7,7 @@ import type {
   AdminResult,
   CatalogAdminRepository,
   CategoryFields,
+  OptionFields,
   OptionGroupLink,
   ProductFields,
   StoredImage
@@ -73,6 +74,42 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
           .map((category) => ({ id: category.id, slug: category.slug, name: category.name, kind: category.kind, type: TYPE_BY_KIND[category.kind]!, sortOrder: category.sortOrder, visible: category.visible }))
       )
     );
+  }
+
+  async createOption(groupId: string, fields: OptionFields & { sortOrder: number }): Promise<AdminResult<{ id: string }>> {
+    const failed = this.fail("createOption");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return catalogError("not_found", "no row");
+    if (group.options.some((option) => option.name === fields.name)) return err({ code: "conflict" as const, message: "duplicate name" });
+    const id = this.id("o");
+    group.options = [...group.options, { id, name: fields.name, priceDeltaCents: fields.priceDeltaCents, available: fields.available }];
+    this.record(`createOption:${id}`);
+    return ok({ id });
+  }
+
+  async updateOption(groupId: string, optionId: string, fields: OptionFields): Promise<AdminResult<void>> {
+    const failed = this.fail("updateOption");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    const option = group?.options.find((candidate) => candidate.id === optionId);
+    if (!group || !option) return catalogError("not_found", "no row");
+    group.options = group.options.map((candidate) =>
+      candidate.id === optionId ? { ...candidate, name: fields.name, priceDeltaCents: fields.priceDeltaCents, available: fields.available } : candidate
+    );
+    this.record(`updateOption:${optionId}`);
+    return ok(undefined);
+  }
+
+  async setOptionOrder(groupId: string, rows: Array<{ id: string; sortOrder: number }>): Promise<AdminResult<void>> {
+    const failed = this.fail("setOptionOrder");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return catalogError("not_found", "no row");
+    const position = new Map(rows.map((row) => [row.id, row.sortOrder]));
+    group.options = [...group.options].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+    this.record(`setOptionOrder:${groupId}`);
+    return ok(undefined);
   }
 
   async listOptionGroups(storeId: string) {

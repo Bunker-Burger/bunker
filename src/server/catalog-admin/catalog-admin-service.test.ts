@@ -8,6 +8,8 @@ import {
   deleteProductImage,
   moveCategory,
   moveProduct,
+  reorderOptions,
+  saveOption,
   saveProduct,
   saveProductImage,
   updateCategory,
@@ -443,5 +445,47 @@ describe("product photos", () => {
     repository.images.push({ id: "img-1", productId: SMASH, storagePath: `${STORE}/old.webp`, altText: "Vieja", focalX: 50, focalY: 50 });
     expect(await deleteProductImage(deps(), form({ productId: SMASH }))).toMatchObject({ ok: true, message: "Foto eliminada." });
     expect(repository.writes).toEqual(["deleteImage:img-1", `removeObjects:${STORE}/old.webp`]);
+  });
+});
+
+describe("options and their price (issue #54)", () => {
+  it("adds an option to a group of the store, e.g. one more medallion", async () => {
+    const outcome = await saveOption(deps(), form({ groupId: EXTRAS, name: "Medallón de carne", price: "1400", available: "true" }));
+    expect(outcome.ok).toBe(true);
+    const extras = repository.optionGroups.find((group) => group.id === EXTRAS)!;
+    expect(extras.options.at(-1)).toMatchObject({ name: "Medallón de carne", priceDeltaCents: 140000n, available: true });
+  });
+
+  it("renames an option and changes its extra price; without 'available' it is paused", async () => {
+    const outcome = await saveOption(deps(), form({ groupId: SIZE, optionId: DOUBLE, name: "Simple", price: "0", available: "true" }));
+    expect(outcome.ok).toBe(true);
+    const size = repository.optionGroups.find((group) => group.id === SIZE)!;
+    expect(size.options[0]).toMatchObject({ id: DOUBLE, name: "Simple", priceDeltaCents: 0n, available: true });
+
+    await saveOption(deps(), form({ groupId: EXTRAS, optionId: BACON, name: "Bacon", price: "950" }));
+    expect(repository.optionGroups.find((group) => group.id === EXTRAS)!.options[0]).toMatchObject({ priceDeltaCents: 95000n, available: false });
+  });
+
+  it("refuses an option of another group, a repeated name, a bad price and a non-admin", async () => {
+    const wrongGroup = await saveOption(deps(), form({ groupId: EXTRAS, optionId: DOUBLE, name: "Doble", price: "0" }));
+    expect(wrongGroup.ok === false && wrongGroup.fieldErrors?.optionId).toBeTruthy();
+    const repeated = await saveOption(deps(), form({ groupId: SIZE, name: "triple", price: "100" }));
+    expect(repeated.ok === false && repeated.fieldErrors?.name).toContain("ya tiene una opción con ese nombre");
+    const badPrice = await saveOption(deps(), form({ groupId: SIZE, name: "Cuádruple", price: "-5" }));
+    expect(badPrice.ok === false && badPrice.fieldErrors?.price).toBeTruthy();
+    const stranger = await saveOption(deps({ userId: "22222222-2222-4222-8222-222222222222" }), form({ groupId: SIZE, name: "Cuádruple", price: "100" }));
+    expect(stranger.ok).toBe(false);
+    expect(repository.optionGroups.find((group) => group.id === SIZE)!.options).toHaveLength(2);
+  });
+
+  it("saves a new order with every option of the group exactly once", async () => {
+    const outcome = await reorderOptions(deps(), form({ groupId: SIZE, optionId: [TRIPLE, DOUBLE] }));
+    expect(outcome.ok).toBe(true);
+    expect(repository.optionGroups.find((group) => group.id === SIZE)!.options.map((option) => option.id)).toEqual([TRIPLE, DOUBLE]);
+
+    for (const optionId of [[TRIPLE], [TRIPLE, TRIPLE], [TRIPLE, BACON]]) {
+      const refused = await reorderOptions(deps(), form({ groupId: SIZE, optionId }));
+      expect(refused.ok).toBe(false);
+    }
   });
 });

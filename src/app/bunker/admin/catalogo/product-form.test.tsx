@@ -1,10 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { reorderOptionsAction, saveOptionAction, saveProductAction } from "./actions";
 import type { AdminFormState } from "./form-state";
 import { ProductForm, type ProductFormCategory, type ProductFormOptionGroup } from "./product-form";
 
-vi.mock("./actions", () => ({ saveProductAction: vi.fn() }));
+vi.mock("./actions", () => ({ saveProductAction: vi.fn(), saveOptionAction: vi.fn(), reorderOptionsAction: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const categories: ProductFormCategory[] = [
   { id: "c-burgers", name: "Hamburguesas", type: "burger", tabLabel: "Hamburguesas" },
@@ -14,15 +16,16 @@ const categories: ProductFormCategory[] = [
 const groups: ProductFormOptionGroup[] = [
   {
     id: "g-size", name: "Tamaño", selectionMode: "single", required: true, minSelections: 1, maxSelections: 1, applicableTypes: ["burger"],
-    options: [{ id: "o-double", name: "Doble", priceDelta: null, available: true }, { id: "o-triple", name: "Triple", priceDelta: "$ 1.600", available: true }]
+    options: [{ id: "o-double", name: "Doble", priceDelta: null, price: "0", available: true }, { id: "o-triple", name: "Triple", priceDelta: "$ 1.600", price: "1600", available: true }]
   },
   {
     id: "g-extras", name: "Extras", selectionMode: "multiple", required: false, minSelections: 0, maxSelections: 3, applicableTypes: ["burger"],
-    options: [{ id: "o-bacon", name: "Bacon", priceDelta: "$ 900", available: true }, { id: "o-pickles", name: "Pepinillos", priceDelta: "$ 300", available: false }]
+    options: [{ id: "o-bacon", name: "Bacon", priceDelta: "$ 900", price: "900", available: true }, { id: "o-pickles", name: "Pepinillos", priceDelta: "$ 300", price: "300", available: false }]
   }
 ];
 
 describe("ProductForm", () => {
+  beforeEach(() => vi.clearAllMocks());
   it("lists only the option groups of the chosen category's type", async () => {
     render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
     expect(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ })).toBeInTheDocument();
@@ -38,7 +41,7 @@ describe("ProductForm", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
     const size = screen.getByRole("group", { name: "Por defecto en Tamaño" });
     expect(within(size).getAllByRole("radio")).toHaveLength(2);
-    expect(within(size).getByRole("radio", { name: "Triple +$ 1.600" })).toBeInTheDocument();
+    expect(within(size).getByRole("radio", { name: "Triple por defecto" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
     const extras = screen.getByRole("group", { name: "Por defecto en Extras" });
@@ -61,7 +64,7 @@ describe("ProductForm", () => {
     expect(screen.getByRole("spinbutton", { name: "Precio base" })).toHaveValue(7800);
     expect(screen.getByRole("checkbox", { name: /Con stock/ })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Publicado/ })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Triple +$ 1.600" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Triple por defecto" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Guardar producto" })).toBeInTheDocument();
   });
 
@@ -80,5 +83,52 @@ describe("ProductForm", () => {
     const name = screen.getByRole("textbox", { name: "Nombre" });
     expect(name).toHaveAttribute("aria-invalid", "true");
     expect(name).toHaveAccessibleDescription("Ingresá un nombre.");
+  });
+
+  it("saves an option's name and extra price from its row, apart from the product (issue #54)", async () => {
+    vi.mocked(saveOptionAction).mockResolvedValue({ status: "success", message: "ok" });
+    render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
+    await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
+
+    const name = screen.getByRole("textbox", { name: "Nombre de Doble" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Simple");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar Doble" }));
+
+    await waitFor(() => expect(saveOptionAction).toHaveBeenCalled());
+    const sent = vi.mocked(saveOptionAction).mock.calls.at(-1)![1];
+    expect(Object.fromEntries(sent)).toEqual({ groupId: "g-size", optionId: "o-double", name: "Simple", price: "0", available: "true" });
+    expect(saveProductAction).not.toHaveBeenCalled();
+  });
+
+  it("adds a new option to an offered group, e.g. one more medallion", async () => {
+    vi.mocked(saveOptionAction).mockResolvedValue({ status: "success", message: "ok" });
+    render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
+    await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Nombre de la nueva opción de Extras" }), "Medallón de carne");
+    await userEvent.type(screen.getByRole("textbox", { name: "Precio extra de la nueva opción de Extras" }), "1400");
+    await userEvent.click(screen.getByRole("button", { name: "Añadir" }));
+
+    await waitFor(() => expect(saveOptionAction).toHaveBeenCalled());
+    const sent = vi.mocked(saveOptionAction).mock.calls.at(-1)![1];
+    expect(Object.fromEntries(sent)).toEqual({ groupId: "g-extras", available: "true", name: "Medallón de carne", price: "1400" });
+  });
+
+  it("moves an option with the arrow keys on its handle and saves the group's new order", async () => {
+    vi.mocked(reorderOptionsAction).mockResolvedValue({ status: "success", message: "ok" });
+    render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
+    await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
+
+    screen.getByRole("button", { name: /Mover Triple/ }).focus();
+    await userEvent.keyboard("{ArrowUp}");
+
+    const size = screen.getByRole("group", { name: "Por defecto en Tamaño" });
+    expect(within(size).getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["o-triple", "o-double"]);
+    await waitFor(() => expect(reorderOptionsAction).toHaveBeenCalled());
+    const sent = vi.mocked(reorderOptionsAction).mock.calls.at(-1)![1];
+    expect(sent.get("groupId")).toBe("g-size");
+    expect(sent.getAll("optionId")).toEqual(["o-triple", "o-double"]);
+    expect(screen.getByRole("button", { name: /Mover Triple/ })).toHaveFocus();
   });
 });

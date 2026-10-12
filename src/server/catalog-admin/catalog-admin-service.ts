@@ -8,6 +8,7 @@ import {
   parseDirection,
   parseId,
   parseImageDetails,
+  parseOptionForm,
   parseProductForm,
 } from "./input";
 import {
@@ -362,5 +363,69 @@ export function deleteProductImage(deps: CatalogAdminDependencies, form: FormDat
     if (!deleted.ok) return failure(deps, "deleteProductImage", deleted.error);
     await removeQuietly(deps, "deleteProductImage", [image.value.storagePath]);
     return success("Foto eliminada.", undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Options (issue #54): the price of an extra, e.g. one more medallion, is set by the store.
+
+/**
+ * Creates an option in a group of the store, or updates its name, extra price and availability.
+ * The group (and the option) must belong to the admin's store; the database refuses to pause the
+ * default choice of a published product.
+ */
+export function saveOption(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin<{ optionId: string }>(deps, "saveOption", async (storeId) => {
+    const groupId = parseId(form, "groupId");
+    if (!groupId.ok) return invalid(groupId.error);
+    const optionId = form.get("optionId") ? parseId(form, "optionId") : null;
+    if (optionId && !optionId.ok) return invalid(optionId.error);
+    const fields = parseOptionForm(form);
+    if (!fields.ok) return invalid(fields.error);
+
+    const groups = await deps.repository.listOptionGroups(storeId);
+    if (!groups.ok) return failure(deps, "saveOption", groups.error);
+    const group = groups.value.find((candidate) => candidate.id === groupId.value);
+    if (!group) return invalid({ groupId: "Ese grupo de opciones ya no existe. Recargá la página." });
+    if (optionId && !group.options.some((option) => option.id === optionId.value)) {
+      return invalid({ optionId: "Esa opción ya no existe. Recargá la página." });
+    }
+    const sameName = group.options.find((option) => option.name.trim().toLowerCase() === fields.value.name.toLowerCase());
+    if (sameName && sameName.id !== optionId?.value) return invalid({ name: `“${group.name}” ya tiene una opción con ese nombre.` });
+
+    const messages = {
+      conflict: `“${group.name}” ya tiene una opción con ese nombre.`,
+      rejected: "No se puede pausar: es la opción por defecto de un producto publicado. Cambiá ese valor por defecto primero."
+    };
+    if (optionId) {
+      const saved = await deps.repository.updateOption(group.id, optionId.value, fields.value);
+      if (!saved.ok) return failure(deps, "saveOption", saved.error, messages);
+      return success(`“${fields.value.name}” guardada.`, { optionId: optionId.value });
+    }
+    const created = await deps.repository.createOption(group.id, { ...fields.value, sortOrder: nextSortOrder(group.options.map((_, index) => ({ sortOrder: (index + 1) * 10 }))) });
+    if (!created.ok) return failure(deps, "saveOption", created.error, messages);
+    return success(`“${fields.value.name}” agregada a ${group.name}.`, { optionId: created.value.id });
+  });
+}
+
+/** The order of a group's options, as dragged in the product form: every option, each once. */
+export function reorderOptions(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderOptions", async (storeId) => {
+    const groupId = parseId(form, "groupId");
+    if (!groupId.ok) return invalid(groupId.error);
+    const ids = form.getAll("optionId").map((value) => (typeof value === "string" ? value.toLowerCase() : ""));
+
+    const groups = await deps.repository.listOptionGroups(storeId);
+    if (!groups.ok) return failure(deps, "reorderOptions", groups.error);
+    const group = groups.value.find((candidate) => candidate.id === groupId.value);
+    if (!group) return invalid({ groupId: "Ese grupo de opciones ya no existe. Recargá la página." });
+    const current = new Set(group.options.map((option) => option.id));
+    if (ids.length !== current.size || new Set(ids).size !== ids.length || !ids.every((id) => current.has(id))) {
+      return invalid({ optionId: "Las opciones cambiaron mientras las ordenabas. Recargá la página." });
+    }
+
+    const saved = await deps.repository.setOptionOrder(group.id, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderOptions", saved.error);
+    return success(`Orden de ${group.name} guardado.`, undefined);
   });
 }

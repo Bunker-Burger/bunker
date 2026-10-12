@@ -13,6 +13,9 @@ import {
 } from "./actions";
 import { AdminForm, CheckboxField, TextField } from "../admin-form";
 import { ADMIN_CATALOG_PATH, CATALOG_TABS, productEditPath, tabFor, tabForType, type CatalogTab } from "./form-state";
+import { OptionsEditor, type EditableOptionGroup } from "./options-editor";
+import { pesos } from "./product-props";
+import type { AdminOptionGroup } from "@/server/catalog-admin";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -66,10 +69,15 @@ export default async function CatalogAdminPage({ searchParams }: { searchParams:
           <AdminForm action={createCategoryAction} submitLabel="Crear categoría">
             <input name="kind" type="hidden" value={tab.kind} />
             <TextField label="Nombre" maxLength={60} name="name" required />
-            <TextField hint="Se genera del nombre si lo dejás vacío." label="Slug (opcional)" maxLength={80} name="slug" />
             <CheckboxField defaultChecked label="Visible en el menú" name="visible" />
           </AdminForm>
         </details>
+      </section>
+
+      <section aria-labelledby="options-title" className={styles.tabPanel} id="opciones">
+        <h2 id="options-title">Opciones y extras</h2>
+        <p className={styles.hint}>Medallones, extras y agregados con su precio. Para ofrecerlos en un producto, marcá el grupo en el producto.</p>
+        <OptionsEditor groups={editableGroups(view.value.optionGroups)} />
       </section>
 
       <section aria-labelledby="order-title" className={styles.tabPanel}>
@@ -148,7 +156,8 @@ function CategoryCard({ category, products, tab }: { category: Category; product
         <AdminForm action={updateCategoryAction} submitLabel="Guardar categoría">
           <input name="categoryId" type="hidden" value={category.id} />
           <TextField defaultValue={category.name} label="Nombre" maxLength={60} name="name" required />
-          <TextField defaultValue={category.slug} label="Slug" maxLength={80} name="slug" />
+          {/* The link stays the same when the category is renamed. */}
+          <input name="slug" type="hidden" value={category.slug} />
           <CheckboxField defaultChecked={category.visible} label="Visible en el menú" name="visible" />
           <p className={styles.hint}>El tipo ({tab.label}) no cambia: define qué opciones aplican a sus productos.</p>
         </AdminForm>
@@ -195,4 +204,17 @@ function MoveButtons({
       )}
     </div>
   );
+}
+
+const TYPE_NAMES: Record<string, string> = { burger: "hamburguesas", sandwich: "sándwiches", fries: "papas", beverage: "bebidas" };
+
+/** Plain, serializable groups for the client editor (prices in pesos, no bigint). */
+function editableGroups(groups: AdminOptionGroup[]): EditableOptionGroup[] {
+  return groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    selection: group.selectionMode === "single" ? (group.required ? "Selección única · obligatoria" : "Selección única") : `Hasta ${group.maxSelections}`,
+    appliesTo: group.applicableTypes.map((type) => TYPE_NAMES[type] ?? type).join(", ") || "ningún tipo",
+    options: group.options.map((option) => ({ id: option.id, name: option.name, price: pesos(option.priceDeltaCents), available: option.available }))
+  }));
 }

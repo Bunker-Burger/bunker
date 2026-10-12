@@ -32,6 +32,13 @@ export interface ProductFields {
 
 export type AdminOptionGroup = ConfigurableOptionGroup & { applicableTypes: readonly ProductType[] };
 
+/** One choice of an option group, e.g. "Medallón extra" at +$ 1.400 (issue #54). */
+export interface OptionFields {
+  name: string;
+  priceDeltaCents: bigint;
+  available: boolean;
+}
+
 export interface OptionGroupLink {
   groupId: string;
   defaultOptionIds: string[];
@@ -86,6 +93,11 @@ export interface CatalogAdminRepository {
   setProductPublished(storeId: string, productId: string, published: boolean): Promise<AdminResult<void>>;
   replaceOptionGroups(storeId: string, productId: string, links: OptionGroupLink[]): Promise<AdminResult<void>>;
   setProductOrder(storeId: string, rows: OrderedRow[]): Promise<AdminResult<void>>;
+
+  /** Options belong to a group of the store; the service checks that before calling these. */
+  createOption(groupId: string, fields: OptionFields & { sortOrder: number }): Promise<AdminResult<{ id: string }>>;
+  updateOption(groupId: string, optionId: string, fields: OptionFields): Promise<AdminResult<void>>;
+  setOptionOrder(groupId: string, rows: OrderedRow[]): Promise<AdminResult<void>>;
   isProductInPromotion(storeId: string, productId: string): Promise<AdminResult<boolean>>;
   deleteProduct(storeId: string, productId: string): Promise<AdminResult<void>>;
 
