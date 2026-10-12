@@ -116,7 +116,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     <>
     <AdminForm action={action} submitLabel={product ? "Guardar producto" : "Crear producto"}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
-      {photo ? <PhotoField hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
+      {photo ? <PhotoField key={`${photo.url ?? ""}-${photo.focal?.x ?? ""}-${photo.focal?.y ?? ""}`} hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
 
       <fieldset className={styles.formCard}>
         <legend>

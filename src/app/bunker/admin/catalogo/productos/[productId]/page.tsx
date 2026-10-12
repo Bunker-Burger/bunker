@@ -49,7 +49,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         <h2 id="details-title">Datos y opciones</h2>
         <ProductForm
           categories={formCategories(view.value.catalog.categories)}
-          key={`${product.id}-${product.published}-${product.optionGroups.length}-${product.imageUrl ?? ""}-${product.imageFocalPoint?.x ?? 50}-${product.imageFocalPoint?.y ?? 50}`}
+          key={`${product.id}-${product.published}-${product.optionGroups.length}`}
           photo={{
             url: product.imageUrl ?? null,
             maxBytes: MAX_IMAGE_BYTES,

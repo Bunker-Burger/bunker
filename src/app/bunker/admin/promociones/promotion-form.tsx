@@ -219,6 +219,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
       {defaults.id ? <input name="promotionId" type="hidden" value={defaults.id} /> : null}
       {photo ? (
         <PhotoField
+          key={photo.url ?? ""}
           hint="Se muestra arriba de la carta mientras la promoción está vigente."
           legend="Foto de la promo"
           photo={photo}
