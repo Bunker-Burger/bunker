@@ -114,9 +114,52 @@ describe("PromotionForm preview", () => {
     await userEvent.click(screen.getByRole("button", { name: "Agregar producto" }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Producto 1" }), SMASH);
     expect(rowsText()).toEqual(["Smash$ 7.800$ 6.630"]);
+    await userEvent.click(screen.getByRole("button", { name: "Horarios distintos por día" }));
     await userEvent.click(screen.getByRole("button", { name: "Agregar franja" }));
     expect(screen.getByRole("combobox", { name: "Día 1" })).toHaveValue("1");
     await userEvent.click(screen.getByRole("button", { name: "Quitar franja 1" }));
     expect(screen.queryByRole("combobox", { name: "Día 1" })).not.toBeInTheDocument();
+  });
+
+  it("the day chips send one window per marked day with the same hours (issue #54)", async () => {
+    const action = vi.fn(async () => ({ status: "idle" as const, message: null }));
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "Jueves" }));
+    await userEvent.click(screen.getByRole("button", { name: "Domingo" }));
+    expect(screen.getByRole("button", { name: "Jueves" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+
+    const sent = action.mock.calls.at(-1)![1] as FormData;
+    expect(sent.getAll("scheduleDay")).toEqual(["4", "0"]);
+    expect(sent.getAll("scheduleStart")).toEqual(["20:00", "20:00"]);
+    expect(sent.getAll("scheduleEnd")).toEqual(["23:30", "23:30"]);
+  });
+
+  it("an existing schedule with different hours per day opens in the per-day list", () => {
+    render(
+      <PromotionForm
+        defaults={defaults({ schedule: [{ dayOfWeek: "2", startsAt: "19:00", endsAt: "23:00" }, { dayOfWeek: "5", startsAt: "20:00", endsAt: "01:00" }] })}
+        deliveryFeeCents="120000"
+        products={products}
+        timezone="America/Argentina/Tucuman"
+      />
+    );
+    expect(screen.getByRole("combobox", { name: "Día 2" })).toHaveValue("5");
+    expect(screen.queryByRole("group", { name: "Días de aplicación" })).toBeNull();
+  });
+
+  it("a suggested tag fills the badge; Personalizado opens a free field", async () => {
+    const action = vi.fn(async () => ({ status: "idle" as const, message: null }));
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "30% OFF" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1] as FormData).get("badgeText")).toBe("30% OFF");
+
+    await userEvent.click(screen.getByRole("button", { name: "Personalizado" }));
+    const custom = screen.getByRole("textbox", { name: "Tag personalizado" });
+    await userEvent.clear(custom);
+    await userEvent.type(custom, "Búnker Fest");
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1] as FormData).get("badgeText")).toBe("Búnker Fest");
   });
 });
