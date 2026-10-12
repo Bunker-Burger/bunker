@@ -10,6 +10,7 @@ import {
   PRODUCT_SELECT,
   productRowSchema,
   PROMOTION_SELECT,
+  PROMOTION_SELECT_WITH_FOCAL,
   PROMOTION_SELECT_WITH_IMAGE,
   promotionRowSchema,
   STORE_SELECT,
@@ -91,9 +92,12 @@ export function createSupabaseCatalogRepository(
         if (isPublic) query = query.eq("is_active", true);
         return run("promotion_rules.select", query.order("priority") as PromiseLike<QueryResponse>);
       };
-      let response = await read(PROMOTION_SELECT_WITH_IMAGE);
-      // Before the promotion-photo migration the column does not exist: read as before.
-      if (!response.ok && isMissingColumn(response.error.cause)) response = await read(PROMOTION_SELECT);
+      // Newest columns first; a database without the photo (or framing) migrations reads as before.
+      let response = await read(PROMOTION_SELECT_WITH_FOCAL);
+      for (const older of [PROMOTION_SELECT_WITH_IMAGE, PROMOTION_SELECT]) {
+        if (response.ok || !isMissingColumn(response.error.cause)) break;
+        response = await read(older);
+      }
       if (!response.ok) return response;
       const rows = parseRows("promotion_rules", promotionRowSchema, response.value);
       return rows.ok ? toPromotionRules(rows.value, imageBaseUrl) : rows;

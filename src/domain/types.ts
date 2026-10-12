@@ -213,6 +213,8 @@ export interface PromotionRule {
   badgeText: string | null;
   /** Photo for the menu's promotion banner (issue #54); absent when there is none. */
   imageUrl?: string | null;
+  /** Percentages (0–100) of the photo kept in view when the banner crops it; centred when absent. */
+  imageFocalPoint?: { x: number; y: number };
   priority: number;
   active: boolean;
   startsAt: Date;

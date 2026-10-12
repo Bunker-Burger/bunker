@@ -566,6 +566,8 @@ export type Database = {
           fixed_price_cents: number | null
           get_quantity: number | null
           id: string
+          image_focal_x: number
+          image_focal_y: number
           image_path: string | null
           is_active: boolean
           name: string
@@ -588,6 +590,8 @@ export type Database = {
           fixed_price_cents?: number | null
           get_quantity?: number | null
           id?: string
+          image_focal_x?: number
+          image_focal_y?: number
           image_path?: string | null
           is_active?: boolean
           name: string
@@ -610,6 +614,8 @@ export type Database = {
           fixed_price_cents?: number | null
           get_quantity?: number | null
           id?: string
+          image_focal_x?: number
+          image_focal_y?: number
           image_path?: string | null
           is_active?: boolean
           name?: string

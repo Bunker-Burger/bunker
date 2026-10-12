@@ -93,7 +93,12 @@ const imageRowSchema = z.object({
   sort_order: z.number().int()
 });
 
-const promotionImageRowSchema = z.object({ name: z.string(), image_path: z.string().nullable().optional() });
+const promotionImageRowSchema = z.object({
+  name: z.string(),
+  image_path: z.string().nullable().optional(),
+  image_focal_x: z.number().int().optional(),
+  image_focal_y: z.number().int().optional()
+});
 
 export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Database>): CatalogAdminRepository {
   const bucket = () => client.storage.from(CATALOG_BUCKET);
@@ -452,9 +457,10 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
     async getPromotionImage(storeId, promotionId) {
       const read = (columns: string) =>
         write("promotion_rules.select", client.from("promotion_rules").select(columns).eq("store_id", storeId).eq("id", promotionId) as PromiseLike<QueryResponse>);
+      // Newest columns first; before the photo (or framing) migrations they do not exist.
       let supported = true;
-      let response = await read("name, image_path");
-      // Before the promotion-photo migration the column does not exist.
+      let response = await read("name, image_path, image_focal_x, image_focal_y");
+      if (!response.ok && isMissingColumn(response.error.cause)) response = await read("name, image_path");
       if (!response.ok && isMissingColumn(response.error.cause)) {
         supported = false;
         response = await read("name");
@@ -463,13 +469,27 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
       const rows = parseRows("promotion_rules", promotionImageRowSchema, response.value);
       if (!rows.ok) return rows;
       const [row] = rows.value;
-      return ok(row ? { name: row.name, imagePath: row.image_path ?? null, supported } : null);
+      const focal = row?.image_focal_x !== undefined && row.image_focal_y !== undefined ? { x: row.image_focal_x, y: row.image_focal_y } : null;
+      return ok(row ? { name: row.name, imagePath: row.image_path ?? null, supported, focal } : null);
     },
 
-    setPromotionImage(storeId, promotionId, imagePath) {
+    setPromotionImage(storeId, promotionId, imagePath, focal) {
+      const values = focal ? { image_path: imagePath, image_focal_x: focal.x, image_focal_y: focal.y } : { image_path: imagePath };
       return writeOne(
         "promotion_rules.update",
-        client.from("promotion_rules").update({ image_path: imagePath }).eq("store_id", storeId).eq("id", promotionId).select("id") as PromiseLike<QueryResponse>
+        client.from("promotion_rules").update(values).eq("store_id", storeId).eq("id", promotionId).select("id") as PromiseLike<QueryResponse>
+      );
+    },
+
+    setPromotionFocal(storeId, promotionId, focal) {
+      return writeOne(
+        "promotion_rules.update",
+        client
+          .from("promotion_rules")
+          .update({ image_focal_x: focal.x, image_focal_y: focal.y })
+          .eq("store_id", storeId)
+          .eq("id", promotionId)
+          .select("id") as PromiseLike<QueryResponse>
       );
     }
   };

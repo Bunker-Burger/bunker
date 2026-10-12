@@ -371,7 +371,10 @@ export function deleteProductImage(deps: CatalogAdminDependencies, form: FormDat
 
 const PROMOTION_IMAGE_PENDING = "Las fotos de promociones todavía no están habilitadas en la base de datos (falta aplicar su migración).";
 
-/** Uploads or replaces the photo: new object first, then the row, then the old object is removed. */
+/**
+ * Uploads or replaces the photo (new object first, then the row, then the old object is removed),
+ * or, without a file, only recentres the stored one.
+ */
 export function savePromotionImage(deps: CatalogAdminDependencies, form: FormData) {
   return asAdmin(deps, "savePromotionImage", async (storeId) => {
     const id = parseId(form, "promotionId");
@@ -380,9 +383,18 @@ export function savePromotionImage(deps: CatalogAdminDependencies, form: FormDat
     if (!promotion.ok) return failure(deps, "savePromotionImage", promotion.error);
     if (!promotion.value) return failure(deps, "savePromotionImage", { code: "not_found", message: "promotion not in store" });
     if (!promotion.value.supported) return { ok: false, message: PROMOTION_IMAGE_PENDING } as const;
+    const details = parseImageDetails(form, promotion.value.name);
+    if (!details.ok) return invalid(details.error);
+    const focal = { x: details.value.focalX, y: details.value.focalY };
 
     const file = form.get("image");
-    if (typeof file !== "object" || file === null || file.size === 0) return invalid({ image: "Elegí una imagen." });
+    if (typeof file !== "object" || file === null || file.size === 0) {
+      if (!promotion.value.imagePath) return invalid({ image: "Elegí una imagen." });
+      if (!promotion.value.focal) return { ok: false, message: PROMOTION_IMAGE_PENDING } as const;
+      const moved = await deps.repository.setPromotionFocal(storeId, id.value, focal);
+      if (!moved.ok) return failure(deps, "savePromotionImage", moved.error);
+      return success("Foto acomodada.", undefined);
+    }
     if (file.size > MAX_IMAGE_BYTES) return invalid({ image: "La imagen supera los 5 MB." });
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = await inspectImage(bytes, file.type);
@@ -394,7 +406,7 @@ export function savePromotionImage(deps: CatalogAdminDependencies, form: FormDat
     if (!uploaded.ok) return failure(deps, "savePromotionImage", uploaded.error);
 
     const previous = promotion.value.imagePath;
-    const saved = await deps.repository.setPromotionImage(storeId, id.value, path);
+    const saved = await deps.repository.setPromotionImage(storeId, id.value, path, promotion.value.focal ? focal : undefined);
     if (!saved.ok) {
       await removeQuietly(deps, "savePromotionImage", [path]);
       return failure(deps, "savePromotionImage", saved.error);

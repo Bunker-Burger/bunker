@@ -4,6 +4,7 @@ import { Tag } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
 import type { PromotionRule } from "@/domain/types";
+import { focalStyle } from "./focal-style";
 
 /*
  * Promotions with a photo at the top of the menu (issue #54). They are discount rules, not
@@ -53,7 +54,7 @@ export function PromoSection({ promotions }: { promotions: readonly PromotionRul
           <article className="product-card promo-card" key={promotion.id}>
             <div className="promo-card-image">
               {/* eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos */}
-              <img alt="" loading="lazy" src={promotion.imageUrl ?? ""} />
+              <img alt="" loading="lazy" src={promotion.imageUrl ?? ""} style={focalStyle(promotion)} />
               {promotion.badgeText ? <span className="promo-badge">{promotion.badgeText}</span> : null}
             </div>
             <div className="promo-card-copy">
@@ -77,7 +78,7 @@ export function PromoBanner({ promotions, label }: { promotions: readonly Promot
         {promotions.map((promotion) => (
           <li className="promo-slide" key={promotion.id}>
             {/* eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos */}
-            <img alt="" src={promotion.imageUrl ?? ""} />
+            <img alt="" src={promotion.imageUrl ?? ""} style={focalStyle(promotion)} />
             <div className="promo-slide-copy">
               {promotion.badgeText ? <span className="promo-badge">{promotion.badgeText}</span> : null}
               <h2>{promotion.name}</h2>

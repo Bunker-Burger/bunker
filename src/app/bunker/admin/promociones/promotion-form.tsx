@@ -195,7 +195,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
   const [items, setItems] = useState(defaults.items);
   const [schedule, setSchedule] = useState(defaults.schedule);
   const [badge, setBadge] = useState(defaults.badgeText);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(photo?.url ?? null);
+  const [photoView, setPhotoView] = useState({ url: photo?.url ?? null, focal: photo?.focal ?? { x: 50, y: 50 } });
   const [customBadge, setCustomBadge] = useState(defaults.badgeText !== "" && !BADGE_SUGGESTIONS.includes(defaults.badgeText));
   const initialDays = uniformSchedule(defaults.schedule);
   const [byDay, setByDay] = useState(initialDays === null);
@@ -222,7 +222,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
       {photo ? (
         <PhotoField
           key={photo.url ?? ""}
-          onView={(view) => setPhotoUrl(view.url)}
+          onView={setPhotoView}
           hint="Se muestra arriba de la carta mientras la promoción está vigente."
           legend="Foto de la promo"
           photo={photo}
@@ -520,7 +520,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         </fieldset>
       </fieldset>
 
-      <PromotionPreview badge={badge} items={validItems} mechanic={mechanic} photoUrl={photoUrl} />
+      <PromotionPreview badge={badge} focal={photoView.focal} items={validItems} mechanic={mechanic} photoUrl={photoView.url} />
     </AdminForm>
   );
 }

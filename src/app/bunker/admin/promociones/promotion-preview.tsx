@@ -15,9 +15,11 @@ export function PromotionPreview({
   badge,
   mechanic,
   items,
-  photoUrl
+  photoUrl,
+  focal
 }: {
   badge: string;
+  focal: { x: number; y: number };
   mechanic: PromotionMechanic | null;
   items: PromotionRule["items"];
   photoUrl: string | null;
@@ -43,6 +45,7 @@ export function PromotionPreview({
         description: "",
         badgeText: badge || null,
         imageUrl: photoUrl,
+        imageFocalPoint: focal,
         priority: 0,
         active: true,
         startsAt: new Date(0),

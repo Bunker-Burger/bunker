@@ -15,6 +15,8 @@ export interface PhotoValue {
   maxSide: number;
   /** Where the crop is centred (0–100). Only products keep it; without it the photo is not movable. */
   focal?: { x: number; y: number };
+  /** Crop of the preview: the menu card (default) or the promotion banner. */
+  frame?: "card" | "banner";
 }
 
 const clamp = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
@@ -125,6 +127,7 @@ export function PhotoField({
             <div
               aria-label="Acomodar la foto: arrastrala o usá las flechas"
               className={styles.photoFrame}
+              data-frame={photo.frame ?? "card"}
               onKeyDown={nudge}
               onPointerCancel={() => (drag.current = null)}
               onPointerDown={startDrag}

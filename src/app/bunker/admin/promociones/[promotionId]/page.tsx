@@ -43,7 +43,14 @@ export default async function EditPromotionPage({ params, searchParams }: { para
         defaults={promotionValues(rule, catalog.store.timezone)}
         deliveryFeeCents={catalog.store.deliveryFeeCents === null ? null : catalog.store.deliveryFeeCents.toString()}
         key={`${rule.id}-${rule.active}-${rule.items.length}-${rule.schedule.length}`}
-        photo={{ url: rule.imageUrl ?? null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE }}
+        photo={{
+          url: rule.imageUrl ?? null,
+          maxBytes: MAX_IMAGE_BYTES,
+          minSide: MIN_IMAGE_SIDE,
+          maxSide: MAX_IMAGE_SIDE,
+          focal: rule.imageFocalPoint ?? { x: 50, y: 50 },
+          frame: "banner"
+        }}
         products={formProducts(catalog)}
         timezone={catalog.store.timezone}
       />

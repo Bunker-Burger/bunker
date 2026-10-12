@@ -28,12 +28,15 @@ export async function savePromotionAction(_previous: AdminFormState, form: FormD
 async function savePhoto(promotionId: string, form: FormData): Promise<AdminFormState | null> {
   const file = form.get("image");
   const hasFile = typeof file === "object" && file !== null && file.size > 0;
-  if (!hasFile && form.get("removeImage") !== "true") return null;
   const data = new FormData();
   data.set("promotionId", promotionId);
+  if (form.get("removeImage") === "true" && !hasFile) {
+    return (await performAdminAction(catalogAdminDependencies, deletePromotionImage, data, ADMIN_PROMOTIONS_PATH)).state;
+  }
+  if (!hasFile && form.get("photoMoved") !== "true") return null;
   if (hasFile) data.set("image", file);
-  const operation = hasFile ? savePromotionImage : deletePromotionImage;
-  return (await performAdminAction(catalogAdminDependencies, operation, data, ADMIN_PROMOTIONS_PATH)).state;
+  for (const field of ["focalX", "focalY"]) data.set(field, String(form.get(field) ?? "50"));
+  return (await performAdminAction(catalogAdminDependencies, savePromotionImage, data, ADMIN_PROMOTIONS_PATH)).state;
 }
 
 export async function setPromotionActiveAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {

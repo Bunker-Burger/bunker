@@ -408,6 +408,11 @@ describe("ordering", () => {
     ]);
     const result = rows.ok ? toPromotionRules(rows.value, "https://cdn.test/catalog/") : rows;
     expect(result.ok && result.value.map((rule) => rule.imageUrl)).toEqual(["https://cdn.test/catalog/s1/promotions/a%201.webp", undefined, undefined]);
+    expect(result.ok && result.value.map((rule) => rule.imageFocalPoint)).toEqual([undefined, undefined, undefined]);
+
+    const framed = parseRows("promotion_rules", promotionRowSchema, [{ ...base, id: "d", image_path: "s1/promotions/d.webp", image_focal_x: 30, image_focal_y: 70 }]);
+    const withFocal = framed.ok ? toPromotionRules(framed.value, "https://cdn.test/catalog") : framed;
+    expect(withFocal.ok && withFocal.value[0]?.imageFocalPoint).toEqual({ x: 30, y: 70 });
   });
 });
 

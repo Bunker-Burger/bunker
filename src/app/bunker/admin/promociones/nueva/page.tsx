@@ -24,7 +24,7 @@ export default async function NewPromotionPage() {
       <PromotionForm
         defaults={newPromotionValues(store.timezone)}
         deliveryFeeCents={store.deliveryFeeCents === null ? null : store.deliveryFeeCents.toString()}
-        photo={{ url: null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE }}
+        photo={{ url: null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE, focal: { x: 50, y: 50 }, frame: "banner" }}
         products={formProducts(view.value.catalog)}
         timezone={store.timezone}
       />

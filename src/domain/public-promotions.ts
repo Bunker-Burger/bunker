@@ -31,6 +31,7 @@ export interface PublicPromotion {
   schedule: PromotionRule["schedule"];
   /** Only for promotions with a photo: what the menu's banner shows (issue #54). */
   imageUrl?: string | null | undefined;
+  imageFocalPoint?: { x: number; y: number } | undefined;
   badgeText?: string | null | undefined;
 }
 
@@ -51,7 +52,8 @@ export function toPublicPromotion(rule: PromotionRule, productSlugs: ReadonlyMap
     channels: rule.channels,
     items: rule.items.map((item) => ({ productSlug: productSlugs.get(item.productId) ?? null, quantity: item.quantity })),
     schedule: rule.schedule,
-    ...(rule.imageUrl ? { imageUrl: rule.imageUrl, badgeText: rule.badgeText } : {})
+    ...(rule.imageUrl ? { imageUrl: rule.imageUrl, badgeText: rule.badgeText } : {}),
+    ...(rule.imageUrl && rule.imageFocalPoint ? { imageFocalPoint: rule.imageFocalPoint } : {})
   };
 }
 
@@ -75,6 +77,7 @@ const publicPromotionSchema = z.object({
   items: z.array(z.object({ productSlug: z.string().nullable(), quantity: positiveInt })),
   schedule: z.array(z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: wallClock, endsAt: wallClock })),
   imageUrl: z.string().url().nullable().optional(),
+  imageFocalPoint: z.object({ x: z.number().int().min(0).max(100), y: z.number().int().min(0).max(100) }).optional(),
   badgeText: z.string().nullable().optional()
 });
 
@@ -99,6 +102,7 @@ export function toPromotionRule(promotion: PublicPromotion, productIdBySlug: Rea
     description: "",
     badgeText: promotion.badgeText ?? null,
     ...(promotion.imageUrl ? { imageUrl: promotion.imageUrl } : {}),
+    ...(promotion.imageUrl && promotion.imageFocalPoint ? { imageFocalPoint: promotion.imageFocalPoint } : {}),
     priority: promotion.priority,
     active: true,
     startsAt: new Date(promotion.startsAt),

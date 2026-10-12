@@ -571,6 +571,29 @@ describe("promotion photo for the menu banner (issue #54)", () => {
     expect(repository.writes).toEqual(["setPromotionImage:null", `removeObjects:${STORE}/promotions/old.webp`]);
   });
 
+  it("stores where the banner centres a new photo", async () => {
+    const data = upload();
+    data.set("focalX", "20");
+    data.set("focalY", "80");
+    expect(await savePromotionImage(deps(), data)).toMatchObject({ ok: true });
+    expect(repository.promotions[0]?.focal).toEqual({ x: 20, y: 80 });
+  });
+
+  it("recentres the stored photo without uploading anything", async () => {
+    repository.promotions[0]!.imagePath = `${STORE}/promotions/old.webp`;
+    expect(await savePromotionImage(deps(), form({ promotionId: PROMO, focalX: "10", focalY: "90" }))).toMatchObject({ ok: true, message: "Foto acomodada." });
+    expect(repository.writes).toEqual(["setPromotionFocal:10,90"]);
+    expect(repository.objects.size).toBe(0);
+  });
+
+  it("uploads without framing on a database without the framing migration", async () => {
+    repository.promotionFocalSupported = false;
+    expect(await savePromotionImage(deps(), upload())).toMatchObject({ ok: true });
+    expect(repository.promotions[0]?.focal).toBeUndefined();
+    repository.promotions[0]!.imagePath = path;
+    expect(await savePromotionImage(deps(), form({ promotionId: PROMO, focalX: "10", focalY: "90" }))).toMatchObject({ ok: false, message: expect.stringContaining("migración") });
+  });
+
   it("refuses without an admin session", async () => {
     expect(await savePromotionImage(deps(null), upload())).toMatchObject({ ok: false });
     expect(repository.writes).toEqual([]);

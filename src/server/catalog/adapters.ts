@@ -224,6 +224,9 @@ export function toPromotionRules(rows: PromotionRow[], imageBaseUrl = ""): Resul
       description: row.description,
       badgeText: row.badge_text,
       ...(row.image_path && base ? { imageUrl: `${base}/${row.image_path.split("/").map(encodeURIComponent).join("/")}` } : {}),
+      ...(row.image_path && base && row.image_focal_x !== undefined && row.image_focal_y !== undefined
+        ? { imageFocalPoint: { x: row.image_focal_x, y: row.image_focal_y } }
+        : {}),
       priority: row.priority,
       active: row.is_active,
       startsAt: new Date(row.starts_at),

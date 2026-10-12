@@ -74,6 +74,8 @@ export interface StoredPromotionImage {
   imagePath: string | null;
   /** False until the promotion-photo migration is applied: there is nowhere to store the path. */
   supported: boolean;
+  /** Where the banner centres the photo; null until the framing migration is applied. */
+  focal: { x: number; y: number } | null;
 }
 
 export interface OrderedRow {
@@ -120,5 +122,7 @@ export interface CatalogAdminRepository {
 
   /** The promotion of the store with its photo path, or null when it is not in the store. */
   getPromotionImage(storeId: string, promotionId: string): Promise<AdminResult<StoredPromotionImage | null>>;
-  setPromotionImage(storeId: string, promotionId: string, imagePath: string | null): Promise<AdminResult<void>>;
+  /** `focal` is written only when given (databases with the framing migration). */
+  setPromotionImage(storeId: string, promotionId: string, imagePath: string | null, focal?: { x: number; y: number }): Promise<AdminResult<void>>;
+  setPromotionFocal(storeId: string, promotionId: string, focal: { x: number; y: number }): Promise<AdminResult<void>>;
 }

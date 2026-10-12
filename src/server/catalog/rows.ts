@@ -145,6 +145,9 @@ export const PROMOTION_SELECT = [
 /** With the promotion photo (issue #54); databases without that migration answer to PROMOTION_SELECT. */
 export const PROMOTION_SELECT_WITH_IMAGE = `${PROMOTION_SELECT}, image_path`;
 
+/** With where the photo is centred (issue #54); older databases answer to the selects above. */
+export const PROMOTION_SELECT_WITH_FOCAL = `${PROMOTION_SELECT_WITH_IMAGE}, image_focal_x, image_focal_y`;
+
 export const promotionRowSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -163,6 +166,8 @@ export const promotionRowSchema = z.object({
   applies_to_delivery: z.boolean(),
   applies_to_pickup: z.boolean(),
   image_path: z.string().nullable().optional(),
+  image_focal_x: z.number().int().min(0).max(100).optional(),
+  image_focal_y: z.number().int().min(0).max(100).optional(),
   promotion_items: z.array(z.object({ product_id: z.string(), quantity: smallInt })),
   promotion_schedule: z.array(z.object({ day_of_week: smallInt, starts_at: wallClock, ends_at: wallClock }))
 });

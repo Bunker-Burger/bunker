@@ -3472,3 +3472,8 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   letter-spacing: var(--tracking-badge);
   text-transform: uppercase;
 }
+
+/* A promotion photo is framed like the banner of the menu. */
+.photoFrame[data-frame="banner"] {
+  aspect-ratio: 16 / 9;
+}
