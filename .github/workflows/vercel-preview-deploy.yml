@@ -1,0 +1,104 @@
+name: Vercel Preview — deploy autorizado
+
+# Privileged half of the preview pipeline (docs/runbooks/vercel-preview.md). A maintainer runs it
+# from main with the PR and the full SHA they reviewed. It never checks out nor runs the PR's code:
+# it downloads the artifact built from that SHA by vercel-preview.yml, checks it and uploads it with
+# a trusted Vercel CLI. Preview only: there is no production flag anywhere in this workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Número de la PR
+        required: true
+        type: number
+      sha:
+        description: SHA completo (40) del HEAD revisado
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: vercel-preview-deploy-${{ inputs.pr }}
+  cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@60.0.0
+  VERCEL_TELEMETRY_DISABLED: "1"
+  BUILD_WORKFLOW: .github/workflows/vercel-preview.yml
+
+jobs:
+  deploy:
+    name: Vercel Preview (deploy)
+    # The `preview` environment (VERCEL_* secrets) only admits main; this keeps a branch's copy of the
+    # workflow from even trying.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      # main's code (the guard), never the PR's.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: authorize
+        name: SHA autorizado = HEAD de la PR, con build exitoso
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr }}
+          AUTHORIZED_SHA: ${{ inputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/vercel-preview.yml/runs?event=pull_request&head_sha=$AUTHORIZED_SHA&per_page=100" > "$RUNNER_TEMP/runs.json"
+          node scripts/ci/vercel-preview-guard.mjs dispatch "$RUNNER_TEMP/pr.json" "$RUNNER_TEMP/runs.json"
+      - name: Descargar y revisar el artefacto
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.authorize.outputs.run_id }}
+          AUTHORIZED_SHA: ${{ inputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "vercel-preview-$AUTHORIZED_SHA" --dir "$RUNNER_TEMP/artifact"
+          mkdir -p "$RUNNER_TEMP/prebuilt/.vercel"
+          tar -xzf "$RUNNER_TEMP/artifact/vercel-output.tgz" -C "$RUNNER_TEMP/prebuilt/.vercel" --no-same-owner --no-same-permissions
+          node scripts/ci/vercel-preview-guard.mjs prebuilt "$RUNNER_TEMP/prebuilt/.vercel/output"
+      - name: CLI de Vercel de confianza
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/vercel-cli" --ignore-scripts --no-audit --no-fund "$VERCEL_CLI"
+      - name: Preview de Vercel sin variables
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" > "$RUNNER_TEMP/env.json"
+          node scripts/ci/vercel-preview-guard.mjs preview-env "$RUNNER_TEMP/env.json"
+      - id: deploy
+        name: Deploy (Preview)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          AUTHORIZED_SHA: ${{ inputs.sha }}
+          PR_NUMBER: ${{ inputs.pr }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=$("$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel" deploy --prebuilt --cwd "$RUNNER_TEMP/prebuilt" \
+            --meta "githubCommitSha=$AUTHORIZED_SHA" --meta "githubPrId=$PR_NUMBER" --token "$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview de la PR #$PR_NUMBER, HEAD \`$AUTHORIZED_SHA\`: $url" >> "$GITHUB_STEP_SUMMARY"
