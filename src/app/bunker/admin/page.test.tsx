@@ -1,16 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fixtureProducts, categories as fixtureCategories } from "@/data/catalog";
 import { evaluateStoreStatus, toPublicStoreStatus } from "@/domain/store-status";
 import type { Catalog, PromotionRule, StoreSettings } from "@/domain/types";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import { reorderCategoriesAction, reorderProductsAction, saveProductAction } from "./catalogo/actions";
+import { setStoreStatusAction } from "./tienda/actions";
 import AdminHomePage from "./page";
 
 vi.mock("@/server/catalog-admin", () => ({ getCatalogAdminView: vi.fn() }));
-vi.mock("@/server/store-admin", () => ({ getStoreAdminView: vi.fn() }));
+vi.mock("@/server/store-admin", () => ({ getStoreAdminView: vi.fn(), PAYMENT_METHODS: ["cash", "bank_transfer", "mercado_pago"] }));
 vi.mock("./catalogo/actions", () => ({
   saveProductAction: vi.fn(async () => ({ status: "success", message: "Producto guardado." })),
   reorderCategoriesAction: vi.fn(),
@@ -19,7 +20,14 @@ vi.mock("./catalogo/actions", () => ({
   updateCategoryAction: vi.fn(),
   deleteCategoryAction: vi.fn()
 }));
-vi.mock("./tienda/actions", () => ({ setStoreStatusAction: vi.fn(), saveStoreContactAction: vi.fn() }));
+vi.mock("./tienda/actions", () => ({
+  setStoreStatusAction: vi.fn(),
+  saveStoreContactAction: vi.fn(),
+  addShiftAction: vi.fn(),
+  deleteShiftAction: vi.fn(),
+  savePaymentMethodAction: vi.fn(),
+  reorderPaymentMethodsAction: vi.fn()
+}));
 vi.mock("./promociones/actions", () => ({ setPromotionActiveAction: vi.fn(), reorderPromotionsAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/bunker/admin" }));
 
@@ -89,12 +97,9 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
 
     expect(screen.queryByText(/pedidos hoy|facturaci|ventas|ingresos|clientes|kpi/i)).not.toBeInTheDocument();
 
-    // The other admin screens stay one click away, plus the public menu.
-    const nav = screen.getByRole("navigation", { name: "Administración" });
-    expect(within(nav).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
-      ["Tienda", "/bunker/admin/tienda"],
-      ["Ver menú", "/"]
-    ]);
+    // Everything lives in the panel now; the public menu stays one click away.
+    expect(screen.queryByRole("navigation", { name: "Administración" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver la carta como cliente" })).toHaveAttribute("href", "/");
   });
 
   it("a quick price change sends the rest of the product exactly as stored", async () => {
@@ -183,5 +188,49 @@ describe("/bunker/admin (panel de control, issue #54)", () => {
     vi.mocked(getCatalogAdminView).mockResolvedValue({ ok: false, error: { code: "unavailable" } } as never);
     render(await AdminHomePage());
     expect(screen.getByRole("alert")).toHaveTextContent("No pudimos cargar el panel");
+  });
+
+  describe("store settings, formerly the Tienda screen (issue #54)", () => {
+    const SECRETS = {
+      MERCADO_PAGO_ACCESS_TOKEN: "APP_USR-secret-access-token-123",
+      SUPABASE_SECRET_KEY: "sb_secret_never_in_html_456",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-never-in-html-789"
+    };
+    beforeEach(() => {
+      for (const [key, value] of Object.entries(SECRETS)) vi.stubEnv(key, value);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("shows WhatsApp, opening hours and payment methods in the panel", async () => {
+      const view = (await vi.mocked(getStoreAdminView)()) as unknown as { value: Record<string, unknown> };
+      vi.mocked(getStoreAdminView).mockResolvedValue({
+        ok: true,
+        value: { ...view.value, shifts: [{ id: "sh1", dayOfWeek: 4, opensAt: "20:00", closesAt: "00:30" }] }
+      } as never);
+      render(await AdminHomePage());
+      expect(screen.getByRole("textbox", { name: "WhatsApp del local" })).toHaveValue("+5493815551234");
+      const shifts = screen.getByRole("list", { name: "Turnos" });
+      expect(shifts).toHaveTextContent("Jueves 20:00 a 00:30");
+      expect(shifts).toHaveTextContent("Cruza medianoche");
+      const methods = screen.getByRole("list", { name: "Medios de pago" });
+      expect(within(methods).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label"))).toEqual([
+        "Efectivo habilitado",
+        "Transferencia habilitado",
+        "Mercado Pago habilitado"
+      ]);
+    });
+
+    it("changes the store mode from the panel, including following the opening hours", async () => {
+      vi.mocked(setStoreStatusAction).mockResolvedValue({ status: "success", message: "ok" });
+      render(await AdminHomePage());
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Modo" }), "auto");
+      expect(vi.mocked(setStoreStatusAction).mock.calls.at(-1)![1].get("statusOverride")).toBe("auto");
+    });
+
+    it("never puts server secrets in the HTML", async () => {
+      const { container } = render(await AdminHomePage());
+      for (const secret of Object.values(SECRETS)) expect(container.innerHTML).not.toContain(secret);
+      expect(container.innerHTML).not.toMatch(/ACCESS_TOKEN|SECRET_KEY|SERVICE_ROLE/);
+    });
   });
 });

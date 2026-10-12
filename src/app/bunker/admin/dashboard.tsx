@@ -3,7 +3,6 @@
 import { CirclePlus, CupSoda, Flame, GripVertical, Hamburger, Popcorn, Sandwich, Search, Store, Tag, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type CSSProperties } from "react";
-import { AdminNav } from "./admin-nav";
 import { normalizeSearch } from "@/components/storefront/menu-sections";
 import type { ProductType } from "@/domain/types";
 import styles from "../admin.module.css";
@@ -15,7 +14,9 @@ import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "./paths";
 import { reorderPromotionsAction, setPromotionActiveAction } from "./promociones/actions";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
 import { useDragOrder } from "./use-drag-order";
-import { saveStoreContactAction, setStoreStatusAction } from "./tienda/actions";
+import { StoreSettings, type StoreSettingsProps } from "./store-settings";
+import { setStoreStatusAction } from "./tienda/actions";
+import { OVERRIDE_OPTIONS } from "./tienda/status-labels";
 
 export interface DashboardProduct {
   form: ProductFormValues;
@@ -47,6 +48,8 @@ export interface DashboardStore {
   state: "open" | "paused" | "closed";
   stateLabel: string;
   reason: string;
+  /** "auto" follows the opening hours; the others force open, paused or closed. */
+  statusOverride: string;
   deliveryFee: string;
   whatsapp: string;
 }
@@ -63,12 +66,14 @@ export function AdminDashboard({
   products,
   promotions,
   store,
-  categories
+  categories,
+  settings
 }: {
   products: DashboardProduct[];
   promotions: DashboardPromotion[];
   store: DashboardStore;
   categories: DashboardCategory[];
+  settings: StoreSettingsProps;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -112,6 +117,23 @@ export function AdminDashboard({
         </div>
         <QuickForm action={setStoreStatusAction} className={styles.statusForm} label="Abrir o cerrar el local">
           <StoreSwitch open={store.state === "open"} reason={store.reason} />
+        </QuickForm>
+        <QuickForm action={setStoreStatusAction} className={styles.modeForm} label="Modo del local">
+          <label htmlFor="store-mode">Modo</label>
+          <select
+            className={styles.categorySelect}
+            defaultValue={store.statusOverride}
+            id="store-mode"
+            key={store.statusOverride}
+            name="statusOverride"
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          >
+            {OVERRIDE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </QuickForm>
       </section>
 
@@ -161,23 +183,7 @@ export function AdminDashboard({
         <PromotionRows promotions={shownPromotions} sortable={needle === ""} />
       </section>
 
-      <section aria-labelledby="delivery-title" className={styles.deliveryCard}>
-        <div>
-          <h2 id="delivery-title">Ajuste de costo de envío</h2>
-          <p>Configurá el precio del delivery.</p>
-        </div>
-        <QuickForm action={saveStoreContactAction} className={styles.deliveryForm} label="Costo de delivery">
-          <input name="whatsapp" type="hidden" value={store.whatsapp} />
-          <label htmlFor="quick-delivery">Costo de delivery</label>
-          <PriceField defaultValue={store.deliveryFee} id="quick-delivery" name="deliveryFee" />
-          <QuickSubmit className={styles.smallAction}>Actualizar</QuickSubmit>
-        </QuickForm>
-      </section>
-
-      <div className={styles.moreSettings}>
-        <p>Horarios, WhatsApp y medios de pago:</p>
-        <AdminNav />
-      </div>
+      <StoreSettings {...settings} />
     </div>
   );
 }

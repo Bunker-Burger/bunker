@@ -42,7 +42,7 @@ describe("store and promotion actions", () => {
     vi.mocked(setStoreStatus).mockResolvedValue({ ok: true, message: "Pedidos en pausa.", value: undefined });
     expect(await setStoreStatusAction(IDLE_FORM_STATE, new FormData())).toEqual({ status: "success", message: "Pedidos en pausa." });
     expect(updateTag).toHaveBeenCalledWith("catalog");
-    expect(revalidatePath).toHaveBeenCalledWith("/bunker/admin/tienda", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/bunker/admin", "layout");
 
     vi.clearAllMocks();
     vi.mocked(storeAdminDependencies).mockResolvedValue({ ok: true, value: {} as never });

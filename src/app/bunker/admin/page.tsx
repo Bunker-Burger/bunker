@@ -1,9 +1,10 @@
+import { PAYMENT_METHOD_NAME, PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
 import { focalStyle } from "@/components/storefront/focal-style";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
 import type { PromotionMechanic } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { getCatalogAdminView } from "@/server/catalog-admin";
-import { getStoreAdminView } from "@/server/store-admin";
+import { getStoreAdminView, PAYMENT_METHODS } from "@/server/store-admin";
 import styles from "../admin.module.css";
 import { formValues, pesos } from "./catalogo/product-props";
 import { AdminDashboard } from "./dashboard";
@@ -46,7 +47,7 @@ export default async function AdminHomePage() {
   }
 
   const { catalog } = catalogView.value;
-  const { status, catalog: storeCatalog } = storeView.value;
+  const { status, catalog: storeCatalog, shifts, mercadoPago } = storeView.value;
   const store = storeCatalog.store;
   const categoryNames = new Map(catalog.categories.map((category) => [category.id, category.name]));
   const now = new Date();
@@ -95,8 +96,26 @@ export default async function AdminHomePage() {
           state: status.state,
           stateLabel: STATE_LABEL[status.state],
           reason: statusReason(status, store.timezone),
+          statusOverride: store.statusOverride,
           deliveryFee: store.deliveryFeeCents === null ? "" : pesos(store.deliveryFeeCents),
           whatsapp: store.whatsappE164
+        }}
+        settings={{
+          deliveryFee: store.deliveryFeeCents === null ? "" : pesos(store.deliveryFeeCents),
+          whatsapp: store.whatsappE164,
+          timezone: store.timezone,
+          shifts: [...shifts].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt)),
+          paymentMethods: PAYMENT_METHODS.map((method) => {
+            const stored = store.paymentMethods.find((candidate) => candidate.method === method);
+            return {
+              id: method,
+              name: PAYMENT_METHOD_NAME[method],
+              note: PUBLIC_PAYMENT_NOTE[method],
+              enabled: stored?.enabled ?? false,
+              sortOrder: stored?.sortOrder ?? (PAYMENT_METHODS.indexOf(method) + 1) * 10
+            };
+          }).sort((a, b) => a.sortOrder - b.sortOrder),
+          mercadoPagoNote: mercadoPago.available ? null : "No aparece en la carta hasta completar su configuración en el servidor."
         }}
       />
     </section>
