@@ -7,6 +7,7 @@ import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
 import { ImageForm } from "../../image-form";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups, formValues } from "../../product-props";
+import { Camera } from "lucide-react";
 import { AdminPageBar } from "../../../page-bar";
 
 type Params = Promise<{ productId: string }>;
@@ -44,7 +45,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         </p>
       ) : null}
 
-      <section aria-labelledby="details-title" className={styles.tabPanel}>
+      <section aria-labelledby="details-title" className={styles.plainSection}>
         <h2 id="details-title">Datos y opciones</h2>
         <ProductForm
           categories={formCategories(view.value.catalog.categories)}
@@ -55,7 +56,9 @@ export default async function EditProductPage({ params, searchParams }: { params
       </section>
 
       <section aria-labelledby="photo-title" className={styles.tabPanel}>
-        <h2 id="photo-title">Foto del producto</h2>
+        <h2 className={styles.cardTitle} id="photo-title">
+          <Camera aria-hidden="true" size={20} /> Foto del producto
+        </h2>
         <ImageForm
           image={product.imageUrl ? { url: product.imageUrl, alt: product.imageAlt ?? "", focalX: product.imageFocalPoint?.x ?? 50, focalY: product.imageFocalPoint?.y ?? 50 } : null}
           key={product.imageUrl ?? "no-image"}

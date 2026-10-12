@@ -1,9 +1,11 @@
+import { Camera } from "lucide-react";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
 import { ADMIN_CATALOG_PATH, tabForType } from "../../form-state";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups } from "../../product-props";
 import { AdminPageBar } from "../../../page-bar";
+import { PhotoDropzoneContent } from "../../photo-dropzone";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -35,12 +37,12 @@ export default async function NewProductPage({ searchParams }: { searchParams: S
           <p>Se crea como borrador si no marcás “Publicado”.</p>
           <section aria-labelledby="photo-title" className={styles.formCard}>
             <h2 className={styles.cardTitle} id="photo-title">
-              Foto del producto
+              <Camera aria-hidden="true" size={20} /> Foto del producto
             </h2>
             <div className={styles.dropzone}>
-              <strong>Subir foto del producto</strong>
-              <span>Se habilita al crear el producto: JPG, PNG o WebP, cuadrada o 16:9.</span>
+              <PhotoDropzoneContent detail="Formato JPG o PNG cuadrado o 16:9 · Alta resolución" title="Subir foto del producto" />
             </div>
+            <p className={styles.hint}>Se sube después de crear el producto, desde su página.</p>
           </section>
           <ProductForm categories={categories} {...(preselected ? { defaultCategoryId: preselected.id } : {})} optionGroups={formOptionGroups(view.value.optionGroups)} />
         </>

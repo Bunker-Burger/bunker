@@ -4,6 +4,7 @@ import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react"
 import styles from "../../admin.module.css";
 import { deleteProductImageAction, saveProductImageAction } from "./actions";
 import { AdminForm, FieldError, TextField } from "../admin-form";
+import { PhotoDropzoneContent } from "./photo-dropzone";
 
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/avif";
 
@@ -52,10 +53,15 @@ export function ImageForm({ productId, productName, image, maxBytes, minSide, ma
       <AdminForm action={saveProductImageAction} submitLabel={image ? "Guardar foto" : "Subir foto"} pendingLabel="Subiendo…">
         <input name="productId" type="hidden" value={productId} />
         <div className={styles.field}>
-          <label htmlFor="product-image">{image ? "Reemplazar foto" : "Foto"}</label>
+          {/* The whole box of the capture is the file picker. */}
+          <label className={styles.dropzone} htmlFor="product-image">
+            <PhotoDropzoneContent detail="Formato JPG, PNG, WebP o AVIF, cuadrado o 16:9 · Alta resolución" title={image ? "Reemplazar foto" : "Subir foto del producto"} />
+          </label>
           <input
             accept={ACCEPTED_IMAGE_TYPES}
             aria-describedby="image-hint image-error"
+            aria-label={image ? "Reemplazar foto" : "Subir foto del producto"}
+            className={styles.dropzoneInput}
             id="product-image"
             name="image"
             onChange={(event) => {

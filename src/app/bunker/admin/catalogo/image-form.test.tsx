@@ -9,7 +9,7 @@ const limits = { maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
 describe("ImageForm", () => {
   it("accepts only raster formats and states the limits", () => {
     render(<ImageForm image={null} productId="p1" productName="Smash" {...limits} />);
-    const input = screen.getByLabelText("Foto");
+    const input = screen.getByLabelText("Subir foto del producto");
     expect(input).toHaveAttribute("accept", "image/jpeg,image/png,image/webp,image/avif");
     expect(input).toHaveAccessibleDescription(/JPEG, PNG, WebP o AVIF; hasta 5 MB y entre 320 y 4096 px por lado\. SVG no\./);
     expect(screen.getByRole("button", { name: "Subir foto" })).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe("ImageForm", () => {
     URL.revokeObjectURL = vi.fn();
     render(<ImageForm image={null} productId="p1" productName="Smash" {...limits} />);
     const big = new File([new Uint8Array(limits.maxBytes + 1)], "big.png", { type: "image/png" });
-    fireEvent.change(screen.getByLabelText("Foto"), { target: { files: [big] } });
+    fireEvent.change(screen.getByLabelText("Subir foto del producto"), { target: { files: [big] } });
     expect(screen.getByText("La imagen supera los 5 MB; el servidor la va a rechazar.")).toBeInTheDocument();
   });
 });
