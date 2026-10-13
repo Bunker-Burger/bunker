@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openScreen } from "./screens";
 
 /*
  * BB-16 against the production build: installable, the caching policy (what is stored and what is
@@ -89,7 +90,7 @@ test("offline the cached menu opens and the cart works, but nothing can be sent 
   await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
   await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();
 
-  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
+  const checkout = await openScreen(page, "checkout");
   await expect(checkout.getByTestId("offline-note")).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Sin conexión" })).toBeDisabled();
   await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
@@ -113,7 +114,7 @@ test("a single online visit leaves the menu ready offline, without reloading the
   await expect(page.getByRole("heading", { level: 1, name: "LA CARTA DEL BÚNKER" })).toBeVisible();
   await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
   await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();
-  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
+  const checkout = await openScreen(page, "checkout");
   await expect(checkout.getByRole("button", { name: "Sin conexión" })).toBeDisabled();
   // APIs stay network-only: offline they fail instead of answering from a cache.
   expect(await page.evaluate(() => fetch("/api/store/products").then(() => "answered", () => "failed"))).toBe("failed");

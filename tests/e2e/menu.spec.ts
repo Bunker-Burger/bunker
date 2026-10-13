@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { categories as fixtureCategories, products as fixtureProducts } from "../../src/data/catalog";
 import type { Category, Product, PublicCatalogSnapshot } from "../../src/domain/types";
 import { serializePublicCatalog } from "../../src/server/catalog/public-products";
+import { openScreen } from "./screens";
 
 /*
  * BB-07: public menu and product drawer in a real browser (production build, static fallback
@@ -73,9 +74,12 @@ test("sold-out products are shown, labelled and cannot be added", async ({ page 
   await expect(page.getByLabel("Carrito, 0 productos")).toBeVisible();
 });
 
-test("search and section filters narrow the menu; the card's Agregar uses defaults", async ({ page }) => {
+test("search narrows the menu; the card's Agregar uses defaults", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("searchbox", { name: "Buscar en la carta" }).fill("limon");
+  await page.getByRole("button", { name: "Buscar en la carta" }).click();
+  const searchbox = page.getByRole("searchbox", { name: "Buscar en la carta" });
+  await expect(searchbox).toBeFocused();
+  await searchbox.fill("limon");
   const menu = page.locator("#menu");
   await expect(menu.getByRole("heading", { level: 3 })).toHaveText(["Limonada de la Casa"]);
 
@@ -83,10 +87,10 @@ test("search and section filters narrow the menu; the card's Agregar uses defaul
   await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  await page.getByRole("searchbox", { name: "Buscar en la carta" }).fill("");
-  await page.getByRole("group", { name: "Secciones de la carta" }).getByRole("button", { name: "Papas" }).click();
-  await expect(menu.getByRole("heading", { level: 2 })).toHaveText(["Papas"]);
-  await expect(menu.getByRole("heading", { level: 3 })).toHaveText(["Papas Búnker", "Aros de Cebolla"]);
+  await searchbox.fill("papas");
+  await expect(menu.getByRole("heading", { level: 3 })).toContainText(["Papas Búnker"]);
+  await page.getByRole("button", { name: "Cerrar búsqueda" }).click();
+  await expect(page.getByRole("button", { name: "Buscar en la carta" })).toBeFocused();
 });
 
 test("one orderable product of every public type reaches the same cart", async ({ page }) => {
@@ -103,21 +107,31 @@ test("one orderable product of every public type reaches the same cart", async (
   }
 
   await expect(page.getByLabel("Carrito, 4 productos")).toBeVisible();
-  const cart = page.getByRole("region", { name: "Carrito" });
+  const cart = await openScreen(page, "carrito");
   for (const name of products) {
     await expect(cart.getByText(name, { exact: true })).toBeVisible();
   }
 });
 
-test("the section chips stay pinned while scrolling and jump back to the results", async ({ page }) => {
+test("search interactions: escape closes, clear button cleans query and closes", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Ver Limonada de la Casa" }).scrollIntoViewIfNeeded();
-  const chips = page.getByRole("group", { name: "Secciones de la carta" });
-  await expect(chips).toBeInViewport();
+  const searchButton = page.getByRole("button", { name: "Buscar en la carta" });
+  await searchButton.click();
+  const searchbox = page.getByRole("searchbox", { name: "Buscar en la carta" });
+  await expect(searchbox).toBeVisible();
+  await searchbox.fill("smash");
+  await expect(page.locator("#menu").getByRole("heading", { level: 3 })).toContainText(["Smash Búnker Doble"]);
 
-  await chips.getByRole("button", { name: "Papas", exact: true }).click();
-  await expect(page.locator("#menu").getByRole("heading", { level: 2, name: "Papas" })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "Ver Papas Búnker" })).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(searchbox).toHaveCount(0);
+  await expect(searchButton).toBeFocused();
+
+  await searchButton.click();
+  await searchbox.fill("aros");
+  await expect(page.locator("#menu").getByRole("heading", { level: 3 })).toHaveText(["Aros de Cebolla"]);
+  await page.getByRole("button", { name: "Cerrar búsqueda" }).click();
+  await expect(searchbox).toHaveCount(0);
+  await expect(page.locator("#menu").getByRole("heading", { level: 3 })).toContainText(["Smash Búnker Doble"]);
 });
 
 /*
@@ -204,8 +218,8 @@ test.describe("with the catalog answered by the test", () => {
     await answer(page, snapshot({ products, categories: live }));
     await page.goto("/");
 
-    const chips = page.getByRole("group", { name: "Secciones de la carta" }).getByRole("button");
-    await expect(chips).toHaveText(["Todo", "Destacadas", "Para tomar", "Clásicas", "Papas"]);
     await expect(page.locator("#menu").getByRole("heading", { level: 2 })).toHaveText(["Las más pedidas", "Para tomar", "Papas"]);
+    await expect(page.locator("#menu").getByRole("heading", { level: 3 })).toContainText(["Papas Búnker"]);
+    await expect(page.getByRole("button", { name: /Crispy Chicken/i })).toHaveCount(0);
   });
 });

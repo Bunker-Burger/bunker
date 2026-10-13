@@ -44,6 +44,25 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.supabase.co" }
     ]
   },
+  async redirects() {
+    return [
+      {
+        source: "/bunker/admin/catalogo",
+        destination: "/bunker/admin",
+        permanent: false
+      },
+      {
+        source: "/bunker/admin/tienda",
+        destination: "/bunker/admin",
+        permanent: false
+      },
+      {
+        source: "/bunker/admin/promociones",
+        destination: "/bunker/admin",
+        permanent: false
+      }
+    ];
+  },
   async headers() {
     return [
       {

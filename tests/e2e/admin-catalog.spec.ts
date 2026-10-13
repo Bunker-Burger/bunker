@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 // BB-12/BB-13: the admin screens live under the protected admin layout; anonymous visits never render them.
 // BB-13: store and promotion screens too.
 for (const path of [
+  "/bunker/admin",
   "/bunker/admin/catalogo",
   "/bunker/admin/catalogo?tipo=bebidas",
   "/bunker/admin/catalogo/productos/nuevo",

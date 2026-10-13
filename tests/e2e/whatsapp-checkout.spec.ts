@@ -49,7 +49,7 @@ test.describe("WhatsApp checkout", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
     const checkout = await openScreen(page, "checkout");
-    await checkout.getByText("Delivery a domicilio", { exact: true }).click();
+    await checkout.getByRole("radio", { name: /Delivery a domicilio/i }).check();
 
     await expect(checkout.getByRole("textbox")).toHaveCount(0);
     const link = checkout.getByRole("link", { name: "Enviar pedido por WhatsApp" });
