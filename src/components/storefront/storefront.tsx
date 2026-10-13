@@ -37,7 +37,7 @@ import {
 } from "@/domain/catalog";
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
-import { toPromotionRule } from "@/domain/public-promotions";
+import { toPromotionRule, type PublicPromotion } from "@/domain/public-promotions";
 import { PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
 import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
@@ -104,6 +104,10 @@ export interface StorefrontProps {
   catalogFallback?: "demo" | "empty";
   initialReturnReference?: string | null;
   initialReturnPaymentId?: string | null;
+  /** Promotions published when the page was rendered, so they arrive with it (null: read them after). */
+  initialPromotions?: readonly PublicPromotion[] | null | undefined;
+  /** Minute the server rendered the page at, to judge promotion windows the same way on both sides. */
+  renderedAt?: number | null | undefined;
   onCheckoutRedirect?: ((url: string) => void) | undefined;
 }
 
@@ -150,6 +154,8 @@ export function Storefront({
   catalogFallback = "demo",
   initialReturnReference = null,
   initialReturnPaymentId = null,
+  initialPromotions = null,
+  renderedAt = null,
   onCheckoutRedirect
 }: StorefrontProps) {
   const [returnRef, setReturnRef] = useState<string | null>(() => {
@@ -181,7 +187,7 @@ export function Storefront({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const now = useNow();
+  const now = useNow(renderedAt);
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
@@ -195,7 +201,7 @@ export function Storefront({
   );
 
   // Rules published by the server (fresh read, same as the quote); never a static copy.
-  const publicPromotions = usePublicPromotions();
+  const publicPromotions = usePublicPromotions(initialPromotions ?? undefined);
   const promotions = useMemo(
     () => publicPromotions.map((promotion) => toPromotionRule(promotion, productIdBySlug)),
     [publicPromotions, productIdBySlug]

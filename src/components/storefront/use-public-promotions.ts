@@ -12,12 +12,14 @@ const NONE: readonly PublicPromotion[] = [];
 
 /**
  * Promotion rules the server currently publishes (the same fresh read the quote uses), for
- * display only. Until the first answer arrives, and after any failure, there are none: the menu
+ * display only. It starts from the rules the page was rendered with, so the banner and the promo
+ * prices arrive with the page instead of popping in after it. Without them, until the first
+ * answer arrives, and after any failure, there are none: the menu
  * never advertises a discount it could not confirm. Re-read every minute and when the tab
  * becomes visible again.
  */
-export function usePublicPromotions(): readonly PublicPromotion[] {
-  const [promotions, setPromotions] = useState(NONE);
+export function usePublicPromotions(initial: readonly PublicPromotion[] = NONE): readonly PublicPromotion[] {
+  const [promotions, setPromotions] = useState(initial);
 
   useEffect(() => {
     let controller: AbortController | null = null;
