@@ -1071,7 +1071,7 @@ function CheckoutSection({
     : storeStatus.kind === "ready" && storeStatus.checking
     ? "Verificando el local…"
     : !acceptingOrders
-      ? "No se pueden enviar pedidos ahora"
+      ? "El local no está tomando pedidos"
       : serverCheckout.kind === "loading"
         ? "Calculando el total…"
         : "Enviar pedido por WhatsApp";
@@ -1083,7 +1083,7 @@ function CheckoutSection({
       : storeStatus.kind === "ready" && storeStatus.checking
       ? "Verificando el local…"
       : !acceptingOrders
-        ? "No se pueden enviar pedidos ahora"
+        ? "El local no está tomando pedidos"
         : !hasValidLines
           ? "El carrito está vacío"
           : !isVerified
@@ -1190,7 +1190,11 @@ function CheckoutSection({
             ))}
             {cart.length > 0 ? <div className="summary-rule" /> : null}
             <div className="summary-line muted"><span>Subtotal productos</span><strong>{formatArs(totals.subtotalCents)}</strong></div>
-            <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending && !confirmed ? "A confirmar" : totals.deliveryCents === 0n ? "$0" : formatArs(totals.deliveryCents)}</strong></div>
+            {fulfilment === "pickup" ? (
+              <div className="summary-line muted"><span>Retiro en local</span><strong>Sin costo</strong></div>
+            ) : (
+              <div className="summary-line muted"><span>Envío</span><strong>{deliveryPending && !confirmed ? "A confirmar" : totals.deliveryCents === 0n ? "$0" : formatArs(totals.deliveryCents)}</strong></div>
+            )}
             {promotion ? (
               <div className="summary-promotion" data-testid="applied-promotion">
                 <div className="summary-line"><span>Promoción: {promotion.name}</span><strong>-{formatArs(totals.discountCents)}</strong></div>

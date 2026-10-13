@@ -211,8 +211,8 @@ describe("checkout link freshness in the storefront", () => {
   });
 
   it.each([
-    ["paused", () => json(paused), "El local pausó los pedidos por un momento.", "No se pueden enviar pedidos ahora"],
-    ["unreachable", () => json({ acceptingOrders: false, error: "unavailable" }, 503), "No pudimos verificar si el local está tomando pedidos.", "No se pueden enviar pedidos ahora"]
+    ["paused", () => json(paused), "El local pausó los pedidos por un momento.", "El local no está tomando pedidos"],
+    ["unreachable", () => json({ acceptingOrders: false, error: "unavailable" }, 503), "No pudimos verificar si el local está tomando pedidos.", "El local no está tomando pedidos"]
   ])("removes the link when the store is %s at the next read, and keeps the cart editable", async (_case, second, message, label) => {
     const pendingStatus = deferred();
     serve({

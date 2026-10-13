@@ -136,8 +136,13 @@ describe("checkout with the real store status", () => {
     const checkout = await fillCompleteOrder(user);
 
     await waitFor(() => expect(screen.getByTestId("store-status")).toHaveTextContent(message));
-    expect(within(checkout).getByRole("button", { name: "No se pueden enviar pedidos ahora" })).toBeDisabled();
+    expect(within(checkout).getByRole("button", { name: "El local no está tomando pedidos" })).toBeDisabled();
     expectNoSendAction(checkout);
+    // Picking up says so in the summary instead of "Envío $0" (issue #54).
+    expect(within(checkout).getByText("Envío")).toBeInTheDocument();
+    await user.click(within(checkout).getByRole("radio", { name: /Retiro en local/ }));
+    expect(within(checkout).queryByText("Envío")).not.toBeInTheDocument();
+    expect(within(checkout).getByText("Sin costo")).toBeInTheDocument();
     // The status, catalog verification (BB-06), plus promotions for the estimate (BB-09); no checkout.
     expect(requests.map((request) => request.url)).toEqual([STORE_STATUS_ENDPOINT, PRODUCTS_ENDPOINT, PROMOTIONS_ENDPOINT]);
 
@@ -172,7 +177,7 @@ describe("checkout with the real store status", () => {
     const checkout = await fillCompleteOrder(user);
 
     await waitFor(() => expect(screen.getByTestId("store-status")).toHaveTextContent("No pudimos verificar si el local está tomando pedidos."));
-    expect(within(checkout).getByRole("button", { name: "No se pueden enviar pedidos ahora" })).toBeDisabled();
+    expect(within(checkout).getByRole("button", { name: "El local no está tomando pedidos" })).toBeDisabled();
     expect(within(checkout).getByRole("radio", { name: /Delivery/ }).closest("label")).toHaveTextContent("A confirmar");
     expectNoSendAction(checkout);
   });

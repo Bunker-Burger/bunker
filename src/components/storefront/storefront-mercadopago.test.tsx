@@ -310,7 +310,7 @@ describe("Mercado Pago Storefront Integration (BB-14)", () => {
 
     const submitBtn = screen.getByTestId("mp-submit-button");
     expect(submitBtn).toBeDisabled();
-    expect(submitBtn).toHaveTextContent("No se pueden enviar pedidos ahora");
+    expect(submitBtn).toHaveTextContent("El local no está tomando pedidos");
   });
 });
 
