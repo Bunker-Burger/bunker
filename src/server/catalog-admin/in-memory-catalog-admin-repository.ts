@@ -7,6 +7,7 @@ import type {
   AdminResult,
   CatalogAdminRepository,
   CategoryFields,
+  OptionFields,
   OptionGroupLink,
   ProductFields,
   StoredImage
@@ -43,6 +44,11 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
   images: MemoryImage[] = [];
   objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
   promotionProductIds = new Set<string>();
+  promotions: Array<{ id: string; storeId: string; name: string; imagePath: string | null; focal?: { x: number; y: number } }> = [];
+  /** False simulates a database without the promotion-photo framing migration. */
+  promotionFocalSupported = true;
+  /** False simulates a database without the promotion-photo migration. */
+  promotionImagesSupported = true;
   /** Every mutating call, in order, for sequencing assertions. */
   writes: string[] = [];
   /** Method names that fail with `unavailable` (or the given error). */
@@ -73,6 +79,42 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
           .map((category) => ({ id: category.id, slug: category.slug, name: category.name, kind: category.kind, type: TYPE_BY_KIND[category.kind]!, sortOrder: category.sortOrder, visible: category.visible }))
       )
     );
+  }
+
+  async createOption(groupId: string, fields: OptionFields & { sortOrder: number }): Promise<AdminResult<{ id: string }>> {
+    const failed = this.fail("createOption");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return catalogError("not_found", "no row");
+    if (group.options.some((option) => option.name === fields.name)) return err({ code: "conflict" as const, message: "duplicate name" });
+    const id = this.id("o");
+    group.options = [...group.options, { id, name: fields.name, priceDeltaCents: fields.priceDeltaCents, available: fields.available }];
+    this.record(`createOption:${id}`);
+    return ok({ id });
+  }
+
+  async updateOption(groupId: string, optionId: string, fields: OptionFields): Promise<AdminResult<void>> {
+    const failed = this.fail("updateOption");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    const option = group?.options.find((candidate) => candidate.id === optionId);
+    if (!group || !option) return catalogError("not_found", "no row");
+    group.options = group.options.map((candidate) =>
+      candidate.id === optionId ? { ...candidate, name: fields.name, priceDeltaCents: fields.priceDeltaCents, available: fields.available } : candidate
+    );
+    this.record(`updateOption:${optionId}`);
+    return ok(undefined);
+  }
+
+  async setOptionOrder(groupId: string, rows: Array<{ id: string; sortOrder: number }>): Promise<AdminResult<void>> {
+    const failed = this.fail("setOptionOrder");
+    if (failed) return failed;
+    const group = this.optionGroups.find((candidate) => candidate.id === groupId);
+    if (!group) return catalogError("not_found", "no row");
+    const position = new Map(rows.map((row) => [row.id, row.sortOrder]));
+    group.options = [...group.options].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+    this.record(`setOptionOrder:${groupId}`);
+    return ok(undefined);
   }
 
   async listOptionGroups(storeId: string) {
@@ -268,6 +310,34 @@ export class InMemoryCatalogAdminRepository implements CatalogAdminRepository {
     if (failed) return failed;
     this.images = this.images.filter((candidate) => candidate.id !== imageId);
     this.record(`deleteImage:${imageId}`);
+    return ok(undefined);
+  }
+
+  async getPromotionImage(storeId: string, promotionId: string) {
+    const promotion = this.promotions.find((candidate) => candidate.storeId === storeId && candidate.id === promotionId);
+    const supported = this.promotionImagesSupported;
+    const focal = supported && this.promotionFocalSupported ? (promotion?.focal ?? { x: 50, y: 50 }) : null;
+    return this.fail("getPromotionImage") ?? ok(promotion ? { name: promotion.name, imagePath: supported ? promotion.imagePath : null, supported, focal } : null);
+  }
+
+  async setPromotionImage(storeId: string, promotionId: string, imagePath: string | null, focal?: { x: number; y: number }): Promise<AdminResult<void>> {
+    const failed = this.fail("setPromotionImage");
+    if (failed) return failed;
+    const promotion = this.promotions.find((candidate) => candidate.storeId === storeId && candidate.id === promotionId);
+    if (!promotion) return catalogError("not_found", "no row");
+    promotion.imagePath = imagePath;
+    if (focal) promotion.focal = focal;
+    this.record(`setPromotionImage:${imagePath}`);
+    return ok(undefined);
+  }
+
+  async setPromotionFocal(storeId: string, promotionId: string, focal: { x: number; y: number }): Promise<AdminResult<void>> {
+    const failed = this.fail("setPromotionFocal");
+    if (failed) return failed;
+    const promotion = this.promotions.find((candidate) => candidate.storeId === storeId && candidate.id === promotionId);
+    if (!promotion) return catalogError("not_found", "no row");
+    promotion.focal = focal;
+    this.record(`setPromotionFocal:${focal.x},${focal.y}`);
     return ok(undefined);
   }
 }

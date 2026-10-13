@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { AdminForm } from "../../admin-form";
-import { ADMIN_PROMOTIONS_PATH } from "../../paths";
+import { AdminPageBar } from "../../page-bar";
+import { ADMIN_PANEL_PATH } from "../../paths";
 import { deletePromotionAction } from "../actions";
 import { PromotionForm } from "../promotion-form";
 import { formProducts, promotionValues } from "../promotion-props";
@@ -12,12 +13,12 @@ type Params = Promise<{ promotionId: string }>;
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function EditPromotionPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
-  const [{ promotionId }, { creada }] = await Promise.all([params, searchParams]);
+  const [{ promotionId }, { creada, foto }] = await Promise.all([params, searchParams]);
   const view = await getStoreAdminView();
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="promotion-title">
-        <h1 id="promotion-title">Promoción</h1>
+        <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Promoción" titleId="promotion-title" />
         <p className={styles.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -28,11 +29,12 @@ export default async function EditPromotionPage({ params, searchParams }: { para
 
   return (
     <section className={styles.adminPanel} aria-labelledby="promotion-title">
-      <Link className={styles.backLink} href={ADMIN_PROMOTIONS_PATH}>
-        ← Volver a promociones
-      </Link>
-      <h1 id="promotion-title">{rule.name}</h1>
-      {creada === "1" ? (
+      <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title={rule.name} titleId="promotion-title" />
+      {creada === "1" && foto === "0" ? (
+        <p className={styles.error} role="alert">
+          Promoción creada, pero la foto no se pudo subir. Probá de nuevo desde “Foto de la promo”.
+        </p>
+      ) : creada === "1" ? (
         <p className={styles.success} role="status">
           Promoción creada.
         </p>
@@ -41,6 +43,14 @@ export default async function EditPromotionPage({ params, searchParams }: { para
         defaults={promotionValues(rule, catalog.store.timezone)}
         deliveryFeeCents={catalog.store.deliveryFeeCents === null ? null : catalog.store.deliveryFeeCents.toString()}
         key={`${rule.id}-${rule.active}-${rule.items.length}-${rule.schedule.length}`}
+        photo={{
+          url: rule.imageUrl ?? null,
+          maxBytes: MAX_IMAGE_BYTES,
+          minSide: MIN_IMAGE_SIDE,
+          maxSide: MAX_IMAGE_SIDE,
+          focal: rule.imageFocalPoint ?? { x: 50, y: 50 },
+          frame: "banner"
+        }}
         products={formProducts(catalog)}
         timezone={catalog.store.timezone}
       />

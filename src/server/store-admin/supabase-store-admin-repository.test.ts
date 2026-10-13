@@ -30,12 +30,12 @@ describe("store settings", () => {
 
     const { repository, calls } = repo(() => ({ data: [{ id: STORE }] }));
     await repository.setStatusOverride(STORE, "paused");
-    await repository.setContact(STORE, { deliveryFeeCents: 120000n, whatsappE164: "+5493815551234" });
-    await repository.setContact(STORE, { deliveryFeeCents: null, whatsappE164: "+5493815551234" });
+    await repository.setContact(STORE, { deliveryFeeCents: 120000n, whatsappE164: "+5493815551234", pickupAddress: "San Lorenzo 877, Aguilares", pickupMapsUrl: "https://maps.app.goo.gl/x" });
+    await repository.setContact(STORE, { pickupAddress: null, pickupMapsUrl: null, deliveryFeeCents: null, whatsappE164: "+5493815551234" });
     expect(calls.map((call) => op(call, "update")[0]?.[1])).toEqual([
       { status_override: "paused" },
-      { delivery_fee_cents: 120000, whatsapp_e164: "+5493815551234" },
-      { delivery_fee_cents: null, whatsapp_e164: "+5493815551234" }
+      { delivery_fee_cents: 120000, whatsapp_e164: "+5493815551234", pickup_address: "San Lorenzo 877, Aguilares", pickup_maps_url: "https://maps.app.goo.gl/x" },
+      { delivery_fee_cents: null, whatsapp_e164: "+5493815551234", pickup_address: null, pickup_maps_url: null }
     ]);
     for (const call of calls) {
       expect(op(call, "eq")).toEqual([["eq", "id", STORE]]);

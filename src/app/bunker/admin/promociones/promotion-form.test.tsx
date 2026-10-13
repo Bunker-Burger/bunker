@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { quoteCart } from "@/domain/pricing";
 import type { PromotionRule } from "@/domain/types";
+import type { AdminFormState } from "../form-state";
 import { PromotionForm, previewRows, type PromotionFormProduct, type PromotionFormValues } from "./promotion-form";
 
 vi.mock("./actions", () => ({ savePromotionAction: vi.fn() }));
@@ -114,9 +115,100 @@ describe("PromotionForm preview", () => {
     await userEvent.click(screen.getByRole("button", { name: "Agregar producto" }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Producto 1" }), SMASH);
     expect(rowsText()).toEqual(["Smash$ 7.800$ 6.630"]);
+    await userEvent.click(screen.getByRole("button", { name: "Horarios distintos por día" }));
     await userEvent.click(screen.getByRole("button", { name: "Agregar franja" }));
     expect(screen.getByRole("combobox", { name: "Día 1" })).toHaveValue("1");
     await userEvent.click(screen.getByRole("button", { name: "Quitar franja 1" }));
     expect(screen.queryByRole("combobox", { name: "Día 1" })).not.toBeInTheDocument();
+  });
+
+  it("the day chips send one window per marked day with the same hours (issue #54)", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "Jueves" }));
+    await userEvent.click(screen.getByRole("button", { name: "Domingo" }));
+    expect(screen.getByRole("button", { name: "Jueves" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+
+    const sent = action.mock.calls.at(-1)![1];
+    expect(sent.getAll("scheduleDay")).toEqual(["4", "0"]);
+    expect(sent.getAll("scheduleStart")).toEqual(["20:00", "20:00"]);
+    expect(sent.getAll("scheduleEnd")).toEqual(["23:30", "23:30"]);
+  });
+
+  it("an existing schedule with different hours per day opens in the per-day list", () => {
+    render(
+      <PromotionForm
+        defaults={defaults({ schedule: [{ dayOfWeek: "2", startsAt: "19:00", endsAt: "23:00" }, { dayOfWeek: "5", startsAt: "20:00", endsAt: "01:00" }] })}
+        deliveryFeeCents="120000"
+        products={products}
+        timezone="America/Argentina/Tucuman"
+      />
+    );
+    expect(screen.getByRole("combobox", { name: "Día 2" })).toHaveValue("5");
+    expect(screen.queryByRole("group", { name: "Días de aplicación" })).toBeNull();
+  });
+
+  it("a suggested tag fills the badge; Personalizado opens a free field", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "30% OFF" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1]).get("badgeText")).toBe("30% OFF");
+
+    await userEvent.click(screen.getByRole("button", { name: "Personalizado" }));
+    const custom = screen.getByRole("textbox", { name: "Tag personalizado" });
+    await userEvent.clear(custom);
+    await userEvent.type(custom, "Búnker Fest");
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1]).get("badgeText")).toBe("Búnker Fest");
+  });
+
+  it("opens with the photo card, as in the capture, and sends the file with the promotion (issue #54)", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const { container } = render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    expect(container.querySelector("fieldset legend")).toHaveTextContent("Foto de la promo");
+    const file = new File(["png"], "banner.png", { type: "image/png" });
+    const input = screen.getByLabelText<HTMLInputElement>("Subir foto de la promo");
+    await userEvent.upload(input, file);
+    // jsdom's FormData drops the file's name across realms, so check the field the form submits.
+    expect(input).toHaveAttribute("name", "image");
+    expect(input.form).toBe(screen.getByRole("button", { name: "Crear promoción" }).closest("form"));
+    expect(input.files?.[0]?.name).toBe("banner.png");
+    expect(screen.queryByLabelText("Quitar la foto al guardar")).not.toBeInTheDocument();
+  });
+
+  it("offers removing a stored photo", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    const photo = { url: "https://cdn.test/catalog/s1/promotions/p.webp", maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    render(<PromotionForm action={action} defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByLabelText("Quitar la foto al guardar"));
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    expect((action.mock.calls.at(-1)![1]).get("removeImage")).toBe("true");
+  });
+
+  it("keeps a stored weekly window when saving without touching it", async () => {
+    const action = vi.fn<(state: AdminFormState, form: FormData) => Promise<AdminFormState>>(async () => ({ status: "idle", message: null }));
+    render(<PromotionForm action={action} defaults={defaults({ schedule: [{ dayOfWeek: "2", startsAt: "18:00", endsAt: "23:59" }] })} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    await userEvent.click(screen.getByRole("button", { name: "Crear promoción" }));
+    const sent = action.mock.calls.at(-1)![1];
+    expect([sent.getAll("scheduleDay"), sent.getAll("scheduleStart"), sent.getAll("scheduleEnd")]).toEqual([["2"], ["18:00"], ["23:59"]]);
+  });
+
+  it("previews the banner and the section card once there is a photo (issue #54)", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
+    render(<PromotionForm defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
+    const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
+    expect(within(preview).getByText(/Subí una foto para verla/)).toBeInTheDocument();
+
+    await userEvent.upload(screen.getByLabelText("Subir foto de la promo"), new File(["png"], "banner.png", { type: "image/png" }));
+    await userEvent.type(screen.getByRole("textbox", { name: /Nombre de la promoción/ }), "Jueves de birra");
+    expect(await within(preview).findByRole("region", { name: "Vista previa del banner" })).toBeInTheDocument();
+    expect(within(preview).getAllByRole("heading", { name: "Jueves de birra" })).toHaveLength(2);
   });
 });

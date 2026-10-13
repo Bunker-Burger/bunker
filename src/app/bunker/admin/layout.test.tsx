@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,28 +29,18 @@ describe("/bunker/admin layout", () => {
 
     expect(connection).toHaveBeenCalledOnce();
     expect(screen.getByText("Contenido privado")).toBeInTheDocument();
-    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Dueño")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
     expect(screen.queryByText("private-user-uuid")).not.toBeInTheDocument();
     expect(screen.queryByText("private-store-uuid")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("token");
   });
 
-  it("links every admin section, marks the current one and keeps the public menu one click away", async () => {
+  it("has no tab bar: the captures show none, the control panel links the other screens", async () => {
     currentAdminMock.mockResolvedValue({ ok: true, value: { userId: "u", storeId: "s", role: "admin" } });
-
     render(await AdminLayout({ children: <div /> }));
-
-    const nav = screen.getByRole("navigation", { name: "Administración" });
-    const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
-      ["Catálogo", "/bunker/admin/catalogo"],
-      ["Tienda", "/bunker/admin/tienda"],
-      ["Promociones", "/bunker/admin/promociones"],
-      ["Ver menú", "/"]
-    ]);
-    expect(within(nav).getByRole("link", { name: "Tienda" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "Catálogo" })).not.toHaveAttribute("aria-current");
+    expect(screen.queryByRole("navigation", { name: "Administración" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/bunker/admin");
   });
 
   it.each([

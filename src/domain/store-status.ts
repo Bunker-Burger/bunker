@@ -20,6 +20,9 @@ export interface StoreOperatingSettings {
   /** Fixed delivery fee; null while it is not configured, which keeps orders disabled. */
   deliveryFeeCents: bigint | null;
   businessHours: readonly BusinessHoursWindow[];
+  /** Where pickup orders are collected (issue #54); absent until the store sets it. */
+  pickupAddress?: string | null;
+  pickupMapsUrl?: string | null;
 }
 
 export type StoreState = "open" | "paused" | "closed";
@@ -42,6 +45,8 @@ export interface StoreStatus {
   nextOpeningAt: Date | null;
   deliveryFeeCents: bigint | null;
   timezone: string;
+  pickupAddress?: string;
+  pickupMapsUrl?: string | null;
 }
 
 export class StoreNotAcceptingOrdersError extends Error {
@@ -169,7 +174,13 @@ function shiftsAround(nowMs: number, settings: StoreOperatingSettings): Interval
  * stay disabled even when forced open. Manual overrides win over the weekly hours.
  */
 export function evaluateStoreStatus(settings: StoreOperatingSettings, now: Date): StoreStatus {
-  const base = { deliveryFeeCents: settings.deliveryFeeCents, timezone: settings.timezone, closesAt: null, nextOpeningAt: null };
+  const base = {
+    deliveryFeeCents: settings.deliveryFeeCents,
+    timezone: settings.timezone,
+    closesAt: null,
+    nextOpeningAt: null,
+    ...(settings.pickupAddress ? { pickupAddress: settings.pickupAddress, pickupMapsUrl: settings.pickupMapsUrl ?? null } : {})
+  };
 
   if (settings.statusOverride === "paused") return { ...base, state: "paused", acceptingOrders: false, reason: "manual_paused" };
   if (settings.statusOverride === "closed") return { ...base, state: "closed", acceptingOrders: false, reason: "manual_closed" };
@@ -207,6 +218,9 @@ export interface PublicStoreStatus {
   nextOpeningAt: string | null;
   deliveryFeeCents: string | null;
   timezone: string;
+  /** Only when the store set where pickup orders are collected. */
+  pickupAddress?: string;
+  pickupMapsUrl?: string | null;
 }
 
 export function toPublicStoreStatus(status: StoreStatus): PublicStoreStatus {
@@ -217,7 +231,8 @@ export function toPublicStoreStatus(status: StoreStatus): PublicStoreStatus {
     closesAt: status.closesAt?.toISOString() ?? null,
     nextOpeningAt: status.nextOpeningAt?.toISOString() ?? null,
     deliveryFeeCents: status.deliveryFeeCents?.toString() ?? null,
-    timezone: status.timezone
+    timezone: status.timezone,
+    ...(status.pickupAddress ? { pickupAddress: status.pickupAddress, pickupMapsUrl: status.pickupMapsUrl ?? null } : {})
   };
 }
 
@@ -237,6 +252,8 @@ export function parsePublicStoreStatus(value: unknown): PublicStoreStatus | null
     isoOrNull(candidate.nextOpeningAt) &&
     (candidate.deliveryFeeCents === null || (typeof candidate.deliveryFeeCents === "string" && /^\d+$/.test(candidate.deliveryFeeCents))) &&
     typeof candidate.timezone === "string" &&
-    isValidTimeZone(candidate.timezone);
+    isValidTimeZone(candidate.timezone) &&
+    (candidate.pickupAddress === undefined || (typeof candidate.pickupAddress === "string" && candidate.pickupAddress.length <= 200)) &&
+    (candidate.pickupMapsUrl === undefined || candidate.pickupMapsUrl === null || (typeof candidate.pickupMapsUrl === "string" && /^https:\/\//.test(candidate.pickupMapsUrl)));
   return valid ? (candidate as unknown as PublicStoreStatus) : null;
 }

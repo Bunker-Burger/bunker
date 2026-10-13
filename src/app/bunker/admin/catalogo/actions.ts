@@ -12,6 +12,10 @@ import {
   moveCategory,
   moveProduct,
   saveProduct,
+  reorderCategories,
+  reorderOptions,
+  reorderProducts,
+  saveOption,
   saveProductImage,
   updateCategory,
   type AdminOutcome,
@@ -43,6 +47,7 @@ async function perform<T>(operation: UseCase<T>, form: FormData): Promise<{ stat
   }
   updateTag(CATALOG_CACHE_TAG);
   revalidatePath(ADMIN_CATALOG_PATH, "layout");
+  revalidatePath("/bunker/admin");
   return { state: { status: "success", message: outcome.message }, value: outcome.value };
 }
 
@@ -66,28 +71,61 @@ export async function moveProductAction(_previous: AdminFormState, form: FormDat
   return (await perform(moveProduct, form)).state;
 }
 
-export async function saveProductImageAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await perform(saveProductImage, form)).state;
-}
-
-export async function deleteProductImageAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await perform(deleteProductImage, form)).state;
-}
-
-/** A new product continues on its edit page (photo, publication); an edit stays on the form. */
+/**
+ * A new product continues on its edit page (publication, options); an edit stays on the form.
+ * The photo travels with the form (issue #54) and is uploaded, recentred or removed once the
+ * product itself is saved.
+ */
 export async function saveProductAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   const isNew = !form.get("productId");
   const { state, value } = await perform(saveProduct, form);
-  if (isNew && state.status === "success" && value) redirect(`${productEditPath(value.productId)}?creado=1`);
-  return state;
+  if (state.status !== "success" || !value) return state;
+  const photo = await savePhoto(value.productId, form);
+  if (isNew) redirect(`${productEditPath(value.productId)}?creado=1${photo?.status === "error" ? "&foto=0" : ""}`);
+  if (photo?.status === "error") {
+    return { ...photo, message: `Producto guardado, pero la foto no: ${photo.fieldErrors?.image ?? photo.message}` };
+  }
+  return photo ? { status: "success", message: `${state.message} ${photo.message}` } : state;
+}
+
+async function savePhoto(productId: string, form: FormData): Promise<AdminFormState | null> {
+  const file = form.get("image");
+  const hasFile = typeof file === "object" && file !== null && file.size > 0;
+  const data = new FormData();
+  data.set("productId", productId);
+  if (form.get("removeImage") === "true" && !hasFile) return (await perform(deleteProductImage, data)).state;
+  if (!hasFile && form.get("photoMoved") !== "true") return null;
+  if (hasFile) data.set("image", file);
+  for (const field of ["focalX", "focalY"]) data.set(field, String(form.get(field) ?? "50"));
+  return (await perform(saveProductImage, data)).state;
 }
 
 /** After deleting, the product page no longer exists: back to the catalog tab. */
 export async function deleteProductAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   const { state } = await perform(deleteProduct, form);
-  const tab = form.get("tab");
   if (state.status === "success" && form.get("from") === "edit") {
-    redirect(`${ADMIN_CATALOG_PATH}${typeof tab === "string" && /^[a-z]+$/.test(tab) ? `?tipo=${tab}` : ""}`);
+    // The catalog lives in the control panel (issue #54).
+    redirect("/bunker/admin");
   }
   return state;
+}
+
+/** Name, extra price and availability of an option, or a new option in a group (issue #54). */
+export async function saveOptionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(saveOption, form)).state;
+}
+
+/** New order of a group's options, dragged in the product form (issue #54). */
+export async function reorderOptionsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderOptions, form)).state;
+}
+
+/** New order of the menu's sections, dragged in the panel (issue #54). */
+export async function reorderCategoriesAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderCategories, form)).state;
+}
+
+/** New order of one category's products, dragged in the panel (issue #54). */
+export async function reorderProductsAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
+  return (await perform(reorderProducts, form)).state;
 }

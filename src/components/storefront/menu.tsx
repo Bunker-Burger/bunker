@@ -1,19 +1,37 @@
 "use client";
 
-import { Check, Plus, Search, UtensilsCrossed, X } from "lucide-react";
-import { useId, useMemo, useRef, useState, type FocusEvent } from "react";
-import type { Category, Product } from "@/domain/types";
+import { CupSoda, Flame, Hamburger, Plus, Popcorn, Sandwich, Search, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { useId, useMemo } from "react";
+import type { Category, Product, ProductType } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
 import { formatArs } from "@/lib/money";
 import { focalStyle } from "./focal-style";
-import { buildMenuSections, menuCategories, menuFilters, type MenuFilter } from "./menu-sections";
-
-// Browsers leave a focused chip half-cut inside a horizontal scroller; bring it fully into view.
-function revealInScroller(event: FocusEvent<HTMLElement>) {
-  event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
-}
+import { buildMenuSections, menuCategories } from "./menu-sections";
 
 const plural = (count: number) => (count === 1 ? "1 producto" : `${count} productos`);
+
+/** Card layouts of the canonical menu capture: large (most ordered), row (burgers, sandwiches), compact (sides, drinks). */
+export type CardLayout = "hero" | "row" | "compact";
+export const layoutFor = (product: Product, featured: boolean): CardLayout =>
+  featured ? "hero" : product.type === "fries" || product.type === "beverage" ? "compact" : "row";
+
+const PLACEHOLDER_ICONS: Record<ProductType, LucideIcon> = {
+  burger: Hamburger,
+  sandwich: Sandwich,
+  fries: Popcorn,
+  beverage: CupSoda,
+  other: UtensilsCrossed
+};
+
+/** A product without a photo: the approved dark tile with its category's icon, never a grey block. */
+function ProductPlaceholder({ type }: { type: ProductType }) {
+  const Icon = PLACEHOLDER_ICONS[type];
+  return (
+    <span className="product-placeholder" aria-hidden="true">
+      <Icon />
+    </span>
+  );
+}
 
 interface MenuProps {
   products: readonly Product[];
@@ -24,31 +42,19 @@ interface MenuProps {
   onAdd: (product: Product) => void;
   /** No snapshot could be read yet (and no demo menu is allowed): not the same as an empty menu. */
   unavailable?: boolean;
+  /** What the customer typed in the header search (issue #54: the search lives in the header). */
+  query?: string;
+  onClearQuery?: () => void;
 }
 
-/** The public menu: search, section filters and the sections in the configured order. */
-export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavailable = false }: MenuProps) {
-  const [filter, setFilter] = useState<MenuFilter>("all");
-  const [query, setQuery] = useState("");
-  const searchId = useId();
-  const resultsRef = useRef<HTMLParagraphElement>(null);
-
-  // Picking a section while scrolled deep into the menu jumps back to where the results start.
-  const chooseFilter = (next: MenuFilter) => {
-    setFilter(next);
-    const results = resultsRef.current;
-    if (results && results.getBoundingClientRect().top < 0) {
-      requestAnimationFrame(() => results.scrollIntoView({ block: "start" }));
-    }
-  };
+/** The public menu: the sections in the configured order, narrowed by the header search. */
+export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavailable = false, query = "", onClearQuery }: MenuProps) {
   const sectionCategories = useMemo(() => menuCategories(categories), [categories]);
-  const filters = useMemo(() => menuFilters(products, sectionCategories), [products, sectionCategories]);
-  // A filter whose category disappeared from the catalog falls back to the full menu.
-  const activeFilter = filters.some((option) => option.id === filter) ? filter : "all";
-  const sections = buildMenuSections(products, sectionCategories, activeFilter, query);
+  const sections = buildMenuSections(products, sectionCategories, "all", query);
+  const categoryNames = useMemo(() => new Map(sectionCategories.map((category) => [category.id, category.name])), [sectionCategories]);
   const shown = sections.reduce((total, section) => total + section.products.length, 0);
   const published = products.some((product) => product.published);
-  const narrowed = activeFilter !== "all" || query.trim() !== "";
+  const narrowed = query.trim() !== "";
 
   if (unavailable && !published) {
     return (
@@ -73,44 +79,7 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
 
   return (
     <>
-      <label className="menu-search" htmlFor={searchId}>
-        <Search aria-hidden="true" size={18} />
-        <span className="sr-only">Buscar en la carta</span>
-        <input
-          autoComplete="off"
-          enterKeyHint="search"
-          id={searchId}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar hamburguesas, papas, bebidas…"
-          type="search"
-          value={query}
-        />
-        {query ? (
-          <button aria-label="Borrar búsqueda" className="menu-search-clear" onClick={() => setQuery("")} type="button">
-            <X aria-hidden="true" size={16} />
-          </button>
-        ) : null}
-      </label>
-
-      {/* Only the chips stay pinned while scrolling: at 320px a pinned search too would eat the screen. */}
-      <div className="menu-tools">
-        <div className="category-tabs" role="group" aria-label="Secciones de la carta">
-          {filters.map((option) => (
-            <button
-              aria-pressed={activeFilter === option.id}
-              className={activeFilter === option.id ? "category-tab active" : "category-tab"}
-              key={option.id}
-              onClick={() => chooseFilter(option.id)}
-              onFocus={revealInScroller}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p aria-live="polite" className={narrowed ? "menu-results" : "sr-only"} ref={resultsRef}>
+      <p aria-live="polite" className={narrowed ? "menu-results" : "sr-only"}>
         {narrowed ? (shown === 0 ? "" : `Mostrando ${plural(shown)}.`) : ""}
       </p>
 
@@ -118,15 +87,8 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
         <div className="empty-state menu-empty" role="status">
           <Search aria-hidden="true" />
           <h3>No encontramos productos</h3>
-          <p>{query.trim() ? `Nada coincide con “${query.trim()}”.` : "No hay productos en esta sección por ahora."}</p>
-          <button
-            className="primary-action"
-            onClick={() => {
-              setQuery("");
-              setFilter("all");
-            }}
-            type="button"
-          >
+          <p>{query.trim() ? `Nada coincide con “${query.trim()}”.` : "No hay productos por ahora."}</p>
+          <button className="primary-action" onClick={onClearQuery} type="button">
             Ver toda la carta
           </button>
         </div>
@@ -134,17 +96,15 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
 
       {sections.map((section) => (
         <section aria-labelledby={`seccion-${section.id}`} className="menu-category" key={section.id}>
-          <div className="section-heading">
-            <div>
-              <span>{section.eyebrow}</span>
-              <h2 id={`seccion-${section.id}`}>{section.title}</h2>
-            </div>
-            <span>{plural(section.products.length)}</span>
+          <div className="menu-heading">
+            <h2 id={`seccion-${section.id}`}>{section.title}</h2>
+            {section.featured ? null : <p>{section.eyebrow}</p>}
           </div>
           <div className={section.featured ? "product-grid featured-grid" : "product-grid"}>
             {section.products.map((product) => (
               <ProductCard
-                featured={section.featured}
+                categoryName={categoryNames.get(product.categoryId) ?? null}
+                layout={layoutFor(product, section.featured)}
                 key={product.id}
                 onAdd={() => onAdd(product)}
                 onOpen={() => onOpen(product)}
@@ -159,17 +119,20 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
   );
 }
 
-function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
+/** One product of the menu; also the admin's "Así se verá en la carta" preview (issue #54). */
+export function ProductCard({ product, promotion, layout, categoryName, onOpen, onAdd }: {
   product: Product;
   promotion: PromotionalPrice | null;
-  featured: boolean;
+  layout: CardLayout;
+  categoryName: string | null;
   onOpen: () => void;
   onAdd: () => void;
 }) {
   const id = useId();
   const priceCents = promotion?.priceCents ?? product.priceCents;
+  const compact = layout === "compact";
   return (
-    <article className={`product-card${featured ? " featured" : ""}${!product.inStock ? " sold-out" : ""}`}>
+    <article className={`product-card ${layout}${!product.inStock ? " sold-out" : ""}`}>
       <button
         aria-describedby={`${id}-label ${id}-price ${id}-stock ${id}-desc`}
         aria-label={`Ver ${product.name}`}
@@ -180,8 +143,8 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
       >
         <div className="product-image-wrap">
           {/* eslint-disable-next-line @next/next/no-img-element -- mock photography; next/image lands with real assets (BB-02) */}
-          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} style={focalStyle(product)} /> : null}
-          {product.featured ? <span className="featured-dot" aria-hidden="true"><Check size={16} /></span> : null}
+          {product.imageUrl ? <img alt="" className="product-image" src={product.imageUrl} style={focalStyle(product)} /> : <ProductPlaceholder type={product.type} />}
+          {product.featured && layout === "hero" ? <span className="featured-dot" aria-hidden="true"><Flame size={18} /></span> : null}
           {!product.inStock ? <span className="sold-out-badge" aria-hidden="true">Agotado</span> : null}
         </div>
         <div className="product-copy">
@@ -195,18 +158,19 @@ function ProductCard({ product, promotion, featured, onOpen, onAdd }: {
           </div>
           {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
           <p id={`${id}-desc`}>{product.description}</p>
+          {!compact && categoryName ? <span className="product-meta" aria-hidden="true">{categoryName}</span> : null}
           <span className="sr-only" id={`${id}-label`}>Precio</span>
           <span className="sr-only" id={`${id}-stock`}>{product.inStock ? "Disponible." : "Agotado, no se puede pedir."}</span>
         </div>
       </button>
       <button
         aria-label={product.inStock ? `Agregar ${product.name}` : `${product.name} agotado`}
-        className="add-button"
+        className={compact ? "add-button round" : "add-button"}
         disabled={!product.inStock}
         onClick={onAdd}
         type="button"
       >
-        {product.inStock ? <>Agregar <Plus aria-hidden="true" size={16} /></> : "Sin stock"}
+        {compact ? <Plus aria-hidden="true" size={18} /> : product.inStock ? <>Agregar <Plus aria-hidden="true" size={16} /></> : "Sin stock"}
       </button>
     </article>
   );

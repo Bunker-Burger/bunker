@@ -61,3 +61,12 @@ export function promotionPhase(rule: PromotionRule, inEffect: boolean, now: Date
   if (now >= rule.endsAt) return "expired";
   return inEffect ? "running" : "waiting_window";
 }
+
+/** Where a promotion stands, as the promotion list and the control panel show it. */
+export const PHASE: Record<PromotionPhase, { label: string; className: "badge" | "badgeMuted" | "badgeWarning" }> = {
+  running: { label: "En vigencia ahora", className: "badge" },
+  waiting_window: { label: "Activa, fuera de franja", className: "badgeMuted" },
+  scheduled: { label: "Programada", className: "badgeMuted" },
+  expired: { label: "Vencida", className: "badgeWarning" },
+  paused: { label: "Pausada", className: "badgeMuted" }
+};

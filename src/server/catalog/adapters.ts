@@ -49,6 +49,7 @@ export function toStoreOperatingSettings(row: StoreOperatingRow): StoreOperating
     timezone: row.timezone,
     statusOverride: row.status_override,
     deliveryFeeCents: row.delivery_fee_cents,
+    ...(row.pickup_address ? { pickupAddress: row.pickup_address, pickupMapsUrl: row.pickup_maps_url ?? null } : {}),
     businessHours: row.store_business_hours
       .map((window) => ({ dayOfWeek: window.day_of_week, opensAt: window.opens_at, closesAt: window.closes_at }))
       .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.opensAt.localeCompare(b.opensAt))
@@ -208,7 +209,8 @@ function toMechanic(row: PromotionRow): Result<PromotionMechanic, CatalogError> 
 }
 
 /** Ordered by ascending `priority` (the store-wide unique rank configured by the admin). */
-export function toPromotionRules(rows: PromotionRow[]): Result<PromotionRule[], CatalogError> {
+export function toPromotionRules(rows: PromotionRow[], imageBaseUrl = ""): Result<PromotionRule[], CatalogError> {
+  const base = imageBaseUrl.replace(/\/+$/, "");
   const rules: PromotionRule[] = [];
   for (const row of rows) {
     const mechanic = toMechanic(row);
@@ -222,6 +224,10 @@ export function toPromotionRules(rows: PromotionRow[]): Result<PromotionRule[], 
       name: row.name,
       description: row.description,
       badgeText: row.badge_text,
+      ...(row.image_path && base ? { imageUrl: `${base}/${row.image_path.split("/").map(encodeURIComponent).join("/")}` } : {}),
+      ...(row.image_path && base && row.image_focal_x !== undefined && row.image_focal_y !== undefined
+        ? { imageFocalPoint: { x: row.image_focal_x, y: row.image_focal_y } }
+        : {}),
       priority: row.priority,
       active: row.is_active,
       startsAt: new Date(row.starts_at),

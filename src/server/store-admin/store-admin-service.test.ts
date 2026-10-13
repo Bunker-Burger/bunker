@@ -8,6 +8,7 @@ import {
   deletePromotion,
   deleteShift,
   movePromotion,
+  reorderPromotions,
   savePaymentMethod,
   savePromotion,
   saveStoreContact,
@@ -131,10 +132,23 @@ describe("store status and contact", () => {
     expect(await setStoreStatus(deps(), form({ statusOverride: "open" }))).toEqual({ ok: false, message: "Configurá la tarifa de delivery antes de habilitar pedidos.", mayHaveWritten: true });
   });
 
+  it("saves where pickup orders are collected, and clears it when emptied (issue #54)", async () => {
+    const maps = "https://maps.app.goo.gl/bunker";
+    expect(
+      await saveStoreContact(deps(), form({ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "  San Lorenzo 877,   Aguilares ", pickupMapsUrl: maps }))
+    ).toMatchObject({ ok: true });
+    expect(repository.stores[0]).toMatchObject({ pickupAddress: "San Lorenzo 877, Aguilares", pickupMapsUrl: maps });
+    expect(await saveStoreContact(deps(), form({ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "", pickupMapsUrl: "" }))).toMatchObject({ ok: true });
+    expect(repository.stores[0]).toMatchObject({ pickupAddress: null, pickupMapsUrl: null });
+  });
+
   it.each([
     [{ deliveryFee: "12,50", whatsapp: "+5493815551234" }, "deliveryFee"],
     [{ deliveryFee: "1200", whatsapp: "3815551234" }, "whatsapp"],
-    [{ deliveryFee: "1200", whatsapp: "+0123" }, "whatsapp"]
+    [{ deliveryFee: "1200", whatsapp: "+0123" }, "whatsapp"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupMapsUrl: "http://maps.google.com/x" }, "pickupMapsUrl"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupMapsUrl: "javascript:alert(1)" }, "pickupMapsUrl"],
+    [{ deliveryFee: "1200", whatsapp: "+5493815551234", pickupAddress: "x".repeat(201) }, "pickupAddress"]
   ])("rejects %j", async (fields, field) => {
     expect(await saveStoreContact(deps(), form(fields))).toMatchObject({ ok: false, fieldErrors: { [field]: expect.any(String) } });
   });
@@ -333,6 +347,20 @@ describe("promotions", () => {
       });
       expect(repository.writes).toEqual(["movePromotion:P3=20,P2=10"]);
       expect(repository.promotions.map((p) => [p.name, p.priority])).toEqual([["P1", 30], ["P2", 10], ["P3", 20]]);
+    });
+
+    it("puts the promotions in the dragged order, one neighbour swap at a time (issue #54)", async () => {
+      const id = (n: number) => `0d000000-0000-4000-8000-00000000000${n}`;
+      expect(await reorderPromotions(deps(), form({ promotionId: [id(3), id(1), id(2)] }))).toMatchObject({ ok: true, message: "Orden de promociones guardado." });
+      const byPriority = [...repository.promotions].sort((a, b) => b.priority - a.priority).map((p) => p.name);
+      expect(byPriority).toEqual(["P3", "P1", "P2"]);
+      expect(repository.writes).toHaveLength(2);
+    });
+
+    it("refuses an order that does not list exactly the store's promotions", async () => {
+      const id = (n: number) => `0d000000-0000-4000-8000-00000000000${n}`;
+      expect(await reorderPromotions(deps(), form({ promotionId: [id(1), id(2)] }))).toMatchObject({ ok: false, fieldErrors: { promotionId: expect.stringContaining("Recargá") } });
+      expect(repository.writes).toEqual([]);
     });
 
     it.each([

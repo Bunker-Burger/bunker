@@ -31,6 +31,11 @@
   --color-success-soft: rgb(34 197 94 / 0.12);
   --color-overlay: rgb(0 0 0 / 0.72);
   --color-glass: rgb(20 20 20 / 0.92);
+  /* Over photos (issue #54): darkening scrims and the text laid on them. */
+  --color-scrim: rgb(0 0 0 / 0.3);
+  --color-scrim-strong: rgb(0 0 0 / 0.85);
+  --color-on-image: #ffffff;
+  --color-on-image-muted: rgb(255 255 255 / 0.85);
 
   --font-*: initial;
   --font-sans: "Space Grotesk Variable", "Segoe UI", system-ui, sans-serif;
@@ -79,6 +84,7 @@
 
   --shadow-glow: 0 4px 20px -2px rgb(245 158 11 / 0.35);
   --shadow-overlay: 0 1rem 3rem rgb(0 0 0 / 0.6);
+  --shadow-card: 0 0.5rem 1.5rem rgb(0 0 0 / 0.35);
 
   --spacing-tap: 2.75rem;
   --container-content: 80rem;
@@ -93,8 +99,9 @@
   --bottom-nav-offset: 0rem;
   /* Height of extra fixed bars stacked above the nav (e.g. the cart tray); set where they render. */
   --fixed-bottom-extra: 0rem;
+  --toast-clearance: 0rem;
   /* Everything fixed at the bottom; content padding and focus scrolling keep clear of it. */
-  --fixed-bottom-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + 1rem);
+  --fixed-bottom-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + var(--toast-clearance) + 1rem);
   color-scheme: dark;
 }
 

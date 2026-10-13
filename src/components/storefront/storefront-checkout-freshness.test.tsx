@@ -211,8 +211,8 @@ describe("checkout link freshness in the storefront", () => {
   });
 
   it.each([
-    ["paused", () => json(paused), "El local pausó los pedidos por un momento.", "No se pueden enviar pedidos ahora"],
-    ["unreachable", () => json({ acceptingOrders: false, error: "unavailable" }, 503), "No pudimos verificar si el local está tomando pedidos.", "No se pueden enviar pedidos ahora"]
+    ["paused", () => json(paused), "El local pausó los pedidos por un momento.", "El local no está tomando pedidos"],
+    ["unreachable", () => json({ acceptingOrders: false, error: "unavailable" }, 503), "No pudimos verificar si el local está tomando pedidos.", "El local no está tomando pedidos"]
   ])("removes the link when the store is %s at the next read, and keeps the cart editable", async (_case, second, message, label) => {
     const pendingStatus = deferred();
     serve({
@@ -239,7 +239,6 @@ describe("checkout link freshness in the storefront", () => {
     // The cart and the menu keep working while the checkout is blocked.
     await user.click(screen.getByRole("button", { name: "Agregar uno de Smash Búnker Doble" }));
     expect(screen.getByLabelText("Carrito, 2 productos")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Papas" }));
     await user.click(screen.getByRole("button", { name: "Agregar Papas Búnker" }));
     expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
     expect(watcher.seen).toBe(false);

@@ -32,6 +32,13 @@ export interface ProductFields {
 
 export type AdminOptionGroup = ConfigurableOptionGroup & { applicableTypes: readonly ProductType[] };
 
+/** One choice of an option group, e.g. "Medallón extra" at +$ 1.400 (issue #54). */
+export interface OptionFields {
+  name: string;
+  priceDeltaCents: bigint;
+  available: boolean;
+}
+
 export interface OptionGroupLink {
   groupId: string;
   defaultOptionIds: string[];
@@ -61,6 +68,16 @@ export interface ImageDetails {
   focalY: number;
 }
 
+/** A promotion's photo for the menu banner (issue #54). */
+export interface StoredPromotionImage {
+  name: string;
+  imagePath: string | null;
+  /** False until the promotion-photo migration is applied: there is nowhere to store the path. */
+  supported: boolean;
+  /** Where the banner centres the photo; null until the framing migration is applied. */
+  focal: { x: number; y: number } | null;
+}
+
 export interface OrderedRow {
   id: string;
   sortOrder: number;
@@ -86,6 +103,11 @@ export interface CatalogAdminRepository {
   setProductPublished(storeId: string, productId: string, published: boolean): Promise<AdminResult<void>>;
   replaceOptionGroups(storeId: string, productId: string, links: OptionGroupLink[]): Promise<AdminResult<void>>;
   setProductOrder(storeId: string, rows: OrderedRow[]): Promise<AdminResult<void>>;
+
+  /** Options belong to a group of the store; the service checks that before calling these. */
+  createOption(groupId: string, fields: OptionFields & { sortOrder: number }): Promise<AdminResult<{ id: string }>>;
+  updateOption(groupId: string, optionId: string, fields: OptionFields): Promise<AdminResult<void>>;
+  setOptionOrder(groupId: string, rows: OrderedRow[]): Promise<AdminResult<void>>;
   isProductInPromotion(storeId: string, productId: string): Promise<AdminResult<boolean>>;
   deleteProduct(storeId: string, productId: string): Promise<AdminResult<void>>;
 
@@ -97,4 +119,10 @@ export interface CatalogAdminRepository {
   savePrimaryImage(productId: string, existingImageId: string | null, image: ImageDetails & { storagePath: string }): Promise<AdminResult<void>>;
   updateImageDetails(imageId: string, details: ImageDetails): Promise<AdminResult<void>>;
   deleteImage(imageId: string): Promise<AdminResult<void>>;
+
+  /** The promotion of the store with its photo path, or null when it is not in the store. */
+  getPromotionImage(storeId: string, promotionId: string): Promise<AdminResult<StoredPromotionImage | null>>;
+  /** `focal` is written only when given (databases with the framing migration). */
+  setPromotionImage(storeId: string, promotionId: string, imagePath: string | null, focal?: { x: number; y: number }): Promise<AdminResult<void>>;
+  setPromotionFocal(storeId: string, promotionId: string, focal: { x: number; y: number }): Promise<AdminResult<void>>;
 }

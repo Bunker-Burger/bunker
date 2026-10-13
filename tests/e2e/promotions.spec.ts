@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { openScreen } from "./screens";
 
 /*
  * BB-09: the menu and the checkout estimate announce only the promotions the server publishes
@@ -68,6 +69,7 @@ test.describe("with the promotions answered by state", () => {
       await expect(card.getByText("Martes de Smash: 15% de descuento en productos seleccionados")).toBeVisible();
 
       await card.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
+      await openScreen(page, "checkout");
       const applied = page.getByTestId("applied-promotion");
       await expect(applied).toContainText("Promoción: Martes de Smash");
       await expect(applied).toContainText("-$ 1.170");
@@ -84,17 +86,22 @@ test.describe("with the promotions answered by state", () => {
     const published = await serve(page, { promotions: [martesDeSmash()] });
     await page.goto("/");
     await smashCard(page).getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
+    await openScreen(page, "checkout");
     await expect(total(page)).toHaveText("$ 6.630");
 
     published.body = { promotions: [] };
     await page.clock.runFor(REFRESH_MS);
+    await openScreen(page, "menu");
     await expect(smashCard(page).locator("s.compare-at")).toHaveCount(0);
+    await openScreen(page, "checkout");
     await expect(page.getByTestId("applied-promotion")).toHaveCount(0);
     await expect(total(page)).toHaveText("$ 7.800");
 
     published.body = { promotions: [martesDeSmash({ percentOff: 25 })] };
     await page.clock.runFor(REFRESH_MS);
+    await openScreen(page, "menu");
     await expect(smashCard(page).getByText("$ 5.850")).toBeVisible();
+    await openScreen(page, "checkout");
     await expect(page.getByTestId("applied-promotion")).toContainText("-$ 1.950");
     await expect(total(page)).toHaveText("$ 5.850");
   });
@@ -105,16 +112,21 @@ test.describe("with the promotions answered by state", () => {
     await page.goto("/");
     await smashCard(page).getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
 
+    await openScreen(page, "checkout");
     const pickup = page.getByRole("radio", { name: /Retiro en local/ });
     await expect(pickup).toBeChecked();
     await expect(page.getByTestId("store-status")).toHaveText("El local está abierto.");
+    await openScreen(page, "menu");
     await expect(smashCard(page).locator("s.compare-at")).toHaveCount(0);
+    await openScreen(page, "checkout");
     await expect(total(page)).toHaveText("$ 7.800");
 
     await pickup.focus();
     await page.keyboard.press("ArrowUp");
     await expect(page.getByRole("radio", { name: /Delivery/ })).toBeChecked();
+    await openScreen(page, "menu");
     await expect(smashCard(page).locator("s.compare-at")).toHaveText("Antes $ 7.800");
+    await openScreen(page, "checkout");
     await expect(page.getByTestId("applied-promotion")).toContainText("-$ 1.170");
     // 7.800 − 1.170 + 1.200 delivery.
     await expect(total(page)).toHaveText("$ 7.830");
@@ -124,7 +136,11 @@ test.describe("with the promotions answered by state", () => {
     await page.clock.install({ time: TUESDAY_NIGHT });
     await serve(page, { promotions: [martesDeSmash()] });
     await page.goto("/");
+    const menuResults = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    expect(menuResults.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
+
     await smashCard(page).getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
+    await openScreen(page, "checkout");
     await expect(page.getByTestId("applied-promotion")).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);

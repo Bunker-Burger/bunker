@@ -396,6 +396,24 @@ describe("ordering", () => {
     const result = rows.ok ? toPromotionRules(rows.value) : rows;
     expect(result.ok && result.value.map((rule) => rule.id)).toEqual(["a", "b"]);
   });
+
+  it("builds the banner photo URL from the bucket base, and leaves it out without a photo (issue #54)", () => {
+    const base = { slug: "x", name: "x", description: "", badge_text: "2x1", promotion_type: "free_delivery", priority: 1, is_active: true,
+      starts_at: "2026-10-01T00:00:00Z", ends_at: "2026-12-01T00:00:00Z", fixed_price_cents: null, percent_off: null, buy_quantity: null,
+      get_quantity: null, applies_to_delivery: true, applies_to_pickup: true, promotion_items: [], promotion_schedule: [] };
+    const rows = parseRows("promotion_rules", promotionRowSchema, [
+      { ...base, id: "a", image_path: "s1/promotions/a 1.webp" },
+      { ...base, id: "b", image_path: null },
+      { ...base, id: "c" }
+    ]);
+    const result = rows.ok ? toPromotionRules(rows.value, "https://cdn.test/catalog/") : rows;
+    expect(result.ok && result.value.map((rule) => rule.imageUrl)).toEqual(["https://cdn.test/catalog/s1/promotions/a%201.webp", undefined, undefined]);
+    expect(result.ok && result.value.map((rule) => rule.imageFocalPoint)).toEqual([undefined, undefined, undefined]);
+
+    const framed = parseRows("promotion_rules", promotionRowSchema, [{ ...base, id: "d", image_path: "s1/promotions/d.webp", image_focal_x: 30, image_focal_y: 70 }]);
+    const withFocal = framed.ok ? toPromotionRules(framed.value, "https://cdn.test/catalog") : framed;
+    expect(withFocal.ok && withFocal.value[0]?.imageFocalPoint).toEqual({ x: 30, y: 70 });
+  });
 });
 
 describe("sold out", () => {

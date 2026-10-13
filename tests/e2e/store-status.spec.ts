@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openScreen } from "./screens";
 
 /*
  * BB-08: a paused or closed store blocks sending an order from the app, while the menu and the
@@ -30,15 +31,16 @@ const statuses = {
 
 async function fillCompleteOrder(page: Page) {
   await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
-  const checkout = page.getByRole("region", { name: "Finalizar pedido" });
-  await checkout.getByText("Delivery", { exact: true }).click();
+  const checkout = await openScreen(page, "checkout");
+  await checkout.getByRole("radio", { name: /Delivery a domicilio/i }).check();
   return checkout;
 }
 
 async function expectNoSendAction(page: Page) {
   await expect(page.locator('a[href*="wa.me"], a[href*="whatsapp"]')).toHaveCount(0);
   const checkout = page.getByRole("region", { name: "Finalizar pedido" });
-  await expect(checkout.getByRole("link")).toHaveCount(0);
+  // Only in-page navigation (the back arrow to the cart) may be a link in the checkout screen.
+  await expect(checkout.locator('a:not([href^="#"])')).toHaveCount(0);
 }
 
 test.describe("with the status answered per state", () => {
@@ -59,16 +61,16 @@ test.describe("with the status answered per state", () => {
       await expect(page.getByTestId("store-status")).toHaveText(
         name === "paused" ? "El local pausó los pedidos por un momento." : "El local está cerrado."
       );
-      await expect(checkout.getByRole("button", { name: "No se pueden enviar pedidos ahora" })).toBeDisabled();
+      await expect(checkout.getByRole("button", { name: "El local no está tomando pedidos" })).toBeDisabled();
       await expectNoSendAction(page);
 
       // Browsing and the persisted cart are unaffected, across a reload too.
-      // Exact: with every section listed, "Ver Papas Búnker" and "Agregar Papas Búnker" match too.
-      await page.getByRole("button", { name: "Papas", exact: true }).click();
+      await openScreen(page, "menu");
       await expect(page.getByRole("heading", { name: "Papas Búnker" })).toBeVisible();
       await page.reload();
       await expect(page.getByLabel("Carrito, 1 productos")).toBeVisible();
-      await expect(page.getByTestId("store-status")).toHaveText(
+      const checkoutReloaded = await openScreen(page, "checkout");
+      await expect(checkoutReloaded.getByTestId("store-status")).toHaveText(
         name === "paused" ? "El local pausó los pedidos por un momento." : "El local está cerrado."
       );
       await expectNoSendAction(page);

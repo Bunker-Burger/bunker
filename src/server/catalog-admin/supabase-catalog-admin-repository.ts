@@ -5,7 +5,7 @@ import { parseRows, productTypeByKind } from "@/server/catalog/adapters";
 import { catalogError } from "@/server/catalog/errors";
 import { CATEGORY_SELECT, categoryRowSchema, optionGroupRowSchema } from "@/server/catalog/rows";
 import { fromWriteError, write, writeOne } from "@/server/admin/supabase-writes";
-import type { QueryResponse } from "@/server/catalog/supabase-catalog-repository";
+import { isMissingColumn, type QueryResponse } from "@/server/catalog/supabase-catalog-repository";
 import type { Database } from "@/server/supabase/database.types";
 import type { AdminError, AdminOptionGroup, AdminResult, CatalogAdminRepository, OptionGroupLink, StoredImage, StoredProduct } from "./ports";
 
@@ -91,6 +91,13 @@ const imageRowSchema = z.object({
   focal_y: z.number().int(),
   is_primary: z.boolean(),
   sort_order: z.number().int()
+});
+
+const promotionImageRowSchema = z.object({
+  name: z.string(),
+  image_path: z.string().nullable().optional(),
+  image_focal_x: z.number().int().optional(),
+  image_focal_y: z.number().int().optional()
 });
 
 export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Database>): CatalogAdminRepository {
@@ -317,6 +324,47 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
         : catalogError("unavailable", "product_option_groups: links read back differ from the requested ones");
     },
 
+    async createOption(groupId, fields) {
+      const price = toSafeNumber(fields.priceDeltaCents);
+      if (price === null) return err({ code: "rejected" as const, message: "options.insert: price out of range" });
+      const response = await write(
+        "options.insert",
+        client
+          .from("options")
+          .insert({ option_group_id: groupId, name: fields.name, price_delta_cents: price, is_available: fields.available, sort_order: fields.sortOrder })
+          .select("id")
+          .single() as PromiseLike<QueryResponse>
+      );
+      if (!response.ok) return response;
+      const id = (response.value as { id?: unknown } | null)?.id;
+      return typeof id === "string" ? ok({ id }) : catalogError("invalid_data", "options.insert: no id returned");
+    },
+
+    updateOption(groupId, optionId, fields) {
+      const price = toSafeNumber(fields.priceDeltaCents);
+      if (price === null) return Promise.resolve(err({ code: "rejected" as const, message: "options.update: price out of range" }));
+      return writeOne(
+        "options.update",
+        client
+          .from("options")
+          .update({ name: fields.name, price_delta_cents: price, is_available: fields.available })
+          .eq("option_group_id", groupId)
+          .eq("id", optionId)
+          .select("id") as PromiseLike<QueryResponse>
+      );
+    },
+
+    async setOptionOrder(groupId, rows) {
+      for (const row of rows) {
+        const saved = await writeOne(
+          "options.update",
+          client.from("options").update({ sort_order: row.sortOrder }).eq("option_group_id", groupId).eq("id", row.id).select("id") as PromiseLike<QueryResponse>
+        );
+        if (!saved.ok) return saved;
+      }
+      return ok(undefined);
+    },
+
     async setProductOrder(storeId, rows) {
       for (const row of rows) {
         const saved = await writeOne(
@@ -404,6 +452,45 @@ export function createSupabaseCatalogAdminRepository(client: SupabaseClient<Data
 
     deleteImage(imageId) {
       return writeOne("product_images.delete", client.from("product_images").delete().eq("id", imageId).select("id") as PromiseLike<QueryResponse>);
+    },
+
+    async getPromotionImage(storeId, promotionId) {
+      const read = (columns: string) =>
+        write("promotion_rules.select", client.from("promotion_rules").select(columns).eq("store_id", storeId).eq("id", promotionId) as PromiseLike<QueryResponse>);
+      // Newest columns first; before the photo (or framing) migrations they do not exist.
+      let supported = true;
+      let response = await read("name, image_path, image_focal_x, image_focal_y");
+      if (!response.ok && isMissingColumn(response.error.cause)) response = await read("name, image_path");
+      if (!response.ok && isMissingColumn(response.error.cause)) {
+        supported = false;
+        response = await read("name");
+      }
+      if (!response.ok) return response;
+      const rows = parseRows("promotion_rules", promotionImageRowSchema, response.value);
+      if (!rows.ok) return rows;
+      const [row] = rows.value;
+      const focal = row?.image_focal_x !== undefined && row.image_focal_y !== undefined ? { x: row.image_focal_x, y: row.image_focal_y } : null;
+      return ok(row ? { name: row.name, imagePath: row.image_path ?? null, supported, focal } : null);
+    },
+
+    setPromotionImage(storeId, promotionId, imagePath, focal) {
+      const values = focal ? { image_path: imagePath, image_focal_x: focal.x, image_focal_y: focal.y } : { image_path: imagePath };
+      return writeOne(
+        "promotion_rules.update",
+        client.from("promotion_rules").update(values).eq("store_id", storeId).eq("id", promotionId).select("id") as PromiseLike<QueryResponse>
+      );
+    },
+
+    setPromotionFocal(storeId, promotionId, focal) {
+      return writeOne(
+        "promotion_rules.update",
+        client
+          .from("promotion_rules")
+          .update({ image_focal_x: focal.x, image_focal_y: focal.y })
+          .eq("store_id", storeId)
+          .eq("id", promotionId)
+          .select("id") as PromiseLike<QueryResponse>
+      );
     }
   };
 }

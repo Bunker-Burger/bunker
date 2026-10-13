@@ -785,3 +785,2983 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/*
+ * Issue #54 — composition of the canonical admin captures (admin_agregar_nuevo_producto,
+ * admin_configuraci_n_precios, admin_crear_promoci_n_ofertas): a single column of cards with
+ * uppercase display titles, pill calls to action, toggles for state, and the shared bottom nav.
+ * Only presentation: forms, fields and actions are unchanged.
+ */
+
+.brand > img {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.brand strong {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.adminViewport {
+  padding: 0 1rem var(--fixed-bottom-clearance);
+}
+
+.adminHeader {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  max-width: 48rem;
+  margin: 0 -1rem;
+  padding: calc(0.75rem + env(safe-area-inset-top)) 1rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-glass);
+  backdrop-filter: blur(16px);
+}
+
+.adminContent {
+  max-width: 48rem;
+}
+
+@media (min-width: 48rem) {
+  .adminHeader {
+    margin: 0 auto;
+    padding-inline: 0;
+  }
+}
+
+.secondaryAction {
+  border-radius: var(--radius-full);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+/* Section tabs: the segmented pill bar of the price capture ("Productos · Promociones"). */
+.adminNav,
+.tabs {
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 1.25rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  scrollbar-width: none;
+}
+
+.tab {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tab[aria-current="page"] {
+  box-shadow: var(--shadow-glow);
+}
+
+/* Page: no outer box; the title is the large amber display heading of the captures. */
+.adminPanel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.adminPanel h1 {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--color-primary);
+  font-size: var(--text-headline-lg);
+  line-height: var(--text-headline-lg--line-height);
+  letter-spacing: var(--tracking-display);
+}
+
+.backLink {
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-foreground);
+}
+
+/* Each section and each group of fields is a card with an uppercase title row. */
+.tabPanel,
+.formCard {
+  gap: 1rem;
+  min-width: 0;
+  margin: 1rem 0 0;
+  padding: 1.25rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.formCard {
+  display: grid;
+  margin: 0;
+}
+
+.adminPanel h2,
+.formCard > legend {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  line-height: var(--text-headline-md--line-height);
+  letter-spacing: var(--tracking-normal);
+  text-transform: uppercase;
+}
+
+.formCard > legend {
+  display: flex;
+  float: left;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+.formCard > legend + * {
+  clear: both;
+}
+
+.requiredTag {
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+}
+
+.adminForm {
+  gap: 1rem;
+}
+
+.field > label {
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-height: 3rem;
+  font-size: var(--text-body-lg);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary);
+  outline: 1px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+/* Main call to action: the wide amber pill at the end of each capture. */
+.primaryAction,
+.primaryLink {
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  box-shadow: var(--shadow-glow);
+}
+
+.adminForm > .primaryAction {
+  justify-self: stretch;
+}
+
+.dangerAction,
+.iconAction {
+  border-radius: var(--radius-full);
+}
+
+/* State and stock: rows with a description and a toggle on the right. */
+.checkGroup {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.checkGroup .checkField {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.15rem 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.checkGroup .checkField > label {
+  grid-column: 1;
+  grid-row: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.checkGroup .checkField > .hint,
+.checkGroup .checkField > .fieldError {
+  grid-column: 1;
+}
+
+.checkGroup .checkField > input {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: relative;
+  width: 3rem;
+  height: 1.75rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+  transition: background-color 0.15s;
+}
+
+.checkGroup .checkField > input::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.checkGroup .checkField > input:checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.checkGroup .checkField > input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.2rem);
+}
+
+.optionGroup {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.defaults {
+  margin-left: 0;
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+/* Product and promotion rows: the cards of the price capture (photo, name, badges, price). */
+.categoryCard {
+  background: var(--color-surface);
+}
+
+.categoryCard h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.productRow,
+.orderList > li,
+.promotionRow {
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.thumb {
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.productInfo > a {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.productInfo > span:nth-of-type(1) {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.disclosure {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.sectionLinks .primaryLink {
+  justify-content: center;
+  width: 100%;
+}
+
+/* Header on one row at phone width: role and sign out stay beside the brand. */
+.adminActions {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.adminHeader {
+  align-items: center;
+}
+
+.adminHeader .secondaryAction {
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 26rem) {
+  .brand strong {
+    font-size: var(--text-title);
+  }
+
+  .role {
+    display: none;
+  }
+}
+
+.tab {
+  padding: 0 0.85rem;
+}
+
+/* A category's products are the cards; the category itself is a plain group inside its section. */
+.tabPanel .categoryCard {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Product rows keep the photo beside the name at every width, as in the price capture. */
+.productRow {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.productRow .productInfo {
+  flex: 1 1 auto;
+  flex-basis: auto;
+}
+
+.productRow .moveButtons {
+  flex-direction: column;
+  margin-left: 0;
+}
+
+.checkGroup.fieldset > legend {
+  margin-bottom: 0.25rem;
+}
+
+.adminPanel > p:not(.eyebrow) {
+  margin: 0 0 1rem;
+}
+
+/* Full width like the storefront: the header band runs edge to edge, content lines up below it. */
+.adminHeader {
+  box-shadow: 0 0 0 100vmax var(--color-glass);
+  clip-path: inset(0 -100vmax);
+}
+
+@media (min-width: 64rem) {
+  .adminHeader,
+  .adminContent {
+    max-width: 64rem;
+  }
+}
+
+/* Header of the capture: brand with "Panel de control" under it and a round sign-out button. */
+.brandText {
+  display: grid;
+  line-height: 1;
+}
+
+.brandText small {
+  margin-top: 0.2rem;
+  color: var(--color-secondary);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.logoutAction {
+  display: grid;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.logoutAction:hover {
+  color: var(--color-danger-text);
+}
+
+/* Control panel (admin_configuraci_n_precios). */
+.dashboard {
+  display: grid;
+  gap: 1.5rem;
+  padding-top: 0.25rem;
+}
+
+.statusCard,
+.deliveryCard {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.statusHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.statusTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.statusTitle svg {
+  color: var(--color-primary);
+}
+
+.state_open,
+.state_paused,
+.state_closed {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.state_open {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.state_paused {
+  border: 1px solid var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+}
+
+.state_closed {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.statusReason {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+}
+
+.statusForm,
+.deliveryForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusForm select {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+}
+
+.smallAction {
+  min-height: var(--spacing-tap);
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.smallAction:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.quickError {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--text-body-sm);
+}
+
+.toolbar {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  padding: 0 1rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-field);
+  color: var(--color-muted);
+}
+
+.searchField:focus-within {
+  border-color: var(--color-primary);
+}
+
+.searchField input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  outline: none;
+}
+
+.toolbarActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.addPrimary,
+.addSecondary {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-body-sm);
+  font-weight: 800;
+  letter-spacing: var(--tracking-label);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.addPrimary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.addSecondary {
+  border: 1px solid var(--color-accent-border);
+  background: var(--color-surface-high);
+  color: var(--color-primary);
+}
+
+.prices {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pricesHead {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.pricesHead h2,
+.deliveryCard h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  letter-spacing: var(--tracking-normal);
+  text-transform: uppercase;
+}
+
+.pricesHead p,
+.deliveryCard p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.segmented {
+  display: inline-flex;
+  width: fit-content;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+}
+
+.segmented button {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.segmented button span {
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--color-scrim);
+}
+
+.quickList {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quickRow {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.quickRowOff {
+  border-color: var(--color-danger);
+  background: linear-gradient(var(--color-danger-soft), var(--color-danger-soft)), var(--color-surface);
+}
+
+.quickRowPromo {
+  border-color: var(--color-accent-border);
+  background: linear-gradient(var(--color-accent-soft), var(--color-accent-soft)), var(--color-surface);
+}
+
+.quickInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.quickThumb {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-high);
+  color: var(--color-primary);
+}
+
+.quickThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.quickThumb > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 0.25rem;
+  border-top-left-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quickText {
+  display: grid;
+  min-width: 0;
+}
+
+.quickTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.quickTitle a {
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 600;
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.quickTitle > span {
+  margin-left: 0;
+}
+
+.quickDescription {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.priceInput {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: var(--spacing-tap);
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.priceInput:focus-within {
+  border-color: var(--color-primary);
+}
+
+.priceInput input {
+  width: 5.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  font: inherit;
+  outline: none;
+}
+
+.quickToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  margin-left: auto;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickToggle input {
+  position: relative;
+  width: 2.75rem;
+  height: 1.6rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.quickToggle input::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.quickToggle input:checked {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.quickToggle input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.15rem);
+}
+
+.quickToggle input:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.deliveryForm label {
+  flex-basis: 100%;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+@media (min-width: 40rem) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .toolbarActions {
+    grid-template-columns: auto auto;
+  }
+
+  .addPrimary,
+  .addSecondary {
+    padding: 0 1rem;
+  }
+
+  .pricesHead {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .quickRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .quickControls {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+@media (min-width: 64rem) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+  }
+
+  .dashboardSide {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1;
+    gap: 1rem;
+    align-content: start;
+  }
+
+  .prices {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .deliveryCard {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolbarActions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Phones and tablets: the side cards stay in the capture's order (status, search, list, delivery). */
+@media (max-width: 63.99rem) {
+  .dashboardSide {
+    display: contents;
+  }
+}
+
+@media (min-width: 64rem) {
+  /* Row 1 is as tall as the side column; the delivery card sits right under it. */
+  .dashboard {
+    grid-template-rows: auto 1fr;
+  }
+
+  .deliveryCard {
+    align-self: start;
+  }
+}
+
+/* The brand text is not the old square "BB" mark. */
+.brand > .brandText {
+  display: grid;
+  width: auto;
+  height: auto;
+  place-items: start;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+}
+
+.brand > .brandText strong {
+  white-space: nowrap;
+}
+
+/* Phones: price, save and the switch on one line; the switch's word is read, not shown. */
+@media (max-width: 30rem) {
+  .priceInput input {
+    width: 4.25rem;
+  }
+
+  .quickToggle {
+    padding-left: 0.5rem;
+  }
+
+  .quickToggle > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .quickControls {
+    flex-wrap: nowrap;
+  }
+}
+
+/* Capture details: store switch, category pills, promotions block, toggles without words. */
+.statusForm {
+  display: block;
+}
+
+.storeSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: var(--spacing-tap);
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.storeSwitch input[type="checkbox"] {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 1.75rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.storeSwitch input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.storeSwitch input[type="checkbox"]:checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.storeSwitch input[type="checkbox"]:checked::after {
+  background: var(--color-foreground);
+  transform: translateX(1.2rem);
+}
+
+.storeSwitch input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.statusReason {
+  color: var(--color-muted);
+}
+
+.state_open::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  box-shadow: 0 0 8px var(--color-success);
+  vertical-align: middle;
+}
+
+.categoryPills {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.categoryPills button {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.categoryPills button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.segmented a {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
+  border-radius: var(--radius-full);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.segmented a[aria-current="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.segmented a span {
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--color-scrim);
+}
+
+.promosTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+  text-transform: uppercase;
+  scroll-margin-top: 5rem;
+}
+
+#lista-productos,
+#lista-promociones {
+  scroll-margin-top: 5rem;
+}
+
+.priceValue {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  min-width: 6.5rem;
+  align-items: center;
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-price);
+  font-weight: 700;
+}
+
+.smallActionLink {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  padding: 0 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+/* The capture's switches carry no word next to them; it stays for screen readers. */
+.quickToggle > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Second pass against the capture: metric cards, one-line status, inline rectangular badges. */
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.metric {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.metricLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.metricLabel svg {
+  color: var(--color-muted);
+}
+
+.metric strong {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-lg);
+  line-height: 1;
+}
+
+.metric strong small {
+  color: var(--color-success);
+  font-family: var(--font-sans);
+  font-size: var(--text-badge);
+  font-weight: 700;
+}
+
+.statusCard {
+  gap: 0.6rem;
+}
+
+.storeSwitch > span {
+  color: var(--color-primary);
+}
+
+.quickTitle .badge,
+.quickTitle .badgeMuted,
+.quickTitle .badgeWarning {
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+
+.quickText {
+  gap: 0.15rem;
+}
+
+.priceInput input[type="text"] {
+  width: 5.5rem;
+}
+
+.categoryPills button {
+  border-color: transparent;
+  background: var(--color-surface-high);
+}
+
+.moreSettings {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.moreSettings p {
+  margin: 0;
+}
+
+.moreSettings .adminNav {
+  margin: 0;
+}
+
+@media (min-width: 64rem) {
+  .moreSettings {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+/* The capture separates name and price row by space only, and the switch by distance. */
+.quickControls {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.quickToggle {
+  border-left: 0;
+}
+
+/* Form details from the new-product and new-promotion captures. */
+.pageBar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: calc(0.75rem + env(safe-area-inset-top)) 0 0.75rem;
+  background: var(--color-glass);
+  box-shadow: 0 0 0 100vmax var(--color-glass);
+  clip-path: inset(0 -100vmax);
+}
+
+.pageBar h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-primary);
+  font-size: var(--text-headline);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageBack {
+  display: grid;
+  flex: 0 0 auto;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-foreground);
+}
+
+.pageLogo {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+/* A screen with its own bar replaces the panel header. */
+.adminViewport:has([data-page-bar]) .adminHeader {
+  display: none;
+}
+
+.cardTitle {
+  margin: 0;
+}
+
+.dropzone {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  text-align: center;
+}
+
+.dropzone strong {
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.field input[type="file"] {
+  min-height: 7rem;
+  border: 2px dashed var(--color-border-strong);
+  text-align: center;
+}
+
+.prefixed {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.875rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+}
+
+.field .prefixed input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+  font-weight: 700;
+}
+
+.choicePills,
+.mechanicTiles {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choicePills legend,
+.mechanicTiles legend {
+  margin-bottom: 0.45rem;
+  padding: 0;
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.choicePills > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+}
+
+.choicePill,
+.choicePillActive {
+  position: relative;
+  display: grid;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.choicePillActive {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.choicePill input,
+.choicePillActive input,
+.mechanicTile input,
+.mechanicTileActive input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.choicePill:has(input:focus-visible),
+.choicePillActive:has(input:focus-visible),
+.mechanicTile:has(input:focus-visible),
+.mechanicTileActive:has(input:focus-visible) {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.optionPrice {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+
+.defaults .checkField {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.defaults .checkField span {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.selectionTag {
+  grid-column: 2;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.mechanicTiles > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.mechanicTile,
+.mechanicTileActive {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 0.15rem;
+  min-height: 6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+.mechanicTileActive {
+  border: 2px solid var(--color-primary);
+  background: var(--color-accent-soft);
+}
+
+.mechanicTile strong,
+.mechanicTileActive strong {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+
+.mechanicTile small,
+.mechanicTileActive small {
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.badgeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: -0.4rem;
+}
+
+.badgeChips button {
+  min-height: var(--spacing-tap);
+  padding: 0 0.85rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-foreground);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.badgeChips button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* Photo box of the new-product capture. */
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardTitle svg {
+  color: var(--color-primary);
+}
+
+.dropzone {
+  gap: 0.4rem;
+  padding: 1.75rem 1rem;
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+label.dropzone {
+  cursor: pointer;
+}
+
+label.dropzone:hover {
+  border-color: var(--color-primary);
+}
+
+.field:has(.dropzoneInput:focus-visible) label.dropzone {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.dropzoneIcon {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 0.4rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-primary);
+}
+
+.dropzone > strong {
+  font-size: var(--text-headline-md);
+}
+
+.dropzoneTip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.dropzoneTip svg {
+  color: var(--color-primary);
+}
+
+/* The real file input stays focusable and readable, but the box is what is seen. */
+.field .dropzoneInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.dropzoneTip {
+  padding: 0.25rem 0.65rem;
+  font-size: var(--text-badge);
+  white-space: nowrap;
+}
+
+label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
+  font-weight: 400;
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+}
+
+/* The product's own cards are the sections; no box around them. */
+.plainSection {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.plainSection > h2 {
+  margin: 0;
+}
+
+/* Product selector of the capture: one row, icon over the name, the chosen one in amber. */
+.choicePills legend {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.activeTag {
+  color: var(--color-primary);
+  font-size: var(--text-badge);
+  letter-spacing: var(--tracking-badge);
+}
+
+.choicePills > div {
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+}
+
+.choicePill,
+.choicePillActive {
+  gap: 0.3rem;
+  min-height: 3.75rem;
+}
+
+.choicePillActive {
+  box-shadow: var(--shadow-glow);
+}
+
+.choicePill,
+.choicePillActive {
+  font-size: var(--text-badge);
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+/* Pinned bars are opaque: nothing scrolling under them shows through. */
+.pageBar,
+.adminHeader {
+  background: var(--color-surface);
+  box-shadow: 0 0 0 100vmax var(--color-surface);
+  backdrop-filter: none;
+}
+
+/* A screen with its own bar starts right at the top. */
+.adminViewport:has([data-page-bar]) .adminContent {
+  margin-top: 0;
+}
+
+/* Options and extras with their price (issue #54). */
+.optionGroups {
+  display: grid;
+  gap: 1rem;
+}
+
+.optionGroupCard {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(var(--color-accent-soft), var(--color-accent-soft)), var(--color-surface);
+  scroll-margin-top: 5rem;
+}
+
+.optionGroupCard header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.optionGroupCard h3 {
+  margin: 0;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+}
+
+.optionRows {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.optionRow,
+.newOption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.newOption {
+  border-style: dashed;
+  border-color: var(--color-accent-border);
+}
+
+.optionName {
+  flex: 1 1 10rem;
+  min-width: 0;
+  min-height: var(--spacing-tap);
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
+.optionName:focus-visible {
+  border-color: var(--color-primary);
+  outline: 1px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+.addOptionAction {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.optionRow .quickToggle,
+.newOption .quickToggle {
+  margin-left: 0;
+}
+
+.editPricesLink {
+  grid-column: 2;
+  justify-self: start;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+/* Variants of a group in the product form, as the capture: choice, price, save; then "Añadir". */
+.variantRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.variantRow .checkField {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.variantRow .priceInput input[type="text"] {
+  width: 4.5rem;
+}
+
+.variantNew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-md);
+}
+
+/* The detached forms only show their messages. */
+.optionForms {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.optionForms form {
+  display: contents;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .variantRow .checkField {
+    grid-column: 1 / -1;
+  }
+}
+
+.variantRow {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.variantRow > input[type="radio"],
+.variantRow > input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.variantName {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.variantName .optionName {
+  flex: 1;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .variantRow .variantName {
+    grid-column: 2 / -1;
+  }
+
+  .variantRow .priceInput {
+    grid-column: 2;
+  }
+}
+
+/* Drag to order the options of a group. */
+.variantRow {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+}
+
+.variantRow[data-dragging] {
+  border-color: var(--color-primary);
+  opacity: 0.6;
+}
+
+.dragHandle {
+  display: grid;
+  width: 2rem;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.dragHandle:hover {
+  color: var(--color-primary);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .variantRow .variantName {
+    grid-column: 3 / -1;
+  }
+
+  .variantRow .priceInput {
+    grid-column: 3;
+  }
+}
+
+/* Categories in the panel: draggable pills, "+ Categoría", edit bar (issue #54). */
+.categoryTools {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.categoryPills {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+}
+
+.categoryPill[data-dragging] {
+  opacity: 0.5;
+  outline: 2px dashed var(--color-primary);
+}
+
+.categoryPill[data-hidden] > button[aria-pressed] {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.categoryPills .categoryPill > button[aria-pressed] {
+  padding-left: 0.25rem;
+}
+
+.categoryPills .pillGrip {
+  display: grid;
+  min-height: 2.5rem;
+  padding: 0 0 0 0.6rem;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.categoryPills .addCategory {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px dashed var(--color-accent-border);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.categoryForm,
+.categoryEdit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.categoryEdit {
+  display: grid;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.categorySelect {
+  min-height: var(--spacing-tap);
+  padding: 0 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-foreground);
+}
+
+.visibleCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--spacing-tap);
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.visibleCheck input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-primary);
+}
+
+.smallAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.dangerSmall {
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.categoryDelete {
+  display: block;
+}
+
+.rowGrip {
+  display: grid;
+  width: 2rem;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.quickRow:has(> .rowGrip) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.quickRow:has(> .rowGrip) > .quickControls {
+  grid-column: 1 / -1;
+}
+
+.quickRow[data-dragging] {
+  border-color: var(--color-primary);
+  opacity: 0.6;
+}
+
+@media (min-width: 40rem) {
+  .quickRow:has(> .rowGrip) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .quickRow:has(> .rowGrip) > .quickControls {
+    grid-column: auto;
+  }
+}
+
+/* Pause an option from its row: a small switch next to the save button. */
+.variantRow {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+}
+
+.variantAvailable {
+  display: grid;
+  min-height: var(--spacing-tap);
+  place-items: center;
+  cursor: pointer;
+}
+
+.variantAvailable input {
+  position: relative;
+  width: 2.5rem;
+  height: 1.45rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  cursor: pointer;
+  appearance: none;
+}
+
+.variantAvailable input::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: var(--radius-full);
+  background: var(--color-foreground);
+  transition: transform 0.15s;
+}
+
+.variantAvailable input:checked {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.variantAvailable input:checked::after {
+  background: var(--color-on-primary);
+  transform: translateX(1.05rem);
+}
+
+.variantAvailable input:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 26rem) {
+  .variantRow {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  }
+}
+
+/* New-promotion capture: amber section titles with icons, badge chips, value box, combo rows, day chips. */
+.promoCard > legend {
+  font-size: var(--text-title);
+}
+
+.promoLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-primary);
+}
+
+.promoCard .field > label {
+  font-size: var(--text-body-sm);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+}
+
+.badgePicker,
+.dayPicker {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pickerLabel {
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.badgeChips {
+  margin-top: 0;
+}
+
+.badgeChips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.tileIcons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  color: var(--color-primary);
+}
+
+.mechanicTile .tileIcons {
+  color: var(--color-muted);
+}
+
+.mechanicTile,
+.mechanicTileActive {
+  align-content: start;
+}
+
+.valueBox {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+.valuePair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.valueLabel {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.valueNormal {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.savingBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-foreground);
+  font-size: var(--text-body-sm);
+}
+
+.savingBox strong {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.comboRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem auto;
+  align-items: end;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.comboRow .prefixed,
+.comboRow .field .prefixed input {
+  font-size: var(--text-title);
+}
+
+.comboPrice {
+  grid-column: 1 / -1;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.trashAction {
+  display: grid;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.trashAction:hover {
+  color: var(--color-danger-text);
+}
+
+.addDashed {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.dayChips {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dayChips button {
+  min-height: var(--spacing-tap);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-high);
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dayChips button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.linkAction {
+  justify-self: start;
+  min-height: var(--spacing-tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 26rem) {
+  .valuePair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.requiredTag {
+  white-space: nowrap;
+}
+
+/* Hours and dates side by side on phones too, as in the capture; one column only on the narrowest. */
+@media (max-width: 26rem) {
+  .valuePair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 21rem) {
+  .valuePair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Fields side by side line up by their top (labels and boxes level), whatever is under each. */
+.valuePair {
+  align-items: start;
+}
+
+/* Promotion photo: cropped like the banner at the top of the menu (issue #54). */
+.promoPhotoPreview {
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.promoPhotoPreview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Photo preview cropped like the menu card; dragged with a finger or the mouse to recentre it. */
+.photoFrame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.photoFrame:active {
+  cursor: grabbing;
+}
+
+.photoFrame:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.photoFrame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.photoFrameHint {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-full);
+  background: var(--color-glass);
+  color: var(--color-foreground);
+  font-size: var(--text-badge);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+/* Option rows, final layout (issue #54). On a phone: handle and choice on the left, the name on
+   top, then price, availability and save underneath; on wider screens, one line. Earlier
+   .variantRow rules are layered; this block is the one that decides. */
+.defaults > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.defaults > legend + * {
+  clear: both;
+}
+
+.variantRow {
+  grid-template-areas:
+    "handle choice name name"
+    "handle choice price actions";
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  row-gap: 0.5rem;
+}
+
+.variantRow > .dragHandle {
+  grid-area: handle;
+}
+
+.variantRow > input[type="radio"],
+.variantRow > input[type="checkbox"] {
+  grid-area: choice;
+}
+
+.variantRow > .variantName {
+  grid-area: name;
+}
+
+.variantRow > .priceInput {
+  grid-area: price;
+  width: 100%;
+  min-width: 0;
+}
+
+.variantRow .priceInput input[type="text"] {
+  flex: 1;
+}
+
+.variantRow > .variantActions {
+  display: flex;
+  grid-area: actions;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.variantRow .priceInput input[type="text"] {
+  width: 100%;
+  min-width: 0;
+}
+
+/* On a phone the save button is its check icon (its name stays in aria-label). */
+.variantSaveText {
+  display: none;
+}
+
+@media (max-width: 39.99rem) {
+  .defaults {
+    padding: 0.5rem;
+  }
+
+  .variantRow {
+    column-gap: 0.4rem;
+    padding: 0.5rem;
+  }
+
+  .variantRow > .dragHandle {
+    width: 1.5rem;
+  }
+
+  .variantRow .smallAction {
+    min-width: var(--spacing-tap);
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+@media (min-width: 40rem) {
+  .variantSaveText {
+    display: inline;
+  }
+
+  .variantRow {
+    grid-template-areas: "handle choice name price actions";
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  }
+
+  .variantRow > .priceInput {
+    width: 8rem;
+  }
+}
+
+/* "Por defecto" chip of an option (issue #54): which choice comes preselected, not which is shown. */
+.defaultChip {
+  position: relative;
+  display: inline-flex;
+  min-height: var(--spacing-tap);
+  align-items: center;
+  cursor: pointer;
+}
+
+.defaultChip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.defaultChip span {
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.defaultChip:has(input:checked) span {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.defaultChip:has(input:focus-visible) span {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.defaultChip:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.variantRow > .defaultChip {
+  grid-area: choice;
+}
+
+.variantRow {
+  grid-template-areas:
+    "handle name choice"
+    "handle price actions";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+@media (min-width: 40rem) {
+  .variantRow {
+    grid-template-areas: "handle name choice price actions";
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+}
+
+/* Phone: the "Por defecto" chip sits above the name so the name keeps the whole width. */
+@media (max-width: 39.99rem) {
+  .variantRow {
+    grid-template-areas:
+      "handle choice choice"
+      "handle name name"
+      "handle price actions";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .variantRow > .defaultChip {
+    justify-self: start;
+    min-height: auto;
+  }
+
+  /* Category tiles two by two: whole words, no "HAMBURGUESA / S". */
+  .choicePills > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .choicePill,
+  .choicePillActive {
+    overflow-wrap: normal;
+  }
+}
+
+/* "Así se verá en la carta": the menu's own card, read-only, before the save button (issue #54). */
+.previewCard {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-canvas);
+}
+
+.previewCards {
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.previewLabel {
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+/* A promotion photo is framed like the banner of the menu. */
+.photoFrame[data-frame="banner"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* Store settings inside the panel (issue #54): what the "Tienda" screen had. */
+.settingsColumn {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+@media (min-width: 64rem) {
+  .settingsColumn {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+.deliveryCard h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deliveryCard h2 svg {
+  color: var(--color-primary);
+}
+
+.settingsForm {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settingsForm label {
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.settingsForm .smallAction {
+  justify-self: start;
+  margin-top: 0.3rem;
+}
+
+.modeForm {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.modeForm label {
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.modeForm select {
+  flex: 1;
+  min-width: 0;
+}
+
+.shiftList,
+.methodList {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shiftList li,
+.methodList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  padding: 0.3rem 0.4rem 0.3rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.methodList li {
+  padding-left: 0.2rem;
+}
+
+.methodList li[data-dragging] {
+  border-color: var(--color-primary);
+  opacity: 0.6;
+}
+
+.methodInfo {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.methodInfo small {
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+}
+
+.shiftForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.shiftForm .smallAction {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.iconSmall {
+  display: grid;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.iconSmall:hover {
+  color: var(--color-danger-text);
+}
+
+/* Inside the settings column the cards stack; the old single delivery card's placement does not apply. */
+.settingsColumn > .deliveryCard {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+/* Collapsible settings card: title, summary and an arrow; tapping it opens the card. */
+.collapsibleCard > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: -0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  list-style: none;
+}
+
+.collapsibleCard > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsibleCard > summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.collapsibleHead {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.collapsibleHead small {
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.collapsibleArrow {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  transition: transform 0.2s;
+}
+
+.collapsibleCard[open] .collapsibleArrow {
+  transform: rotate(180deg);
+}
+
+.weekList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+
+.weekList li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--spacing-tap);
+  padding: 0.35rem 0.6rem;
+}
+
+.weekList li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.weekList strong {
+  font-size: var(--text-body-sm);
+}
+
+.closedDay {
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.shiftChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.shiftChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.15rem 0.15rem 0.6rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-foreground);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.shiftChip small {
+  color: var(--color-primary);
+  font-size: var(--text-badge);
+}
+
+.chipRemove {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.chipRemove:hover,
+.chipRemove:focus-visible {
+  color: var(--color-danger-text);
+}
+
+/* The add form: day across, open and close side by side, never cut. */
+.shiftForm {
+  grid-template-columns: 1fr 1fr;
+  padding: 0.75rem;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-md);
+}
+
+.shiftForm > label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+}
+
+.shiftForm > label:first-of-type,
+.shiftForm > .shiftFormTitle,
+.shiftForm > small {
+  grid-column: 1 / -1;
+}
+
+.shiftForm input[type="time"],
+.shiftForm select {
+  width: 100%;
+  min-width: 0;
+}
+
+.shiftFormTitle {
+  font-weight: 700;
+}

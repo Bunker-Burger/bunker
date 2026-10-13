@@ -2,7 +2,7 @@ import type { PromotionWindow } from "@/domain/types";
 import { err, ok } from "@/lib/result";
 import type { AdminResult } from "@/server/admin/use-case";
 import { catalogError } from "@/server/catalog/errors";
-import type { PromotionDraft, PromotionFields, PromotionItem, StoreAdminRepository, StoredPaymentMethod, StoredShift, StoredStore } from "./ports";
+import type { StoreContactFields, PromotionDraft, PromotionFields, PromotionItem, StoreAdminRepository, StoredPaymentMethod, StoredShift, StoredStore } from "./ports";
 
 /*
  * Test double: one store's operation settings and promotions, with the DB rules the use cases rely
@@ -53,7 +53,7 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     return ok(undefined);
   }
 
-  async setContact(storeId: string, fields: { deliveryFeeCents: bigint | null; whatsappE164: string }): Promise<AdminResult<void>> {
+  async setContact(storeId: string, fields: StoreContactFields): Promise<AdminResult<void>> {
     const failed = this.fail("setContact");
     if (failed) return failed;
     const store = this.stores.find((candidate) => candidate.id === storeId);
@@ -146,6 +146,14 @@ export class InMemoryStoreAdminRepository implements StoreAdminRepository {
     [promotion.priority, neighbour.priority] = [neighbour.priority, promotion.priority];
     this.writes.push(`movePromotion:${promotion.name}=${promotion.priority},${neighbour.name}=${neighbour.priority}`);
     return ok({ moved: true });
+  }
+
+  async listPromotionOrder(storeId: string) {
+    const ordered = this.promotions
+      .filter((promotion) => promotion.storeId === storeId)
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
+      .map((promotion) => promotion.id);
+    return this.fail("listPromotionOrder") ?? ok(ordered);
   }
 
   async deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>> {

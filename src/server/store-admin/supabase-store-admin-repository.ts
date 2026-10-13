@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { isMissingColumn } from "@/server/catalog/supabase-catalog-repository";
 import { PAYMENT_METHOD_NAME } from "@/domain/public-payment-options";
 import { err, ok } from "@/lib/result";
 import { write, writeOne } from "@/server/admin/supabase-writes";
@@ -105,10 +106,14 @@ export function createSupabaseStoreAdminRepository(client: SupabaseClient<Databa
     async setContact(storeId, fields) {
       const fee = fields.deliveryFeeCents === null ? null : safeCents(fields.deliveryFeeCents);
       if (fields.deliveryFeeCents !== null && fee === null) return err({ code: "rejected", message: "stores.update: fee out of range" });
-      return writeOne(
-        "stores.update",
-        q(client.from("stores").update({ delivery_fee_cents: fee, whatsapp_e164: fields.whatsappE164 }).eq("id", storeId).select("id"))
-      );
+      const contact = { delivery_fee_cents: fee, whatsapp_e164: fields.whatsappE164 };
+      const pickup = { pickup_address: fields.pickupAddress, pickup_maps_url: fields.pickupMapsUrl };
+      const saved = await writeOne("stores.update", q(client.from("stores").update({ ...contact, ...pickup }).eq("id", storeId).select("id")));
+      // Before the pickup-location migration those columns do not exist: save the rest.
+      if (!saved.ok && isMissingColumn(saved.error.cause)) {
+        return writeOne("stores.update", q(client.from("stores").update(contact).eq("id", storeId).select("id")));
+      }
+      return saved;
     },
 
     async listShifts(storeId) {
@@ -199,6 +204,16 @@ export function createSupabaseStoreAdminRepository(client: SupabaseClient<Databa
       );
       if (!moved.ok) return moved;
       return typeof moved.value === "boolean" ? ok({ moved: moved.value }) : catalogError("invalid_data", "admin_move_promotion: no result");
+    },
+
+    async listPromotionOrder(storeId) {
+      const found = await rows(
+        "promotion_rules.select",
+        "promotion_rules",
+        z.object({ id: z.string() }),
+        q(client.from("promotion_rules").select("id").eq("store_id", storeId).order("priority", { ascending: false }).order("id"))
+      );
+      return found.ok ? ok(found.value.map((row) => row.id)) : found;
     },
 
     deletePromotion(storeId, promotionId) {

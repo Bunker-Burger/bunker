@@ -8,6 +8,7 @@ import {
   parseDirection,
   parseId,
   parseImageDetails,
+  parseOptionForm,
   parseProductForm,
 } from "./input";
 import {
@@ -362,5 +363,178 @@ export function deleteProductImage(deps: CatalogAdminDependencies, form: FormDat
     if (!deleted.ok) return failure(deps, "deleteProductImage", deleted.error);
     await removeQuietly(deps, "deleteProductImage", [image.value.storagePath]);
     return success("Foto eliminada.", undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Promotion photo (issue #54): shown in the banner at the top of the menu.
+
+const PROMOTION_IMAGE_PENDING = "Las fotos de promociones todavía no están habilitadas en la base de datos (falta aplicar su migración).";
+
+/**
+ * Uploads or replaces the photo (new object first, then the row, then the old object is removed),
+ * or, without a file, only recentres the stored one.
+ */
+export function savePromotionImage(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "savePromotionImage", async (storeId) => {
+    const id = parseId(form, "promotionId");
+    if (!id.ok) return invalid(id.error);
+    const promotion = await deps.repository.getPromotionImage(storeId, id.value);
+    if (!promotion.ok) return failure(deps, "savePromotionImage", promotion.error);
+    if (!promotion.value) return failure(deps, "savePromotionImage", { code: "not_found", message: "promotion not in store" });
+    if (!promotion.value.supported) return { ok: false, message: PROMOTION_IMAGE_PENDING } as const;
+    const details = parseImageDetails(form, promotion.value.name);
+    if (!details.ok) return invalid(details.error);
+    const focal = { x: details.value.focalX, y: details.value.focalY };
+
+    const file = form.get("image");
+    if (typeof file !== "object" || file === null || file.size === 0) {
+      if (!promotion.value.imagePath) return invalid({ image: "Elegí una imagen." });
+      if (!promotion.value.focal) return { ok: false, message: PROMOTION_IMAGE_PENDING } as const;
+      const moved = await deps.repository.setPromotionFocal(storeId, id.value, focal);
+      if (!moved.ok) return failure(deps, "savePromotionImage", moved.error);
+      return success("Foto acomodada.", undefined);
+    }
+    if (file.size > MAX_IMAGE_BYTES) return invalid({ image: "La imagen supera los 5 MB." });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const image = await inspectImage(bytes, file.type);
+    if (!image.ok) return invalid({ image: image.error.message });
+
+    const random = (deps.newId ?? (() => crypto.randomUUID()))();
+    const path = `${storeId}/promotions/${id.value}-${random}.${image.value.extension}`;
+    const uploaded = await deps.repository.putObject(path, bytes, image.value.mime);
+    if (!uploaded.ok) return failure(deps, "savePromotionImage", uploaded.error);
+
+    const previous = promotion.value.imagePath;
+    const saved = await deps.repository.setPromotionImage(storeId, id.value, path, promotion.value.focal ? focal : undefined);
+    if (!saved.ok) {
+      await removeQuietly(deps, "savePromotionImage", [path]);
+      return failure(deps, "savePromotionImage", saved.error);
+    }
+    if (previous) await removeQuietly(deps, "savePromotionImage", [previous]);
+    return success(previous ? "Foto reemplazada." : "Foto agregada.", undefined);
+  });
+}
+
+/** Clears the path first (the banner stops showing it), then removes the stored file. */
+export function deletePromotionImage(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "deletePromotionImage", async (storeId) => {
+    const id = parseId(form, "promotionId");
+    if (!id.ok) return invalid(id.error);
+    const promotion = await deps.repository.getPromotionImage(storeId, id.value);
+    if (!promotion.ok) return failure(deps, "deletePromotionImage", promotion.error);
+    if (!promotion.value) return failure(deps, "deletePromotionImage", { code: "not_found", message: "promotion not in store" });
+    if (!promotion.value.imagePath) return success("La promoción ya no tiene foto.", undefined);
+
+    const cleared = await deps.repository.setPromotionImage(storeId, id.value, null);
+    if (!cleared.ok) return failure(deps, "deletePromotionImage", cleared.error);
+    await removeQuietly(deps, "deletePromotionImage", [promotion.value.imagePath]);
+    return success("Foto eliminada.", undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Options (issue #54): the price of an extra, e.g. one more medallion, is set by the store.
+
+/**
+ * Creates an option in a group of the store, or updates its name, extra price and availability.
+ * The group (and the option) must belong to the admin's store; the database refuses to pause the
+ * default choice of a published product.
+ */
+export function saveOption(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin<{ optionId: string }>(deps, "saveOption", async (storeId) => {
+    const groupId = parseId(form, "groupId");
+    if (!groupId.ok) return invalid(groupId.error);
+    const optionId = form.get("optionId") ? parseId(form, "optionId") : null;
+    if (optionId && !optionId.ok) return invalid(optionId.error);
+    const fields = parseOptionForm(form);
+    if (!fields.ok) return invalid(fields.error);
+
+    const groups = await deps.repository.listOptionGroups(storeId);
+    if (!groups.ok) return failure(deps, "saveOption", groups.error);
+    const group = groups.value.find((candidate) => candidate.id === groupId.value);
+    if (!group) return invalid({ groupId: "Ese grupo de opciones ya no existe. Recargá la página." });
+    if (optionId && !group.options.some((option) => option.id === optionId.value)) {
+      return invalid({ optionId: "Esa opción ya no existe. Recargá la página." });
+    }
+    const sameName = group.options.find((option) => option.name.trim().toLowerCase() === fields.value.name.toLowerCase());
+    if (sameName && sameName.id !== optionId?.value) return invalid({ name: `“${group.name}” ya tiene una opción con ese nombre.` });
+
+    const messages = {
+      conflict: `“${group.name}” ya tiene una opción con ese nombre.`,
+      rejected: "No se puede pausar: es la opción por defecto de un producto publicado. Cambiá ese valor por defecto primero."
+    };
+    if (optionId) {
+      const saved = await deps.repository.updateOption(group.id, optionId.value, fields.value);
+      if (!saved.ok) return failure(deps, "saveOption", saved.error, messages);
+      return success(`“${fields.value.name}” guardada.`, { optionId: optionId.value });
+    }
+    const created = await deps.repository.createOption(group.id, { ...fields.value, sortOrder: nextSortOrder(group.options.map((_, index) => ({ sortOrder: (index + 1) * 10 }))) });
+    if (!created.ok) return failure(deps, "saveOption", created.error, messages);
+    return success(`“${fields.value.name}” agregada a ${group.name}.`, { optionId: created.value.id });
+  });
+}
+
+/** The order of a group's options, as dragged in the product form: every option, each once. */
+export function reorderOptions(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderOptions", async (storeId) => {
+    const groupId = parseId(form, "groupId");
+    if (!groupId.ok) return invalid(groupId.error);
+    const ids = form.getAll("optionId").map((value) => (typeof value === "string" ? value.toLowerCase() : ""));
+
+    const groups = await deps.repository.listOptionGroups(storeId);
+    if (!groups.ok) return failure(deps, "reorderOptions", groups.error);
+    const group = groups.value.find((candidate) => candidate.id === groupId.value);
+    if (!group) return invalid({ groupId: "Ese grupo de opciones ya no existe. Recargá la página." });
+    const current = new Set(group.options.map((option) => option.id));
+    if (ids.length !== current.size || new Set(ids).size !== ids.length || !ids.every((id) => current.has(id))) {
+      return invalid({ optionId: "Las opciones cambiaron mientras las ordenabas. Recargá la página." });
+    }
+
+    const saved = await deps.repository.setOptionOrder(group.id, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderOptions", saved.error);
+    return success(`Orden de ${group.name} guardado.`, undefined);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Drag-and-drop order from the control panel (issue #54): the whole list, each id once.
+
+function sameSet(ids: string[], current: string[]) {
+  const known = new Set(current);
+  return ids.length === known.size && new Set(ids).size === ids.length && ids.every((id) => known.has(id));
+}
+
+const listedIds = (form: FormData, field: string) => form.getAll(field).map((value) => (typeof value === "string" ? value.toLowerCase() : ""));
+
+/** The order of the menu's sections, as dragged in the panel. */
+export function reorderCategories(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderCategories", async (storeId) => {
+    const ids = listedIds(form, "categoryId");
+    const categories = await deps.repository.listCategories(storeId);
+    if (!categories.ok) return failure(deps, "reorderCategories", categories.error);
+    if (!sameSet(ids, categories.value.map((category) => category.id))) {
+      return invalid({ categoryId: "Las categorías cambiaron mientras las ordenabas. Recargá la página." });
+    }
+    const saved = await deps.repository.setCategoryOrder(storeId, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderCategories", saved.error);
+    return success("Orden de la carta guardado.", undefined);
+  });
+}
+
+/** The order of the products of one category, as dragged in the panel. */
+export function reorderProducts(deps: CatalogAdminDependencies, form: FormData) {
+  return asAdmin(deps, "reorderProducts", async (storeId) => {
+    const categoryId = parseId(form, "categoryId");
+    if (!categoryId.ok) return invalid(categoryId.error);
+    const ids = listedIds(form, "productId");
+    const products = await deps.repository.listProducts(storeId, categoryId.value);
+    if (!products.ok) return failure(deps, "reorderProducts", products.error);
+    if (products.value.length === 0 || !sameSet(ids, products.value.map((product) => product.id))) {
+      return invalid({ productId: "Los productos cambiaron mientras los ordenabas. Recargá la página." });
+    }
+    const saved = await deps.repository.setProductOrder(storeId, ids.map((id, index) => ({ id, sortOrder: (index + 1) * 10 })));
+    if (!saved.ok) return failure(deps, "reorderProducts", saved.error);
+    return success("Orden de productos guardado.", undefined);
   });
 }

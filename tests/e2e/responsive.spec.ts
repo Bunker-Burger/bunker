@@ -84,7 +84,13 @@ async function endOfPageClearance(page: Page) {
     const last = main?.lastElementChild?.getBoundingClientRect();
     const fixed = [...document.querySelectorAll<HTMLElement>("body *")].filter((element) => {
       const style = getComputedStyle(element);
-      return style.position === "fixed" && style.display !== "none" && !element.hidden && element.getBoundingClientRect().height > 0;
+      return (
+        style.position === "fixed" &&
+        style.display !== "none" &&
+        !element.hidden &&
+        !element.closest(".store-toast-region, [role=status]") &&
+        element.getBoundingClientRect().height > 0
+      );
     });
     const overlapping = fixed
       .map((element) => element.getBoundingClientRect())
@@ -130,14 +136,32 @@ test.describe("responsive shell", () => {
     await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
     await expect(page.locator(".cart-tray")).toBeVisible();
 
+    // 1. CON TOAST VISIBLE: Verify real UI behavior with visible toast overlay
+    const toast = page.locator(".store-toast");
+    await expect(toast).toBeVisible();
+
+    // Menú CTAs remain fully clickable while toast is present
+    await page.getByRole("button", { name: "Agregar Oklahoma Onion" }).click();
+    await expect(page.locator(".cart-tray")).toContainText("2 productos");
+
+    // Safe area and hit-testing: no interactive element is covered by the toast, tray, or nav
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     expect(await undersizedTargets(page)).toEqual([]);
     expect(await coveredWhenFocused(page)).toEqual([]);
+
+    // 2. SIN TOAST: Dismiss toast to verify structural baseline clearance of permanent bars
+    const closeToast = page.getByRole("button", { name: "Cerrar aviso" });
+    if (await closeToast.isVisible()) {
+      await closeToast.click();
+      await expect(toast).toHaveCount(0);
+      expect(await coveredWhenFocused(page)).toEqual([]);
+    }
+
     const clearance = await endOfPageClearance(page);
     expect(clearance.lastContentBottom).toBeLessThanOrEqual(clearance.firstFixedTop);
 
     await page.evaluate(() => window.scrollTo(0, 0));
-    // Back at the top, the scroll-spy hands the current marker back to Menú.
+    // Back at the top, the current marker is on Menú.
     await expect(page.locator("nav a[aria-current=location]")).toHaveAccessibleName(/^Menú/);
     const metrics = await layoutMetrics(page);
     const { width, height } = metrics.viewport;
@@ -147,34 +171,77 @@ test.describe("responsive shell", () => {
     if (width >= DESKTOP_MIN) {
       expect(metrics.nav?.width).toBeLessThan(width / 2); // floating pill
       expect(metrics.nav?.right).toBeLessThan(width);
-      expect(metrics.checkoutColumns).toBe(2);
     } else {
       expect(metrics.nav).toMatchObject({ left: 0, right: width, bottom: height }); // full-width bottom bar
-      expect(metrics.checkoutColumns).toBe(1);
     }
-    expect(metrics.productColumns).toBe(width >= DESKTOP_MIN ? 3 : width >= TWO_COLUMN_GRID_MIN ? 2 : 1);
+    expect(metrics.productColumns).toBe(width >= TWO_COLUMN_GRID_MIN ? 2 : 1);
 
-    await testInfo.attach(`metrics-${width}`, { body: JSON.stringify({ ...metrics, clearance }, null, 2), contentType: "application/json" });
+    // Verify checkout layout columns and clearance on the checkout screen
+    await page.locator("nav a[href='#checkout']").click();
+    const checkoutMetrics = await layoutMetrics(page);
+    expect(checkoutMetrics.checkoutColumns).toBe(width >= DESKTOP_MIN ? 2 : 1);
+    const checkoutClearance = await endOfPageClearance(page);
+    expect(checkoutClearance.lastContentBottom).toBeLessThanOrEqual(checkoutClearance.firstFixedTop);
+
+    // Return to menu
+    await page.locator("nav a[href='#menu']").click();
+
+    await testInfo.attach(`metrics-${width}`, { body: JSON.stringify({ ...metrics, clearance, checkoutClearance }, null, 2), contentType: "application/json" });
     await testInfo.attach(`storefront-${width}`, { body: await page.screenshot(), contentType: "image/png" });
   });
 
-  test("bottom nav marks the section the user navigates to", async ({ page }) => {
+  test("bottom nav marks the section the user navigates to and inactive views are hidden", async ({ page }) => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Navegación principal" });
-    for (const label of ["Carrito", "Checkout", "Menú"]) {
+    const current = () => nav.locator("a[aria-current=location]");
+
+    await expect(current()).toHaveAccessibleName(/^Menú/);
+    await expect(page.locator("#menu")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#menu")).toBeVisible();
+    await expect(page.locator("#carrito")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#carrito")).toBeHidden();
+    await expect(page.locator("#checkout")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#checkout")).toBeHidden();
+
+    for (const [hash, label, region, activeId, hiddenIds] of [
+      ["#carrito", "Carrito", "Tu pedido", "#carrito", ["#menu", "#checkout"]],
+      ["#checkout", "Checkout", "Finalizar pedido", "#checkout", ["#menu", "#carrito"]],
+      ["#menu", "Menú", "LA CARTA DEL BÚNKER", "#menu", ["#carrito", "#checkout"]]
+    ] as const) {
       await nav.getByRole("link", { name: new RegExp(`^${label}`) }).click();
-      const current = nav.locator("a[aria-current=location]");
-      await expect(current).toHaveCount(1);
-      await expect(current).toHaveAccessibleName(new RegExp(`^${label}`));
+      await expect(current()).toHaveCount(1);
+      await expect(current()).toHaveAccessibleName(new RegExp(`^${label}`));
+      await expect(page.getByRole("region", { name: region })).toBeVisible();
+      await expect(page.locator(activeId)).toHaveAttribute("data-active", "true");
+      await expect(page.locator(activeId)).toBeVisible();
+      for (const hiddenId of hiddenIds) {
+        await expect(page.locator(hiddenId)).toHaveAttribute("data-active", "false");
+        await expect(page.locator(hiddenId)).toBeHidden();
+      }
+      expect(new URL(page.url()).hash).toBe(hash);
     }
 
-    // Scrolling by hand (not via a link) moves the marker with the content.
-    const current = nav.locator("a[aria-current=location]");
-    await page.mouse.wheel(0, 100_000);
-    await expect(current).toHaveAccessibleName(/^Checkout/);
-    await page.mouse.wheel(0, -100_000);
-    await expect(current).toHaveAccessibleName(/^Menú/);
-    await expect(current).toHaveCount(1);
+    // Direct hash changes (deep linking / back-forward) update current marker and view
+    await page.evaluate(() => { window.location.hash = "#checkout"; });
+    await expect(current()).toHaveAccessibleName(/^Checkout/);
+    await expect(page.getByRole("region", { name: "Finalizar pedido" })).toBeVisible();
+    await expect(page.locator("#checkout")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#carrito")).toBeHidden();
+
+    await page.evaluate(() => { window.history.back(); });
+    await expect(current()).toHaveAccessibleName(/^Menú/);
+    await expect(page.getByRole("region", { name: "LA CARTA DEL BÚNKER" })).toBeVisible();
+    await expect(page.locator("#menu")).toBeVisible();
+    await expect(page.locator("#carrito")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
+
+    await page.evaluate(() => { window.history.forward(); });
+    await expect(current()).toHaveAccessibleName(/^Checkout/);
+    await expect(page.getByRole("region", { name: "Finalizar pedido" })).toBeVisible();
+    await expect(page.locator("#checkout")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#carrito")).toBeHidden();
   });
 
   test("design system page holds the same guarantees", async ({ page }, testInfo) => {

@@ -30,6 +30,9 @@ export interface StoredPaymentMethod {
 export interface StoreContactFields {
   deliveryFeeCents: bigint | null;
   whatsappE164: string;
+  /** Where pickup orders are collected and its map link; null clears them (issue #54). */
+  pickupAddress: string | null;
+  pickupMapsUrl: string | null;
 }
 
 export interface PromotionFields {
@@ -80,5 +83,7 @@ export interface StoreAdminRepository {
   setPromotionActive(storeId: string, promotionId: string, active: boolean): Promise<AdminResult<void>>;
   /** Swaps priorities with the neighbour in one transaction; `moved: false` at the end of the list. */
   movePromotion(storeId: string, promotionId: string, direction: "up" | "down"): Promise<AdminResult<{ moved: boolean }>>;
+  /** Ids of the store's promotions, highest priority (tried first) first. */
+  listPromotionOrder(storeId: string): Promise<AdminResult<string[]>>;
   deletePromotion(storeId: string, promotionId: string): Promise<AdminResult<void>>;
 }

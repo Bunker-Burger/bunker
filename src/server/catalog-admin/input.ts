@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
-import { ADMIN_CATEGORY_KINDS, type AdminCategoryKind, type CategoryFields, type ImageDetails, type OptionGroupLink, type ProductFields } from "./ports";
+import { ADMIN_CATEGORY_KINDS, type AdminCategoryKind, type CategoryFields, type ImageDetails, type OptionFields, type OptionGroupLink, type ProductFields } from "./ports";
 
 /*
  * Parses the admin forms (FormData) into typed fields. Nothing here trusts the browser: every
@@ -157,4 +157,18 @@ export function parseImageDetails(form: FormData, fallbackAlt: string): Result<I
   if (!parsed.success) return err(collect(parsed.error.issues));
   const altText = parsed.data.altText || fallbackAlt.trim().slice(0, 180);
   return ok({ ...parsed.data, altText });
+}
+
+const optionSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá un nombre.").max(80, "Máximo 80 caracteres."),
+  price: z.string().refine((value) => parsePriceCents(value) !== null, "Ingresá un precio en pesos, por ejemplo 1400 o 0."),
+  available: z.boolean()
+});
+
+/** An option of a group: name, extra price ("" counts as $ 0) and availability. */
+export function parseOptionForm(form: FormData): Result<OptionFields, FieldErrors> {
+  const price = text(form.get("price")).trim();
+  const parsed = optionSchema.safeParse({ name: text(form.get("name")), price: price === "" ? "0" : price, available: checked(form.get("available")) });
+  if (!parsed.success) return err(collect(parsed.error.issues));
+  return ok({ name: parsed.data.name, priceDeltaCents: parsePriceCents(parsed.data.price)!, available: parsed.data.available });
 }

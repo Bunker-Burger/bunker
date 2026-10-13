@@ -32,6 +32,8 @@ export const storeRowSchema = z.object({
   status_override: z.enum(enums.store_status_override),
   is_public: z.boolean(),
   delivery_fee_cents: cents.nullable(),
+  pickup_address: z.string().nullable().optional(),
+  pickup_maps_url: z.string().nullable().optional(),
   store_business_hours: z.array(
     z.object({ day_of_week: z.number().int().min(0).max(6), opens_at: wallClock, closes_at: wallClock })
   ),
@@ -49,12 +51,17 @@ export type StoreRow = z.output<typeof storeRowSchema>;
 export const STORE_OPERATING_SELECT =
   "id, slug, timezone, status_override, delivery_fee_cents:delivery_fee_cents::text, store_business_hours(day_of_week, opens_at, closes_at)";
 
+/** Pickup address and map link (issue #54); databases without that migration answer to the selects above. */
+export const PICKUP_COLUMNS = ", pickup_address, pickup_maps_url";
+
 export const storeOperatingRowSchema = storeRowSchema.pick({
   id: true,
   slug: true,
   timezone: true,
   status_override: true,
   delivery_fee_cents: true,
+  pickup_address: true,
+  pickup_maps_url: true,
   store_business_hours: true
 });
 export type StoreOperatingRow = z.output<typeof storeOperatingRowSchema>;
@@ -142,6 +149,12 @@ export const PROMOTION_SELECT = [
   "promotion_items(product_id, quantity), promotion_schedule(day_of_week, starts_at, ends_at)"
 ].join(", ");
 
+/** With the promotion photo (issue #54); databases without that migration answer to PROMOTION_SELECT. */
+export const PROMOTION_SELECT_WITH_IMAGE = `${PROMOTION_SELECT}, image_path`;
+
+/** With where the photo is centred (issue #54); older databases answer to the selects above. */
+export const PROMOTION_SELECT_WITH_FOCAL = `${PROMOTION_SELECT_WITH_IMAGE}, image_focal_x, image_focal_y`;
+
 export const promotionRowSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -159,6 +172,9 @@ export const promotionRowSchema = z.object({
   get_quantity: smallInt.nullable(),
   applies_to_delivery: z.boolean(),
   applies_to_pickup: z.boolean(),
+  image_path: z.string().nullable().optional(),
+  image_focal_x: z.number().int().min(0).max(100).optional(),
+  image_focal_y: z.number().int().min(0).max(100).optional(),
   promotion_items: z.array(z.object({ product_id: z.string(), quantity: smallInt })),
   promotion_schedule: z.array(z.object({ day_of_week: smallInt, starts_at: wallClock, ends_at: wallClock }))
 });

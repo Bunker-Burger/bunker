@@ -56,31 +56,16 @@ describe("carta pública", () => {
     renderStorefront({ initialCatalog: { products: fallbackProducts, categories } });
 
     expect(sectionTitles()).toEqual(["Las más pedidas", "Bebidas", "Acompañamientos", "Sándwiches"]);
-    const chips = within(screen.getByRole("group", { name: "Secciones de la carta" })).getAllByRole("button");
-    expect(chips.map((chip) => chip.textContent)).toEqual(["Todo", "Destacadas", "Bebidas", "Acompañamientos", "Clásicas", "Sándwiches"]);
-  });
-
-  it("filtra por sección marcando el filtro activo, y Todo vuelve a la carta completa", async () => {
-    const user = userEvent.setup();
-    renderStorefront();
-    const chips = within(screen.getByRole("group", { name: "Secciones de la carta" }));
-
-    expect(chips.getByRole("button", { name: "Todo" })).toHaveAttribute("aria-pressed", "true");
-    await user.click(chips.getByRole("button", { name: "Hamburguesas" }));
-
-    expect(chips.getByRole("button", { name: "Hamburguesas" })).toHaveAttribute("aria-pressed", "true");
-    expect(chips.getByRole("button", { name: "Todo" })).toHaveAttribute("aria-pressed", "false");
-    expect(sectionTitles()).toEqual(["Hamburguesas"]);
-    expect(screen.getByText("Mostrando 2 productos.")).toBeInTheDocument();
-
-    await user.click(chips.getByRole("button", { name: "Todo" }));
-    expect(sectionTitles()).toHaveLength(4);
+    // No section filters (owner's call on issue #54): the search in the header narrows the menu.
+    expect(screen.queryByRole("group", { name: "Secciones de la carta" })).toBeNull();
   });
 
   it("busca por nombre o descripción y ofrece volver a la carta cuando no hay resultados", async () => {
     const user = userEvent.setup();
     renderStorefront();
+    await user.click(screen.getByRole("button", { name: "Buscar en la carta" }));
     const search = screen.getByRole("searchbox", { name: "Buscar en la carta" });
+    expect(search).toHaveFocus();
 
     await user.type(search, "CEBOLLA");
     expect(menu().getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Oklahoma Onion", "Aros de Cebolla"]);
@@ -92,7 +77,14 @@ describe("carta pública", () => {
     expect(screen.getByText("Nada coincide con “pizza”.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Ver toda la carta" }));
-    expect(search).toHaveValue("");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(sectionTitles()).toHaveLength(4);
+
+    // Escape closes the search, clears it and gives focus back to the magnifier.
+    await user.click(screen.getByRole("button", { name: "Buscar en la carta" }));
+    await user.type(screen.getByRole("searchbox", { name: "Buscar en la carta" }), "papas{Escape}");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.getByRole("button", { name: "Buscar en la carta" })).toHaveFocus();
     expect(sectionTitles()).toHaveLength(4);
   });
 
@@ -166,7 +158,7 @@ describe("drawer de producto", () => {
     const dialog = screen.getByRole("dialog", { name: "Personalizar Oklahoma Onion" });
     expect(new URL(window.location.href).searchParams.get("producto")).toBe("oklahoma-onion");
     expect(dialog).toHaveAccessibleDescription(/^Precio \$\s?7\.200\. Disponible\.$/);
-    expect(within(dialog).getByRole("button", { name: "Cerrar personalizador" })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Seguir pidiendo" })).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -204,7 +196,7 @@ describe("drawer de producto", () => {
     const user = userEvent.setup();
     renderStorefront({ initialProductSlug: "gaseosa-lata" });
     const dialog = screen.getByRole("dialog", { name: "Personalizar Gaseosa Lata 354ml" });
-    const close = within(dialog).getByRole("button", { name: "Cerrar personalizador" });
+    const close = within(dialog).getByRole("button", { name: "Seguir pidiendo" });
     const submit = within(dialog).getByRole("button", { name: /Agregar 1 al carrito/ });
 
     expect(close).toHaveFocus();
@@ -223,7 +215,7 @@ describe("drawer de producto", () => {
     window.history.replaceState({}, "", "/?producto=limonada-de-la-casa");
     renderStorefront({ initialProductSlug: "limonada-de-la-casa" });
 
-    await user.click(within(screen.getByRole("dialog", { name: "Personalizar Limonada de la Casa" })).getByRole("button", { name: "Cerrar personalizador" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Personalizar Limonada de la Casa" })).getByRole("button", { name: "Seguir pidiendo" }));
 
     expect(screen.getByRole("button", { name: "Ver Limonada de la Casa" })).toHaveFocus();
     expect(window.location.search).toBe("");

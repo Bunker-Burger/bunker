@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openScreen } from "./screens";
 import { categories as fixtureCategories, products } from "../../src/data/catalog";
 import { serializePublicCatalog } from "../../src/server/catalog/public-products";
 
@@ -47,8 +48,8 @@ test.describe("WhatsApp checkout", () => {
     }));
     await page.goto("/");
     await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
-    const checkout = page.getByRole("region", { name: "Finalizar pedido" });
-    await checkout.getByText("Delivery", { exact: true }).click();
+    const checkout = await openScreen(page, "checkout");
+    await checkout.getByRole("radio", { name: /Delivery a domicilio/i }).check();
 
     await expect(checkout.getByRole("textbox")).toHaveCount(0);
     const link = checkout.getByRole("link", { name: "Enviar pedido por WhatsApp" });
@@ -66,7 +67,7 @@ test.describe("WhatsApp checkout", () => {
     await serveOpenStore(page, () => ({ status: 409, json: { error: "store_closed" } }));
     await page.goto("/");
     await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
-    const checkout = page.getByRole("region", { name: "Finalizar pedido" });
+    const checkout = await openScreen(page, "checkout");
 
     await expect(checkout.getByRole("alert")).toHaveText("El local no está tomando pedidos ahora.");
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);

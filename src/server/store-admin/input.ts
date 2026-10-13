@@ -43,7 +43,15 @@ export function parseContact(form: FormData): Result<StoreContactFields, FieldEr
   if (feeText !== "" && deliveryFeeCents === null) errors.deliveryFee = "Ingresá la tarifa en pesos, por ejemplo 1200 o 1200.50.";
   const whatsappE164 = normalizeWhatsapp(text(form.get("whatsapp")));
   if (!E164.test(whatsappE164)) errors.whatsapp = "Ingresá el número con código de país, por ejemplo +5493815551234.";
-  return Object.keys(errors).length > 0 ? err(errors) : ok({ deliveryFeeCents, whatsappE164 });
+  const pickupAddress = text(form.get("pickupAddress")).trim().replace(/\s+/g, " ");
+  if (pickupAddress.length > 200) errors.pickupAddress = "La dirección puede tener hasta 200 caracteres.";
+  const pickupMapsUrl = text(form.get("pickupMapsUrl")).trim();
+  if (pickupMapsUrl !== "" && (pickupMapsUrl.length > 500 || !/^https:\/\/\S+$/.test(pickupMapsUrl))) {
+    errors.pickupMapsUrl = "Pegá el enlace completo de Google Maps (empieza con https://).";
+  }
+  return Object.keys(errors).length > 0
+    ? err(errors)
+    : ok({ deliveryFeeCents, whatsappE164, pickupAddress: pickupAddress || null, pickupMapsUrl: pickupMapsUrl || null });
 }
 
 export function parseShift(form: FormData): Result<Omit<StoredShift, "id">, FieldErrors> {

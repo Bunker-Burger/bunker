@@ -9,8 +9,8 @@ import { ok, type Result } from "@/lib/result";
 import type { Database } from "@/server/supabase/database.types";
 import { parseRows, toStoreOperatingSettings } from "./adapters";
 import { catalogError, type CatalogError } from "./errors";
-import { STORE_OPERATING_SELECT, storeOperatingRowSchema } from "./rows";
-import { run, type QueryResponse } from "./supabase-catalog-repository";
+import { PICKUP_COLUMNS, STORE_OPERATING_SELECT, storeOperatingRowSchema } from "./rows";
+import { run, type QueryResponse, isMissingColumn } from "./supabase-catalog-repository";
 
 /**
  * Operational read of a public store: override, time zone, delivery fee and weekly hours.
@@ -24,8 +24,11 @@ export interface StoreOperatingRepository {
 export function createSupabaseStoreOperatingRepository(client: SupabaseClient<Database>): StoreOperatingRepository {
   return {
     async getOperatingSettings(storeSlug) {
-      const query = client.from("stores").select(STORE_OPERATING_SELECT).eq("slug", storeSlug).eq("is_public", true);
-      const response = await run("stores.operating.select", query.maybeSingle() as PromiseLike<QueryResponse>);
+      const read = (columns: string) =>
+        run("stores.operating.select", client.from("stores").select(columns).eq("slug", storeSlug).eq("is_public", true).maybeSingle() as PromiseLike<QueryResponse>);
+      let response = await read(STORE_OPERATING_SELECT + PICKUP_COLUMNS);
+      // Before the pickup-location migration the columns do not exist: read as before.
+      if (!response.ok && isMissingColumn(response.error.cause)) response = await read(STORE_OPERATING_SELECT);
       if (!response.ok) return response;
       if (response.value === null) return catalogError("not_found", `stores: no public store "${storeSlug}"`);
       const rows = parseRows("stores", storeOperatingRowSchema, [response.value]);

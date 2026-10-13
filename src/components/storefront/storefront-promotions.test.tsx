@@ -148,7 +148,7 @@ const summary = () => within(screen.getByRole("heading", { name: "Resumen de la 
 const estimatedTotal = () => summary().getByText("Total estimado").nextElementSibling;
 // As rendered text: formatArs separates the sign with a no-break space.
 const displayed = (cents: bigint) => formatArs(cents).replace(/\s/g, " ");
-const subtotal = () => summary().getByText("Subtotal").nextElementSibling;
+const subtotal = () => summary().getByText("Subtotal productos").nextElementSibling;
 
 /** What the server would charge for one Smash Búnker Doble, from the same database. */
 async function authoritativeQuote(fulfilment: "pickup" | "delivery"): Promise<PaymentQuote> {
@@ -207,6 +207,17 @@ describe("promotions in the storefront, read from the public route", () => {
     expect(quote).toMatchObject({ subtotalCents: 780000n, discountCents: 117000n, totalCents: 663000n });
     expect(quote.promotion?.explanation).toBe("15% de descuento en productos seleccionados");
     expect(estimatedTotal()).toHaveTextContent(displayed(quote.totalCents));
+  });
+
+  it("shows the card's promotional price in the product detail too, and where the discount lands", async () => {
+    at(TUESDAY_NIGHT);
+    const user = await renderWithSmashInCart();
+    await smashCard().findByText("$ 6.630");
+    await user.click(smashCard().getByRole("button", { name: "Ver Smash Búnker Doble" }));
+    const detail = await screen.findByRole("dialog");
+    expect(within(detail).getByText("$ 6.630")).toBeInTheDocument();
+    expect(within(detail).getByText("$ 7.800", { selector: "s" })).toBeInTheDocument();
+    expect(within(detail).getByText(/El descuento se aplica al confirmar el pedido/)).toBeInTheDocument();
   });
 
   it("stops announcing a promotion paused in the database at the next read", async () => {

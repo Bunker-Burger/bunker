@@ -1,7 +1,8 @@
-import Link from "next/link";
+import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
-import { ADMIN_PROMOTIONS_PATH } from "../../paths";
+import { ADMIN_PANEL_PATH } from "../../paths";
+import { AdminPageBar } from "../../page-bar";
 import { PromotionForm } from "../promotion-form";
 import { formProducts, newPromotionValues } from "../promotion-props";
 
@@ -10,7 +11,7 @@ export default async function NewPromotionPage() {
   if (!view.ok) {
     return (
       <section className={styles.adminPanel} aria-labelledby="promotion-title">
-        <h1 id="promotion-title">Nueva promoción</h1>
+        <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Nueva promoción" titleId="promotion-title" />
         <p className={styles.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
       </section>
     );
@@ -18,14 +19,12 @@ export default async function NewPromotionPage() {
   const { store } = view.value.catalog;
   return (
     <section className={styles.adminPanel} aria-labelledby="promotion-title">
-      <Link className={styles.backLink} href={ADMIN_PROMOTIONS_PATH}>
-        ← Volver a promociones
-      </Link>
-      <h1 id="promotion-title">Nueva promoción</h1>
+      <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Nueva promoción" titleId="promotion-title" />
       <p>Se crea pausada si no marcás “Activa”. Queda al final del orden de prioridad.</p>
       <PromotionForm
         defaults={newPromotionValues(store.timezone)}
         deliveryFeeCents={store.deliveryFeeCents === null ? null : store.deliveryFeeCents.toString()}
+        photo={{ url: null, maxBytes: MAX_IMAGE_BYTES, minSide: MIN_IMAGE_SIDE, maxSide: MAX_IMAGE_SIDE, focal: { x: 50, y: 50 }, frame: "banner" }}
         products={formProducts(view.value.catalog)}
         timezone={store.timezone}
       />
