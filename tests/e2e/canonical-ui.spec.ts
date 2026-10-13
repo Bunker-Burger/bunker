@@ -12,7 +12,7 @@ test.describe("Canonical UI: Toast Notifications", () => {
     await page.goto("/");
   });
 
-  test("toast auto-dismisses after ~4 seconds", async ({ page }) => {
+  test("toast auto-dismisses after ~4 seconds with lower and upper boundary verification", async ({ page }) => {
     const addBtn = page.getByRole("button", { name: "Agregar Smash Búnker Doble" });
     await addBtn.click();
 
@@ -20,8 +20,12 @@ test.describe("Canonical UI: Toast Notifications", () => {
     await expect(toast).toBeVisible();
     await expect(toast).toContainText("Smash Búnker Doble se agregó al carrito.");
 
-    // Auto-dismisses at ~4s
-    await expect(toast).toHaveCount(0, { timeout: 6000 });
+    // Lower bound: must remain visible near 3 seconds (rejects premature dismissal <3s / 100ms)
+    await page.waitForTimeout(3000);
+    await expect(toast).toBeVisible();
+
+    // Upper bound: auto-dismisses at ~4s (must be gone by ~5.5s)
+    await expect(toast).toHaveCount(0, { timeout: 2500 });
   });
 
   test("toast pauses countdown on mouse hover and resumes when unhovered", async ({ page }) => {
@@ -70,18 +74,38 @@ test.describe("Canonical UI: Toast Notifications", () => {
     await expect(page.locator(".store-toast")).toHaveCount(0);
   });
 
-  test("toast deduplicates rapid adds and maintains single notification element", async ({ page }) => {
+  test("toast renews 4-second timer on consecutive adds, avoids orphan timers, and tracks accurate cart line count", async ({ page }) => {
     const addBtn = page.getByRole("button", { name: "Agregar Smash Búnker Doble" });
-    // Rapid clicks
-    await addBtn.click();
-    await addBtn.click();
     await addBtn.click();
 
-    // Exactly one toast element exists
+    const toast = page.locator(".store-toast");
+    await expect(toast).toBeVisible();
+
+    // Wait 2.5s (> half duration)
+    await page.waitForTimeout(2500);
+    await expect(toast).toBeVisible();
+
+    // Second click at 2.5s restarts the 4000ms timer
+    await addBtn.click();
+
+    // Wait another 2.5s (total 5.0s from first click)
+    // If previous timer was still active (orphan timer), it would have fired at 4.0s.
+    // Because timer renewed, toast MUST still be visible at 5.0s!
+    await page.waitForTimeout(2500);
+    await expect(toast).toBeVisible();
+
+    // Third click
+    await addBtn.click();
+
+    // Single DOM notification element exists and cart reflects all 3 items
     await expect(page.locator(".store-toast")).toHaveCount(1);
-    const region = page.locator(".store-toast-region[role='status']");
+    const region = page.locator(".store-toast-region[role='status'][aria-live='polite']");
     await expect(region).toBeVisible();
     await expect(region).toContainText("Smash Búnker Doble se agregó al carrito.");
+    await expect(page.locator(".cart-tray")).toContainText("3 productos");
+
+    // Eventually dismisses ~4s after the last click
+    await expect(toast).toHaveCount(0, { timeout: 6000 });
   });
 });
 
@@ -203,59 +227,125 @@ test.describe("Canonical UI: Fast Tray (cart-tray)", () => {
 test.describe("Canonical UI: Hash Routing & Deep-Linking", () => {
   test.use({ serviceWorkers: "block" });
 
-  test("deep-linking directly to /#menu, /#carrito, /#checkout renders active screen and sets aria-current", async ({ page }) => {
+  test("deep-linking directly to /#menu, /#carrito, /#checkout renders active screen, hides inactive screens, and sets aria-current", async ({ page }) => {
     const nav = page.getByRole("navigation", { name: "Navegación principal" });
     const current = () => nav.locator("a[aria-current=location]");
 
     // /#carrito
     await page.goto("/#carrito");
     await expect(page.locator("#carrito")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#carrito")).toBeVisible();
     await expect(page.locator("#menu")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#checkout")).toBeHidden();
     await expect(page.getByRole("region", { name: "Tu pedido" })).toBeVisible();
     await expect(current()).toHaveAccessibleName(/^Carrito/);
+    await expect(current()).toHaveCount(1);
+    expect(await page.locator("#menu button:visible, #checkout button:visible").count()).toBe(0);
 
     // /#checkout
     await page.goto("/#checkout");
     await expect(page.locator("#checkout")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#checkout")).toBeVisible();
+    await expect(page.locator("#menu")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#menu")).toBeHidden();
     await expect(page.locator("#carrito")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#carrito")).toBeHidden();
     await expect(page.getByRole("region", { name: "Finalizar pedido" })).toBeVisible();
     await expect(current()).toHaveAccessibleName(/^Checkout/);
+    await expect(current()).toHaveCount(1);
+    expect(await page.locator("#menu button:visible, #carrito button:visible").count()).toBe(0);
 
     // /#menu
     await page.goto("/#menu");
     await expect(page.locator("#menu")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#menu")).toBeVisible();
+    await expect(page.locator("#carrito")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#carrito")).toBeHidden();
+    await expect(page.locator("#checkout")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#checkout")).toBeHidden();
     await expect(page.getByRole("region", { name: "LA CARTA DEL BÚNKER" })).toBeVisible();
     await expect(current()).toHaveAccessibleName(/^Menú/);
+    await expect(current()).toHaveCount(1);
+    expect(await page.locator("#carrito button:visible, #checkout button:visible").count()).toBe(0);
   });
 
-  test("browser Back and Forward buttons alternate screens while preserving cart state", async ({ page }) => {
+  test("invalid hash falls back to #menu as active and keeps other screens hidden", async ({ page }) => {
+    await page.goto("/#pantalla-inexistente");
+    const nav = page.getByRole("navigation", { name: "Navegación principal" });
+    const current = nav.locator("a[aria-current=location]");
+
+    await expect(page.locator("#menu")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#menu")).toBeVisible();
+    await expect(page.locator("#carrito")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#carrito")).toBeHidden();
+    await expect(page.locator("#checkout")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#checkout")).toBeHidden();
+    await expect(current).toHaveAccessibleName(/^Menú/);
+  });
+
+  test("reloading the page preserves active screen and keeps inactive screens hidden", async ({ page }) => {
+    await page.goto("/#carrito");
+    await expect(page.locator("#carrito")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
+
+    await page.reload();
+    await expect(page.locator("#carrito")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#carrito")).toBeVisible();
+    await expect(page.locator("#menu")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toHaveAttribute("data-active", "false");
+    await expect(page.locator("#checkout")).toBeHidden();
+  });
+
+  test("browser Back and Forward buttons alternate screens while preserving cart state and hiding inactive views", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Agregar Smash Búnker Doble" }).click();
 
     // Navigate to carrito then checkout via nav
     await openScreen(page, "carrito");
     await expect(page.locator("#carrito")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#carrito")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
 
     await openScreen(page, "checkout");
     await expect(page.locator("#checkout")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#checkout")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#carrito")).toBeHidden();
 
     // Browser back -> carrito
     await page.goBack();
     await expect(page.locator("#carrito")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#carrito")).toBeVisible();
     await expect(page.locator("#carrito").getByText("Smash Búnker Doble")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
 
     // Browser back -> menu
     await page.goBack();
     await expect(page.locator("#menu")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#menu")).toBeVisible();
     await expect(page.locator(".cart-tray")).toContainText("1 producto");
+    await expect(page.locator("#carrito")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
 
     // Browser forward -> carrito
     await page.goForward();
     await expect(page.locator("#carrito")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#carrito")).toBeVisible();
     await expect(page.locator("#carrito").getByText("Smash Búnker Doble")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#checkout")).toBeHidden();
 
     // Browser forward -> checkout
     await page.goForward();
     await expect(page.locator("#checkout")).toHaveAttribute("data-active", "true");
+    await expect(page.locator("#checkout")).toBeVisible();
+    await expect(page.locator("#menu")).toBeHidden();
+    await expect(page.locator("#carrito")).toBeHidden();
   });
 });

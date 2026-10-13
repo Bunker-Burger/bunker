@@ -99,8 +99,9 @@
   --bottom-nav-offset: 0rem;
   /* Height of extra fixed bars stacked above the nav (e.g. the cart tray); set where they render. */
   --fixed-bottom-extra: 0rem;
+  --toast-clearance: 0rem;
   /* Everything fixed at the bottom; content padding and focus scrolling keep clear of it. */
-  --fixed-bottom-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + 1rem);
+  --fixed-bottom-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + var(--toast-clearance) + 1rem);
   color-scheme: dark;
 }
 

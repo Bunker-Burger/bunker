@@ -81,7 +81,8 @@
 .product-card.compact .product-copy p { order: 2; -webkit-line-clamp: 1; }
 
 /* Notice: above the tray and the bottom nav, never over the header; only its card takes taps. */
-.store-toast-region { position: fixed; right: 1rem; bottom: calc(var(--fixed-bottom-clearance) + .25rem); left: 1rem; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
+:root:has(.store-toast) { --toast-clearance: 4.5rem; }
+.store-toast-region { position: fixed; right: 1rem; bottom: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + env(safe-area-inset-bottom) + var(--fixed-bottom-extra) + .5rem); left: 1rem; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
 .store-toast { display: flex; align-items: center; gap: .5rem; max-width: 28rem; padding: .55rem .4rem .55rem 1rem; border: 1px solid var(--color-accent-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); box-shadow: var(--shadow-overlay); color: var(--color-foreground); font-size: var(--text-body-sm); pointer-events: auto; animation: store-toast-in .2s ease-out; }
 .store-toast p { margin: 0; padding: .35rem 0; }
 .store-toast-close { display: grid; flex: 0 0 auto; place-items: center; width: var(--spacing-tap); height: var(--spacing-tap); border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-muted); cursor: pointer; }
