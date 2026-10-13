@@ -12,10 +12,11 @@ function subscribe(listener: () => void) {
 const currentMinute = () => Math.floor(Date.now() / MINUTE) * MINUTE;
 
 /**
- * Current time, refreshed every minute, or null while server rendering and hydrating, so
- * time-dependent content (promotion windows) never causes a hydration mismatch.
+ * Current time, refreshed every minute. While server rendering and hydrating it is `renderedAt`
+ * (the minute the server rendered the page) or null without it, so time-dependent content
+ * (promotion windows) is the same on both sides and never causes a hydration mismatch.
  */
-export function useNow(): Date | null {
-  const minute = useSyncExternalStore(subscribe, currentMinute, () => null);
+export function useNow(renderedAt: number | null = null): Date | null {
+  const minute = useSyncExternalStore(subscribe, currentMinute, () => renderedAt);
   return minute === null ? null : new Date(minute);
 }
