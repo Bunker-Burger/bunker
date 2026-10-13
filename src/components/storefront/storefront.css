@@ -91,8 +91,13 @@
 
 /* Cart and checkout screens */
 .order-section { padding: 0 0 1.5rem; }
-/* The pinned screen bar paints edge to edge whatever the content width: the shadow widens its background, the clip keeps it to the bar's height. */
-.view-bar { box-shadow: 0 0 0 100vmax var(--color-surface); clip-path: inset(0 -100vmax); }
+/*
+ * The pinned screen bar paints edge to edge whatever the content width: a border image filled with the
+ * surface, outset only sideways, which is paint and never layout or scroll. Not a 100vmax shadow clipped
+ * with clip-path: iOS WebKit drops the clip of a sticky layer while scrolling and the shadow covered the
+ * whole checkout (blank screen on iPhone).
+ */
+.view-bar { border-image: linear-gradient(var(--color-surface) 0 0) fill 0 / 0 / 0 100vmax; }
 .view-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; margin: 0 0 1rem; padding: calc(.75rem + env(safe-area-inset-top)) 0 .75rem; background: var(--color-surface); }
 .view-back { display: grid; flex: 0 0 auto; place-items: center; width: var(--spacing-tap); height: var(--spacing-tap); border-radius: var(--radius-full); background: var(--color-surface-high); color: var(--color-foreground); }
 .view-bar span { display: block; color: var(--color-primary); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-badge); text-transform: uppercase; }
