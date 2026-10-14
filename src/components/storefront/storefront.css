@@ -57,7 +57,10 @@
 .add-button.round:hover { background: var(--color-primary); color: var(--color-on-primary); }
 
 /* Large card ("Las más pedidas"): photo on top with a dark fade into the copy. */
-.product-card.hero .product-image-wrap { height: 11rem; }
+/* The whole photo, whatever its shape: the card is as tall as the picture (capped), like the product detail. The lone card on wide screens keeps its fixed height below. */
+.product-card.hero .product-image-wrap { height: auto; }
+.product-card.hero .product-image { height: auto; max-height: 40rem; object-fit: contain; }
+.product-card.hero .product-placeholder { aspect-ratio: 4 / 3; }
 .product-card.hero .product-image-wrap::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--color-surface), transparent 55%, var(--color-scrim)); pointer-events: none; }
 /* Row card (burgers, sandwiches): photo on the left. */
 .product-card.row .product-main { grid-template-columns: 8rem minmax(0, 1fr); min-height: 11rem; }
@@ -215,7 +218,7 @@
 .drawer-back { display: inline-flex; align-items: center; gap: .5rem; min-height: var(--spacing-tap); padding: 0 .75rem 0 .25rem; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--color-foreground); font-weight: 700; cursor: pointer; }
 .drawer-content { width: 100%; max-width: 30rem; margin: 0 auto; padding: .25rem 1rem 1.5rem; }
 .drawer-hero { overflow: hidden; padding: 0; }
-.drawer-image { display: block; width: 100%; height: 13rem; object-fit: cover; }
+.drawer-image { display: block; width: 100%; height: auto; max-height: min(34rem, 70dvh); object-fit: contain; }
 .drawer-hero-copy { padding: 1rem; }
 .drawer-title { display: flex; align-items: start; justify-content: space-between; gap: .8rem; }
 .drawer-title h2 { margin: 0; font-family: var(--font-display); font-size: var(--text-headline); font-weight: 700; line-height: 1.1; letter-spacing: var(--tracking-display); text-transform: uppercase; }
@@ -273,7 +276,7 @@ body.drawer-open { overflow: hidden; }
   .featured-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .checkout-layout { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, .8fr); }
   .cart-tray { right: var(--bottom-nav-offset); left: auto; width: 25rem; margin: 0; }
-  .drawer-content { max-width: 36rem; }
+  .drawer-content, .drawer-footer { max-width: 36rem; }
 }
 
 .return-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--color-overlay); backdrop-filter: blur(4px); }
@@ -333,6 +336,7 @@ body.drawer-open { overflow: hidden; }
   .featured-grid:has(> .product-card:only-child) { grid-template-columns: minmax(0, 1fr); }
   .featured-grid > .product-card.hero:only-child .product-main { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: stretch; }
   .featured-grid > .product-card.hero:only-child .product-image-wrap { height: 16rem; }
+  .featured-grid > .product-card.hero:only-child .product-image { height: 100%; max-height: none; object-fit: cover; }
   .featured-grid > .product-card.hero:only-child .product-image-wrap::after { background: linear-gradient(to left, var(--color-surface), transparent 40%); }
   .featured-grid > .product-card.hero:only-child .product-copy { align-self: center; padding-bottom: 4.5rem; }
 }
