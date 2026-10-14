@@ -253,7 +253,7 @@
 .notes-field { display: grid; gap: .25rem; }
 .notes-field > span { color: var(--color-foreground); font-family: var(--font-display); font-size: var(--text-title); font-weight: 600; letter-spacing: var(--tracking-normal); }
 .notes-field textarea { min-height: 5.5rem; margin-top: .5rem; resize: vertical; }
-.drawer-footer { position: sticky; bottom: 0; z-index: 3; display: grid; grid-template-columns: auto 1fr; gap: .6rem; width: 100%; max-width: 32rem; margin: auto auto 0; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); background: var(--color-glass); backdrop-filter: blur(16px); }
+.drawer-footer { position: sticky; bottom: 0; z-index: 3; display: grid; grid-template-columns: auto 1fr; gap: .6rem; width: 100%; margin: auto 0 0; padding: .75rem max(1rem, calc((100% - 30rem) / 2 + 1rem)) calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); background: var(--color-glass); backdrop-filter: blur(16px); }
 .drawer-footer .primary-action { min-width: 0; padding-inline: 1rem; font-size: var(--text-body-sm); }
 .drawer-footer .primary-action span { white-space: nowrap; }
 /* Narrow phones: the label and the amount on two lines instead of a three-line squeeze. */
@@ -276,7 +276,8 @@ body.drawer-open { overflow: hidden; }
   .featured-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .checkout-layout { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, .8fr); }
   .cart-tray { right: var(--bottom-nav-offset); left: auto; width: 25rem; margin: 0; }
-  .drawer-content, .drawer-footer { max-width: 36rem; }
+  .drawer-content { max-width: 36rem; }
+  .drawer-footer { padding-inline: calc((100% - 36rem) / 2 + 1rem); }
 }
 
 .return-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--color-overlay); backdrop-filter: blur(4px); }
