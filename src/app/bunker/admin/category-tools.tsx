@@ -72,7 +72,7 @@ export function CategoryTools({
           Todas ({totalProducts})
         </button>
         {list.map((category, index) => (
-          <span className={styles.categoryPill} data-hidden={!category.visible || undefined} key={category.id} {...rowProps(category.id, index)}>
+          <span className={styles.categoryPill} data-hidden={!category.visible || undefined} key={category.id} {...rowProps(category.id)}>
             <button className={styles.pillGrip} {...handleProps(category.id, index, `Mover ${category.name}`)}>
               <GripVertical aria-hidden="true" size={14} />
             </button>

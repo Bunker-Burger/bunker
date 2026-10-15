@@ -202,7 +202,7 @@ function PaymentMethods({ methods, mercadoPagoNote }: { methods: SettingsPayment
       ) : null}
       <ul aria-label="Medios de pago" className={styles.methodList}>
         {list.map((method, index) => (
-          <li key={method.id} {...rowProps(method.id, index)}>
+          <li key={method.id} {...rowProps(method.id)}>
             <button className={styles.rowGrip} {...handleProps(method.id, index, `Mover ${method.name}`)}>
               <GripVertical aria-hidden="true" size={18} />
             </button>

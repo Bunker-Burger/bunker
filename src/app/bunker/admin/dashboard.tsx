@@ -203,7 +203,7 @@ function PromotionRows({ promotions, sortable }: { promotions: DashboardPromotio
       <ul aria-labelledby="promos-title" className={styles.quickList} id="lista-promociones">
         {list.length === 0 ? <li className={styles.empty}>No hay promociones que coincidan.</li> : null}
         {list.map((promotion, index) => (
-          <li className={`${styles.quickRow} ${styles.quickRowPromo}`} key={promotion.id} {...(draggable ? rowProps(promotion.id, index) : {})}>
+          <li className={`${styles.quickRow} ${styles.quickRowPromo}`} key={promotion.id} {...(draggable ? rowProps(promotion.id) : {})}>
             {draggable ? (
               <button className={styles.rowGrip} {...handleProps(promotion.id, index, `Mover ${promotion.name}`)}>
                 <GripVertical aria-hidden="true" size={18} />
@@ -252,7 +252,7 @@ function ProductRows({ products, sortable, categoryId }: { products: DashboardPr
           <li
             className={product.form.inStock ? styles.quickRow : `${styles.quickRow} ${styles.quickRowOff}`}
             key={product.form.id}
-            {...(sortable ? rowProps(product.form.id, index) : {})}
+            {...(sortable ? rowProps(product.form.id) : {})}
           >
             {sortable ? (
               <button className={styles.rowGrip} {...handleProps(product.form.id, index, `Mover ${product.form.name}`)}>

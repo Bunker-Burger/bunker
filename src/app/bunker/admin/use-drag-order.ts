@@ -40,7 +40,7 @@ export function useDragOrder<T extends { id: string }>(items: readonly T[], onSa
     setDragging(null);
   };
 
-  const rowProps = (id: string, _index: number) => ({
+  const rowProps = (id: string) => ({
     "data-drag-id": id,
     "data-dragging": dragging === id || undefined
   });
