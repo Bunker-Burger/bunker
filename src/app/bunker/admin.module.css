@@ -3769,3 +3769,13 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 .shiftFormTitle {
   font-weight: 700;
 }
+
+/* Long press on a category or a handle must not open iOS's "look up / search" window: dragging is by pointer. */
+.categoryPill,
+.categoryPill button,
+.rowGrip,
+.pillGrip {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
