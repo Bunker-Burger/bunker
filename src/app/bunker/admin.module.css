@@ -1178,10 +1178,9 @@
   margin: 0 0 1rem;
 }
 
-/* Full width like the storefront: the header band runs edge to edge, content lines up below it. */
+/* Full width like the storefront: the header band runs edge to edge, content lines up below it. The band is a border image outset sideways: paint only, never a giant shadow, which iOS WebKit stops clipping while scrolling and then covers the page. */
 .adminHeader {
-  box-shadow: 0 0 0 100vmax var(--color-glass);
-  clip-path: inset(0 -100vmax);
+  border-image: linear-gradient(var(--color-glass) 0 0) fill 0 / 0 / 0 100vmax;
 }
 
 @media (min-width: 64rem) {
@@ -2103,8 +2102,7 @@
   margin: 0 0 1rem;
   padding: calc(0.75rem + env(safe-area-inset-top)) 0 0.75rem;
   background: var(--color-glass);
-  box-shadow: 0 0 0 100vmax var(--color-glass);
-  clip-path: inset(0 -100vmax);
+  border-image: linear-gradient(var(--color-glass) 0 0) fill 0 / 0 / 0 100vmax;
 }
 
 .pageBar h1 {
@@ -2503,8 +2501,14 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 .pageBar,
 .adminHeader {
   background: var(--color-surface);
-  box-shadow: 0 0 0 100vmax var(--color-surface);
+  border-image: linear-gradient(var(--color-surface) 0 0) fill 0 / 0 / 0 100vmax;
   backdrop-filter: none;
+}
+
+/* A border image replaces the real border, so the header keeps its bottom line as an inset line. */
+.adminHeader {
+  border-bottom-width: 0;
+  box-shadow: inset 0 -1px 0 var(--color-border);
 }
 
 /* A screen with its own bar starts right at the top. */
