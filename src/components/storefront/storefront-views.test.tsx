@@ -65,12 +65,12 @@ describe("pantallas del storefront", () => {
 
   it("el header (logo y nombre) sólo está en la carta, sin un segundo acceso al carrito", () => {
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
-    const brand = screen.getByRole("link", { name: "Búnker Burger, ir al menú" });
+    const brand = screen.getByRole("link", { name: "Búnker Burguer, ir al menú" });
     expect(brand.querySelector("img")).toHaveAttribute("src", "/assets/bunker-logo.webp");
     expect(screen.getAllByRole("link", { name: /^Carrito, \d+ productos$/ })).toHaveLength(1);
 
     goTo("#checkout");
-    expect(screen.queryByRole("link", { name: "Búnker Burger, ir al menú" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Búnker Burguer, ir al menú" })).toBeNull();
   });
 
   it("la bandeja rápida aparece sólo en la carta, con cantidad, subtotal y acceso al pedido", async () => {

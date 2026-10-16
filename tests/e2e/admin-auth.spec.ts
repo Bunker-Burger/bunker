@@ -46,7 +46,7 @@ test("the sole owner can enter, sees Admin navigation, logs out, and cannot retu
 
   await expect(page).toHaveURL(/\/bunker\/admin$/);
   await expect(page.getByRole("heading", { name: "Panel administrativo" })).toBeVisible();
-  await page.getByRole("link", { name: "Búnker Burger, volver al menú" }).click();
+  await page.getByRole("link", { name: "Búnker Burguer, volver al menú" }).click();
   await expect(page.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/bunker/admin");
 
   await page.goto("/bunker/admin");

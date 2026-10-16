@@ -17,11 +17,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <main className={styles.adminViewport}>
       <header className={styles.adminHeader}>
-        <Link className={styles.brand} href="/" aria-label="Búnker Burger, volver al menú">
+        <Link className={styles.brand} href="/" aria-label="Búnker Burguer, volver al menú">
           {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
           <img alt="" height={40} src="/assets/bunker-logo.webp" width={40} />
           <span className={styles.brandText}>
-            <strong>BÚNKER BURGER</strong>
+            <strong>BÚNKER BURGUER</strong>
             <small>
               Panel de control · <span>{role}</span>
             </small>

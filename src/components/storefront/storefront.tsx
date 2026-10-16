@@ -396,10 +396,10 @@ export function Storefront({
               </div>
             ) : (
               <>
-                <a className="brand" href="#menu" aria-label="Búnker Burger, ir al menú">
+                <a className="brand" href="#menu" aria-label="Búnker Burguer, ir al menú">
                   {/* eslint-disable-next-line @next/next/no-img-element -- 80px brand mark, already sized */}
                   <img alt="" className="brand-mark" height={40} src="/assets/bunker-logo.webp" width={40} />
-                  <span>BÚNKER BURGER</span>
+                  <span>BÚNKER BURGUER</span>
                 </a>
                 <button aria-label="Buscar en la carta" className="header-icon" onClick={() => setSearchOpen(true)} ref={searchButtonRef} type="button">
                   <Search aria-hidden="true" size={20} />
@@ -767,7 +767,7 @@ function ViewBar({ back, backLabel, title, titleId }: { back: string; backLabel:
         <ArrowLeft aria-hidden="true" size={20} />
       </a>
       <div>
-        <span>BÚNKER BURGER</span>
+        <span>BÚNKER BURGUER</span>
         <h2 id={titleId} tabIndex={-1}>{title}</h2>
       </div>
     </div>
