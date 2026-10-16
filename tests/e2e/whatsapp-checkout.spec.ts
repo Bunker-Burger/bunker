@@ -70,6 +70,6 @@ test.describe("WhatsApp checkout", () => {
     const checkout = await openScreen(page, "checkout");
 
     await expect(checkout.getByRole("alert")).toHaveText("El local no está tomando pedidos ahora.");
-    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+    await expect(page.locator('a[href*="wa.me"]:not([data-credit])')).toHaveCount(0);
   });
 });

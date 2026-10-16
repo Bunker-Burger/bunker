@@ -20,6 +20,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("pie con copyright y crédito", () => {
+  it("muestra el copyright y el crédito con enlace a WhatsApp consultando por servicios", () => {
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent(`© ${new Date().getFullYear()} Búnker Burguer. Todos los derechos reservados.`);
+    const credit = within(footer).getByRole("link", { name: /Lautaro Jimenez/ });
+    expect(credit).toHaveTextContent("Lautaro Jimenez");
+    const url = new URL(credit.getAttribute("href")!);
+    expect(url.origin + url.pathname).toBe("https://wa.me/543865575688");
+    expect(url.searchParams.get("text")).toMatch(/consultarte por tus servicios/);
+    expect(credit).toHaveAttribute("target", "_blank");
+    expect(credit).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  });
+});
+
 describe("pie legal con atributo hidden", () => {
   it("permanece oculto y queda visible al quitar hidden del contenedor", () => {
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);

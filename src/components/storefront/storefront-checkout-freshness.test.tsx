@@ -234,7 +234,7 @@ describe("checkout link freshness in the storefront", () => {
     await act(async () => pendingStatus.resolve(second()));
     await waitFor(() => expect(screen.getByTestId("store-status")).toHaveTextContent(message));
     expect(checkout().getByRole("button", { name: label })).toBeDisabled();
-    expect(document.querySelector('a[href*="wa.me"]')).toBeNull();
+    expect(document.querySelector('a[href*="wa.me"]:not([data-credit])')).toBeNull();
 
     // The cart and the menu keep working while the checkout is blocked.
     await user.click(screen.getByRole("button", { name: "Agregar uno de Smash Búnker Doble" }));

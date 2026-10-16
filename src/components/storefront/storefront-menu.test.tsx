@@ -141,7 +141,8 @@ describe("pie legal (BB-18)", () => {
     expect(hiddenContainer).not.toBeNull();
     expect(hiddenContainer).not.toBeVisible();
     expect(within(footer).queryByRole("navigation", { name: "Textos legales" })).toBeNull();
-    expect(within(footer).queryAllByRole("link")).toEqual([]);
+    // The only visible link is the developer's credit; no legal page is linked yet.
+    expect(within(footer).queryAllByRole("link").map((link) => link.hasAttribute("data-credit"))).toEqual([true]);
     expect([...footer.querySelectorAll('a[href^="/legal/"]')].map((link) => link.getAttribute("href"))).toEqual([
       "/legal/terminos", "/legal/privacidad", "/legal/cancelaciones"
     ]);

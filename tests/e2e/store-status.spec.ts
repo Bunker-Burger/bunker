@@ -37,7 +37,7 @@ async function fillCompleteOrder(page: Page) {
 }
 
 async function expectNoSendAction(page: Page) {
-  await expect(page.locator('a[href*="wa.me"], a[href*="whatsapp"]')).toHaveCount(0);
+  await expect(page.locator('a[href*="wa.me"]:not([data-credit]), a[href*="whatsapp"]:not([data-credit])')).toHaveCount(0);
   const checkout = page.getByRole("region", { name: "Finalizar pedido" });
   // Only in-page navigation (the back arrow to the cart) may be a link in the checkout screen.
   await expect(checkout.locator('a:not([href^="#"])')).toHaveCount(0);

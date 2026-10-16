@@ -93,7 +93,7 @@ test("offline the cached menu opens and the cart works, but nothing can be sent 
   const checkout = await openScreen(page, "checkout");
   await expect(checkout.getByTestId("offline-note")).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Sin conexión" })).toBeDisabled();
-  await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  await expect(page.locator('a[href*="wa.me"]:not([data-credit])')).toHaveCount(0);
   await context.setOffline(false);
 });
 

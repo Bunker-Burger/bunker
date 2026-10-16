@@ -108,7 +108,7 @@ async function fillCompleteOrder(user: ReturnType<typeof userEvent.setup>) {
 
 /** Nothing in the page can open WhatsApp or submit the order. */
 function expectNoSendAction(checkout: HTMLElement) {
-  expect(document.querySelector('a[href*="wa.me"], a[href*="whatsapp"], form[action]')).toBeNull();
+  expect(document.querySelector('a[href*="wa.me"]:not([data-credit]), a[href*="whatsapp"]:not([data-credit]), form[action]')).toBeNull();
   // Only in-page navigation (the back arrow to the cart) may be a link in the checkout screen.
   expect(within(checkout).queryAllByRole("link").filter((link) => !link.getAttribute("href")?.startsWith("#"))).toEqual([]);
   for (const button of within(checkout).queryAllByRole("button")) {

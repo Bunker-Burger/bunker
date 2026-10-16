@@ -88,6 +88,9 @@ function removeProductParam() {
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
+/** Credit in the footer: opens the developer's WhatsApp with a message asking about their services. */
+const CREDIT_WHATSAPP_URL = `https://wa.me/543865575688?text=${encodeURIComponent("Hola Lautaro! Vi la carta online de Búnker Burguer y me gustaría consultarte por tus servicios.")}`;
+
 export interface StorefrontProps {
   initialProductSlug: string | null;
   mercadoPagoEnabled: boolean;
@@ -432,6 +435,13 @@ export function Storefront({
 
         <footer className="store-legal">
           <p>{ALLERGEN_NOTICE}</p>
+          <p className="store-copyright">© {new Date().getFullYear()} Búnker Burguer. Todos los derechos reservados.</p>
+          <p className="store-credit">
+            Creado por{" "}
+            <a aria-label="Lautaro Jimenez: consultar por sus servicios por WhatsApp" data-credit href={CREDIT_WHATSAPP_URL} rel="noopener noreferrer" target="_blank">
+              Lautaro Jimenez
+            </a>
+          </p>
           {/* Quitar `hidden` de este contenedor cuando se quieran mostrar los enlaces. */}
           <div hidden>
             <nav aria-label="Textos legales">
