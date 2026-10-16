@@ -55,6 +55,9 @@ interface ProductFormProps {
   photo?: PhotoValue;
 }
 
+/** "PAPAS" and "Papas" are the same label: the type's name is only added to the category's when they differ. */
+const sameLabel = (a: string, b: string) => a.trim().toLocaleLowerCase("es") === b.trim().toLocaleLowerCase("es");
+
 /** Icons of the capture's product selector, by the type the category gives its products. */
 const CATEGORY_ICONS: Record<string, LucideIcon> = { burger: Hamburger, sandwich: Sandwich, fries: Popcorn, beverage: CupSoda };
 
@@ -143,7 +146,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                 <label className={category.id === categoryId ? styles.choicePillActive : styles.choicePill} key={category.id}>
                   <input checked={category.id === categoryId} name="categoryId" onChange={() => setCategoryId(category.id)} type="radio" value={category.id} />
                   <Icon aria-hidden="true" size={20} />
-                  {category.name === category.tabLabel ? category.name : `${category.tabLabel} · ${category.name}`}
+                  {sameLabel(category.name, category.tabLabel) ? category.name : `${category.tabLabel} · ${category.name}`}
                 </label>
               );
             })}

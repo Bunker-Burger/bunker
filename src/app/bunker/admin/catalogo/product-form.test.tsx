@@ -26,6 +26,12 @@ const groups: ProductFormOptionGroup[] = [
 
 describe("ProductForm", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("does not repeat the type when the category has the same name in other letters (PAPAS, not Papas · PAPAS)", () => {
+    render(<ProductForm categories={[{ id: "c-fries", name: "PAPAS", type: "fries", tabLabel: "Papas" }, ...categories]} optionGroups={groups} />);
+    expect(screen.getByRole("radio", { name: "PAPAS" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /·/ })).not.toBeInTheDocument();
+  });
+
   it("lists only the option groups of the chosen category's type", async () => {
     render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
     expect(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ })).toBeInTheDocument();
