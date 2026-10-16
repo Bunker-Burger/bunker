@@ -29,7 +29,7 @@ export interface PublicPromotion {
   channels: PromotionRule["channels"];
   items: Array<{ productSlug: string | null; quantity: number }>;
   schedule: PromotionRule["schedule"];
-  /** Only for promotions with a photo: what the menu's banner shows (issue #54). */
+  /** What the menu's banner shows (issue #54): the photo, when it has one, and the badge, when it has one. */
   imageUrl?: string | null | undefined;
   imageFocalPoint?: { x: number; y: number } | undefined;
   badgeText?: string | null | undefined;
@@ -52,7 +52,8 @@ export function toPublicPromotion(rule: PromotionRule, productSlugs: ReadonlyMap
     channels: rule.channels,
     items: rule.items.map((item) => ({ productSlug: productSlugs.get(item.productId) ?? null, quantity: item.quantity })),
     schedule: rule.schedule,
-    ...(rule.imageUrl ? { imageUrl: rule.imageUrl, badgeText: rule.badgeText } : {}),
+    ...(rule.imageUrl ? { imageUrl: rule.imageUrl } : {}),
+    ...(rule.badgeText ? { badgeText: rule.badgeText } : {}),
     ...(rule.imageUrl && rule.imageFocalPoint ? { imageFocalPoint: rule.imageFocalPoint } : {})
   };
 }

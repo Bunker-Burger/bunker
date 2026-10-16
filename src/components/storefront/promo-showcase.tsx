@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Plus, Tag } from "lucide-react";
+import { Bike, Copy, Layers, Percent, Plus, Tag, type LucideIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
 import type { Product, PromotionRule } from "@/domain/types";
@@ -8,7 +8,8 @@ import { formatArs } from "@/lib/money";
 import { focalStyle } from "./focal-style";
 
 /*
- * Promotions with a photo at the top of the menu (issue #54). They are discount rules, not
+ * Promotions at the top of the menu (issue #54); one without a photo gets the same dark tile with
+ * an icon that products without a photo get. They are discount rules, not
  * products: the cart applies them by itself. A combo (fixed price over a set of products) is the
  * exception: tapping it adds its products to the cart, which is what makes the price apply.
  * Two presentations are
@@ -26,10 +27,27 @@ export function usePromoLayout(): PromoLayout {
   return useSyncExternalStore(subscribe, readLayout, () => "banner");
 }
 
-/** In effect now and with a photo uploaded: uploading the photo is what puts it in the menu. */
+/** Every promotion in effect now, with or without a photo. */
 export function showcasePromotions(promotions: readonly PromotionRule[], now: Date | null, timezone: string) {
   if (!now) return [];
-  return promotions.filter((promotion) => promotion.imageUrl && isPromotionInEffect(promotion, now, timezone));
+  return promotions.filter((promotion) => isPromotionInEffect(promotion, now, timezone));
+}
+
+const MECHANIC_ICON: Record<PromotionRule["mechanic"]["type"], LucideIcon> = {
+  fixed_price: Layers,
+  percent_off: Percent,
+  buy_x_get_y: Copy,
+  free_delivery: Bike
+};
+
+/** The tile of a promotion without a photo: dark, with an icon of what it does, like a product without a photo. */
+function PromoTile({ promotion }: { promotion: PromotionRule }) {
+  const Icon = MECHANIC_ICON[promotion.mechanic.type];
+  return (
+    <span aria-hidden="true" className="promo-tile">
+      <Icon />
+    </span>
+  );
 }
 
 /** A combo: a fixed price over a set of products. */
@@ -79,7 +97,7 @@ export function ComboSection({ combos, products, onAdd }: { combos: readonly Pro
     <section aria-labelledby="seccion-combos" className="menu-category combo-section">
       <div className="menu-heading">
         <h2 id="seccion-combos">Combos</h2>
-        <p>Todo junto, a precio de combo. Tocá uno y se agrega completo a tu carrito.</p>
+        <p>Búnker combos pensados para que disfrutes aun mas</p>
       </div>
       <div className="product-grid">
         {cards.map(({ combo, contents, priceCents }) => (
@@ -123,8 +141,12 @@ export function PromoSection({ promotions, onAdd }: { promotions: readonly Promo
           const card = (
             <>
               <div className="promo-card-image">
-                {/* eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos */}
-                <img alt="" loading="lazy" src={promotion.imageUrl ?? ""} style={focalStyle(promotion)} />
+                {promotion.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos
+                  <img alt="" loading="lazy" src={promotion.imageUrl} style={focalStyle(promotion)} />
+                ) : (
+                  <PromoTile promotion={promotion} />
+                )}
                 {promotion.badgeText ? <span className="promo-badge">{promotion.badgeText}</span> : null}
               </div>
               <div className="promo-card-copy">
@@ -159,8 +181,12 @@ export function PromoBanner({ promotions, label, onAdd }: { promotions: readonly
       <ul className="promo-banner-track" data-single={promotions.length === 1 || undefined}>
         {promotions.map((promotion) => (
           <li className="promo-slide" key={promotion.id}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos */}
-            <img alt="" src={promotion.imageUrl ?? ""} style={focalStyle(promotion)} />
+            {promotion.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- public catalog bucket, same as product photos
+              <img alt="" src={promotion.imageUrl} style={focalStyle(promotion)} />
+            ) : (
+              <PromoTile promotion={promotion} />
+            )}
             <div className="promo-slide-copy">
               {promotion.badgeText ? <span className="promo-badge">{promotion.badgeText}</span> : null}
               <h2>{promotion.name}</h2>

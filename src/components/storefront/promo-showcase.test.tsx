@@ -25,7 +25,7 @@ const promotion = (overrides: Partial<PromotionRule>): PromotionRule => ({
 });
 
 describe("promotions at the top of the menu (issue #54)", () => {
-  it("shows only promotions in effect now that have a photo", () => {
+  it("shows the promotions in effect now, with or without a photo", () => {
     const rules = [
       promotion({ id: "shown" }),
       promotion({ id: "no-photo", imageUrl: null }),
@@ -33,7 +33,7 @@ describe("promotions at the top of the menu (issue #54)", () => {
       promotion({ id: "ended", endsAt: new Date("2026-10-10T00:00:00Z") }),
       promotion({ id: "other-day", schedule: [{ dayOfWeek: 1, startsAt: "10:00:00", endsAt: "11:00:00" }] })
     ];
-    expect(showcasePromotions(rules, NOW, TZ).map((rule) => rule.id)).toEqual(["shown"]);
+    expect(showcasePromotions(rules, NOW, TZ).map((rule) => rule.id)).toEqual(["shown", "no-photo"]);
     expect(showcasePromotions(rules, null, TZ)).toEqual([]);
   });
 
@@ -45,6 +45,14 @@ describe("promotions at the top of the menu (issue #54)", () => {
     expect(within(banner).getByText(/50%/)).toBeInTheDocument();
     expect(banner.querySelector("img")?.getAttribute("src")).toBe("https://cdn.test/catalog/s1/promotions/p1.webp");
     expect(within(banner).queryByRole("button")).toBeNull();
+  });
+
+  it("shows a promotion without a photo with the tile and its icon, in the banner and the section", () => {
+    render(<PromoShowcase layout="both" promotions={[promotion({ imageUrl: null })]} />);
+    for (const region of [screen.getByRole("region", { name: "Promociones destacadas" }), screen.getByRole("region", { name: "Promociones" })]) {
+      expect(region.querySelector("img")).toBeNull();
+      expect(region.querySelector(".promo-tile svg")).not.toBeNull();
+    }
   });
 
   it("renders a Promociones section with the menu's cards", () => {

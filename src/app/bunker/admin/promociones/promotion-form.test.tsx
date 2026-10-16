@@ -204,10 +204,9 @@ describe("PromotionForm preview", () => {
     const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
     render(<PromotionForm defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
     const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
-    // Without a photo the promotion reaches the menu as the price on its products' cards.
-    expect(within(preview).getByText(/Sin foto no aparece arriba de la carta/)).toBeInTheDocument();
-    expect(within(preview).getByRole("heading", { name: "Smash" })).toBeInTheDocument();
-    expect(within(preview).getByText("$ 6.630")).toBeInTheDocument();
+    // Without a photo the promotion is previewed with the tile and its icon.
+    expect(within(preview).getByText(/Sin foto se muestra con un ícono/)).toBeInTheDocument();
+    expect(within(preview).getByRole("region", { name: "Vista previa del banner" }).querySelector(".promo-tile")).not.toBeNull();
 
     await userEvent.upload(screen.getByLabelText("Subir foto de la promo"), new File(["png"], "banner.png", { type: "image/png" }));
     await userEvent.type(screen.getByRole("textbox", { name: /Nombre de la promoción/ }), "Jueves de birra");
@@ -233,9 +232,9 @@ describe("PromotionForm preview", () => {
     expect(within(section).getByText("$ 11.300", { selector: "s" })).toBeInTheDocument();
   });
 
-  it("explains a promotion that changes no card price when it has no photo", () => {
+  it("previews a free-delivery promotion without a photo too, as the banner with its tile", () => {
     render(<PromotionForm defaults={defaults({ type: "free_delivery", channels: ["delivery"] })} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
     const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
-    expect(within(preview).getByText(/no cambia el precio de las tarjetas/)).toBeInTheDocument();
+    expect(within(preview).getByRole("region", { name: "Vista previa del banner" }).querySelector(".promo-tile")).not.toBeNull();
   });
 });

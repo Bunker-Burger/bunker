@@ -521,7 +521,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         </fieldset>
       </fieldset>
 
-      <PromotionPreview badge={badge} focal={photoView.focal} items={validItems} mechanic={mechanic} photoUrl={photoView.url} products={products} timezone={timezone} />
+      <PromotionPreview badge={badge} focal={photoView.focal} items={validItems} mechanic={mechanic} photoUrl={photoView.url} products={products} />
     </AdminForm>
   );
 }

@@ -3,10 +3,8 @@
 import { Eye } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import "@/components/storefront/storefront.css";
-import { ProductCard } from "@/components/storefront/menu";
 import { ComboSection, isCombo, PromoBanner, PromoSection } from "@/components/storefront/promo-showcase";
-import { promotionalPrice } from "@/domain/promotions";
-import type { PromotionMechanic, PromotionRule, Product } from "@/domain/types";
+import type { PromotionMechanic, PromotionRule } from "@/domain/types";
 import styles from "../../admin.module.css";
 
 export interface PreviewProduct {
@@ -18,10 +16,9 @@ export interface PreviewProduct {
 const NOOP = () => undefined;
 
 /**
- * "Así se verá en la carta" for a promotion (issue #54), fed with what the form says right now.
- * With a photo: the banner slide and the section card. A combo also gets its card of the "Combos"
- * section, photo or not. A promotion without a photo and that is not a combo reaches the menu as the
- * discounted price on the cards of its products, so that card is shown.
+ * "Así se verá en la carta" for a promotion (issue #54), fed with what the form says right now: the
+ * banner slide and the section card, with the photo or, without one, the tile with an icon. A combo
+ * also gets its card of the "Combos" section.
  */
 export function PromotionPreview({
   badge,
@@ -29,8 +26,7 @@ export function PromotionPreview({
   items,
   photoUrl,
   focal,
-  products,
-  timezone
+  products
 }: {
   badge: string;
   focal: { x: number; y: number };
@@ -38,7 +34,6 @@ export function PromotionPreview({
   items: PromotionRule["items"];
   photoUrl: string | null;
   products: readonly PreviewProduct[];
-  timezone: string;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [name, setName] = useState("");
@@ -76,17 +71,6 @@ export function PromotionPreview({
   const priced = products.map((product) => ({ id: product.id, name: product.name, priceCents: BigInt(product.priceCents) }));
   const combo = rule !== null && isCombo(rule);
 
-  // The product whose card shows the discount: the first one the promotion names, or the first of the menu.
-  const example = (() => {
-    if (!rule || combo) return null;
-    const named = items.map((item) => priced.find((product) => product.id === item.productId)).find(Boolean);
-    const base = named ?? priced[0];
-    if (!base) return null;
-    const card = { ...base, slug: "ejemplo", categoryId: "", type: "burger", description: "", imageUrl: null, published: true, featured: false, inStock: true, optionGroups: [] } satisfies Product;
-    const promotion = promotionalPrice(card, [rule], { now: new Date(), timezone, fulfilment: "pickup", deliveryCents: 0n });
-    return { card, promotion };
-  })();
-
   return (
     <section aria-labelledby="menu-preview-title" className={styles.previewCard} ref={ref}>
       <h2 className={styles.cardTitle} id="menu-preview-title">
@@ -98,34 +82,18 @@ export function PromotionPreview({
         <>
           <p className={styles.hint}>Se muestra mientras la promoción está vigente. Se actualiza mientras completás el formulario.</p>
           <div className={styles.previewCards} inert>
-            {photoUrl ? (
-              <>
-                <span className={styles.previewLabel}>Banner arriba de la carta</span>
-                <PromoBanner label="Vista previa del banner" promotions={[rule]} />
-                <span className={styles.previewLabel}>Sección “Promociones”</span>
-                <PromoSection promotions={[rule]} />
-              </>
-            ) : null}
+            <span className={styles.previewLabel}>Banner arriba de la carta</span>
+            <PromoBanner label="Vista previa del banner" promotions={[rule]} />
+            <span className={styles.previewLabel}>Sección “Promociones”</span>
+            <PromoSection promotions={[rule]} />
             {combo ? (
               <>
                 <span className={styles.previewLabel}>Sección “Combos”</span>
                 <ComboSection combos={[rule]} onAdd={NOOP} products={priced} />
               </>
             ) : null}
-            {!photoUrl && !combo ? (
-              example?.promotion ? (
-                <>
-                  <span className={styles.previewLabel}>En la tarjeta de “{example.card.name}”</span>
-                  <ProductCard categoryName={null} layout="row" onAdd={NOOP} onOpen={NOOP} product={example.card} promotion={example.promotion} />
-                </>
-              ) : (
-                <p className={styles.hint}>
-                  Sin foto no aparece arriba de la carta, y esta promo no cambia el precio de las tarjetas: se aplica sola al armar el pedido. Subí una foto para mostrarla arriba.
-                </p>
-              )
-            ) : null}
           </div>
-          {!photoUrl && !combo ? <p className={styles.hint}>Sin foto no aparece arriba de la carta. Subí una foto para mostrarla en el banner.</p> : null}
+          {!photoUrl ? <p className={styles.hint}>Sin foto se muestra con un ícono. Subí una foto para lucirla en el banner.</p> : null}
         </>
       )}
     </section>

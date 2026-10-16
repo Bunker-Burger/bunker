@@ -25,7 +25,7 @@ const rule: PromotionRule = {
 const slugs = new Map([["db-burger", "smash-bunker-doble"]]);
 
 describe("public promotions", () => {
-  it("publishes only what the engine needs: no admin text, money as a string, products by slug", () => {
+  it("publishes only what the engine needs and the badge: no description, money as a string, products by slug", () => {
     const published = toPublicPromotion(rule, slugs);
     expect(published).toEqual({
       id: "combo",
@@ -40,9 +40,11 @@ describe("public promotions", () => {
         { productSlug: "smash-bunker-doble", quantity: 1 },
         { productSlug: null, quantity: 1 }
       ],
-      schedule: [{ dayOfWeek: 5, startsAt: "22:00:00", endsAt: "02:00:00" }]
+      schedule: [{ dayOfWeek: 5, startsAt: "22:00:00", endsAt: "02:00:00" }],
+      // The tag shown on the banner, photo or not; the description is never published.
+      badgeText: "$1"
     });
-    expect(JSON.stringify(published)).not.toMatch(/Todo a|\$1|description|badge/);
+    expect(JSON.stringify(published)).not.toMatch(/Todo a|description/);
   });
 
   it("round-trips through JSON into an equivalent engine rule with the storefront's ids", () => {
@@ -51,7 +53,7 @@ describe("public promotions", () => {
     expect(restored).toMatchObject({
       active: true,
       description: "",
-      badgeText: null,
+      badgeText: "$1",
       mechanic: { type: "fixed_price", fixedPriceCents: 900000n },
       startsAt: rule.startsAt,
       endsAt: rule.endsAt,
@@ -82,7 +84,7 @@ describe("public promotions", () => {
     expect(parsePublicPromotions({ promotions: [valid] })).toHaveLength(1);
   });
 
-  it("publishes the banner photo and its badge only for promotions with a photo (issue #54)", () => {
+  it("publishes the banner photo only for promotions with one, and the badge whenever it is set (issue #54)", () => {
     const withPhoto = { ...rule, imageUrl: "https://cdn.test/catalog/s1/promotions/combo.webp" };
     const published = toPublicPromotion(withPhoto, slugs);
     expect(published).toMatchObject({ imageUrl: withPhoto.imageUrl, badgeText: "$1" });

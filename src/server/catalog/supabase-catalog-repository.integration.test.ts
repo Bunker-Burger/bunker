@@ -179,8 +179,8 @@ describe.skipIf(!enabled)("Supabase catalog (cloud development project)", () => 
       const { promotion: serverPromotion, ...serverTotals } = quoteCart(smash(2), rules.value, "pickup", 120000n, tuesday);
       expect(menuTotals).toEqual(serverTotals);
       expect(menuTotals).toMatchObject({ discountCents: 234000n, totalCents: 1326000n });
-      // Same promotion and amounts; only the badge text, which is never published, is absent.
-      expect(menuPromotion).toEqual({ ...serverPromotion, badgeText: null });
+      // Same promotion and amounts.
+      expect(menuPromotion).toEqual(serverPromotion);
     });
   });
 

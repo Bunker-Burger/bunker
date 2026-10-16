@@ -303,8 +303,10 @@ describe("promotions in the storefront, read from the public route", () => {
     await renderWithSmashInCart();
 
     expect(await smashCard().findByText("$ 6.630")).toBeInTheDocument();
-    expect(screen.queryByText(/\$1\b|Todo a/)).not.toBeInTheDocument();
-    expect(JSON.stringify(publishedBodies)).not.toMatch(/Todo a|badge|description/);
+    expect(screen.queryByText(/Todo a/)).not.toBeInTheDocument();
+    expect(JSON.stringify(publishedBodies)).not.toMatch(/Todo a|description/);
+    // The tag is only a label on the banner: it never becomes a price on the card.
+    expect(smashCard().queryByText(/\$1\b/)).not.toBeInTheDocument();
   });
 
   it("announces no discount when the promotions cannot be read", async () => {
