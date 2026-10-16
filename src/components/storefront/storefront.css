@@ -348,7 +348,7 @@ body.drawer-open { overflow: hidden; }
 .combo-badge { justify-self: start; margin-top: .5rem; display: inline-block; }
 .combo-item { margin-bottom: 1rem; }
 .combo-item-title { margin: 0 0 .5rem; font-family: var(--font-display); font-size: var(--text-headline-md); font-weight: 700; text-transform: uppercase; }
-.combo-footer { grid-template-columns: 1fr; }
+.combo-footer { grid-template-columns: auto 1fr; }
 .option-units { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .6rem; margin: -.1rem 0 .5rem 1.9rem; padding: .45rem .75rem; border-left: 2px solid var(--color-accent-border); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: var(--color-accent-soft); color: var(--color-muted); font-size: var(--text-body-sm); }
 .option-units-label { color: var(--color-foreground); font-weight: 600; }
 .option-units-stepper { display: inline-flex; align-items: center; gap: .15rem; border: 1px solid var(--color-accent-border); border-radius: var(--radius-full); background: var(--color-surface); }

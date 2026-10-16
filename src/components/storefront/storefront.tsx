@@ -352,6 +352,14 @@ export function Storefront({
     }
     setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current));
   };
+  // Editing a combo of the cart reopens its detail with what was chosen; saving replaces the combo's lines.
+  const [editingComboId, setEditingComboId] = useState<string | null>(null);
+  const editingCombo = editingComboId ? promotions.find((promotion) => promotion.id === editingComboId) ?? null : null;
+  const saveComboEdit = (combo: PromotionRule, lines: CartLine[]) => {
+    setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current.filter((line) => line.comboId !== combo.id)));
+    setNotice(`${combo.name} se actualizó en el carrito.`);
+    setEditingComboId(null);
+  };
   const addComboLines = (combo: PromotionRule, lines: CartLine[]) => {
     setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current));
     setRevalidationNotice("");
@@ -507,6 +515,7 @@ export function Storefront({
         onChange={setCart}
         onEditLine={handleEditLine}
         onAddCombo={addAnotherCombo}
+        onEditCombo={(combo) => setEditingComboId(combo.id)}
         products={products}
         promotion={cartPromotion}
         promotions={promotions}
@@ -598,6 +607,18 @@ export function Storefront({
         />
       ) : null}
 
+      {editingCombo ? (
+        <ComboDrawer
+          key={`edit-${editingCombo.id}`}
+          combo={editingCombo}
+          copies={Math.max(1, comboCount(cart, editingCombo))}
+          initial={comboDrawerState(editingCombo, cart, products)}
+          onAdd={(lines) => saveComboEdit(editingCombo, lines)}
+          onClose={() => setEditingComboId(null)}
+          products={products}
+        />
+      ) : null}
+
       {returnRef ? (
         <OrderReturnModal
           externalReference={returnRef}
@@ -627,19 +648,71 @@ export function Storefront({
 }
 
 /** Detail of a combo (issue #54): what it includes, its description and the extras of each product, then the price. */
-export function ComboDrawer({ combo, products, onClose, onAdd }: {
+/** What the combo's detail starts from when a combo already in the cart is edited. */
+export interface ComboDrawerState {
+  selections: SelectedOptions[];
+  extraUnits: Array<Record<string, number>>;
+  notes: string;
+}
+
+/**
+ * The choices of a combo in the cart as the detail shows them: per included product, the options
+ * the units carry and how many carry each extra (rebuilt from the cart's lines).
+ */
+export function comboDrawerState(combo: PromotionRule, lines: readonly CartLine[], products: readonly Product[]): ComboDrawerState {
+  const own = lines.filter((line) => line.comboId === combo.id);
+  const entries = combo.items.flatMap((item) => {
+    const product = products.find((candidate) => candidate.id === item.productId);
+    return product ? [product] : [];
+  });
+  const perProduct = entries.map((product) => {
+    const mine = own.filter((line) => line.productId === product.id);
+    const selected: SelectedOptions = {};
+    const units: Record<string, number> = {};
+    for (const group of getApplicableOptionGroups(product)) {
+      if (group.selectionMode === "multiple") {
+        const ids = new Set(mine.flatMap((line) => line.selectedOptions[group.id] ?? []));
+        selected[group.id] = [...ids];
+        const total = mine.reduce((sum, line) => sum + line.quantity, 0);
+        for (const id of ids) {
+          const carrying = mine.filter((line) => (line.selectedOptions[group.id] ?? []).includes(id)).reduce((sum, line) => sum + line.quantity, 0);
+          // On every unit: left unset, so it follows the quantity if the number of combos changes.
+          if (carrying < total) units[id] = carrying;
+        }
+      } else {
+        const biggest = [...mine].sort((a, b) => b.quantity - a.quantity)[0];
+        selected[group.id] = biggest?.selectedOptions[group.id] ?? getDefaultSelection(product)[group.id] ?? [];
+      }
+    }
+    return { selected, units };
+  });
+  return {
+    selections: perProduct.map((entry) => entry.selected),
+    extraUnits: perProduct.map((entry) => entry.units),
+    notes: own.find((line) => line.notes)?.notes ?? ""
+  };
+}
+
+export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initial }: {
   combo: PromotionRule;
   products: readonly Product[];
   onClose: () => void;
   onAdd: (lines: CartLine[]) => void;
+  /** How many combos are being edited: every included product's quantity is multiplied by it. */
+  copies?: number;
+  /** Set when a combo already in the cart is being edited. */
+  initial?: ComboDrawerState;
 }) {
+  // How many combos: the quantity of every included product is the combo's times this.
+  const [count, setCount] = useState(Math.max(1, copies));
   const items = combo.items.flatMap((item) => {
     const product = products.find((candidate) => candidate.id === item.productId);
-    return product ? [{ product, quantity: item.quantity }] : [];
+    return product ? [{ product, quantity: item.quantity * count }] : [];
   });
-  const [selections, setSelections] = useState<SelectedOptions[]>(() => items.map((item) => getDefaultSelection(item.product)));
-  const [extraUnits, setExtraUnits] = useState<Array<Record<string, number>>>(() => items.map(() => ({})));
-  const [notes, setNotes] = useState("");
+  const editing = initial !== undefined;
+  const [selections, setSelections] = useState<SelectedOptions[]>(() => initial?.selections ?? items.map((item) => getDefaultSelection(item.product)));
+  const [extraUnits, setExtraUnits] = useState<Array<Record<string, number>>>(() => initial?.extraUnits ?? items.map(() => ({})));
+  const [notes, setNotes] = useState(initial?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
 
@@ -661,7 +734,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd }: {
       total + item.groups.reduce((sum, group) => sum + (calculateConfiguredUnitPrice(item.product, group.selected) - item.product.priceCents) * BigInt(group.quantity), 0n),
     0n
   );
-  const fixedCents = combo.mechanic.type === "fixed_price" ? combo.mechanic.fixedPriceCents : 0n;
+  const fixedCents = (combo.mechanic.type === "fixed_price" ? combo.mechanic.fixedPriceCents : 0n) * BigInt(count);
   const normalCents = perItem.reduce((total, item) => total + item.product.priceCents * BigInt(item.quantity), 0n);
   const totalCents = fixedCents + extrasCents;
 
@@ -684,7 +757,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd }: {
             {combo.imageUrl ? <img alt="" className="drawer-image" src={combo.imageUrl} style={focalStyle(combo)} /> : null}
             <div className="drawer-hero-copy">
               <div className="drawer-title">
-                <h2 id={titleId}>{combo.name}</h2>
+                <h2 id={titleId}>{combo.name}{count > 1 ? <small className="combo-copies"> · {count} combos</small> : null}</h2>
                 <span className="product-price">
                   <strong>{formatArs(fixedCents)}</strong>
                   {normalCents > fixedCents ? <s className="compare-at"><span className="sr-only">Antes</span> {formatArs(normalCents)}</s> : null}
@@ -710,6 +783,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd }: {
                 <h3 className="combo-item-title">{item.quantity}× {item.product.name}</h3>
                 <OptionGroups
                   extraUnits={extraUnits[index] ?? {}}
+                  namePrefix={`item-${index}:`}
                   product={item.product}
                   quantity={item.quantity}
                   selected={selections[index] ?? {}}
@@ -735,18 +809,28 @@ export function ComboDrawer({ combo, products, onClose, onAdd }: {
               <span><strong>{combo.name}</strong><small>Precio del combo</small></span>
               <strong>{formatArs(fixedCents)}</strong>
             </div>
-            {extrasCents > 0n ? (
-              <div className="order-summary-line current">
-                <span><strong>Adicionales</strong><small>Se suman al precio del combo</small></span>
-                <strong>+ {formatArs(extrasCents)}</strong>
-              </div>
-            ) : null}
+            {perItem.map((item) => {
+              const cents = item.groups.reduce((sum, group) => sum + (calculateConfiguredUnitPrice(item.product, group.selected) - item.product.priceCents) * BigInt(group.quantity), 0n);
+              if (cents <= 0n) return null;
+              const chosenNames = [...new Set(item.groups.flatMap((group) => getApplicableOptionGroups(item.product).flatMap((optionGroup) => optionGroup.options.filter((option) => option.priceDeltaCents > 0n && (group.selected[optionGroup.id] ?? []).includes(option.id)).map((option) => option.name))))];
+              return (
+                <div className="order-summary-line current" key={item.product.id}>
+                  <span><strong>{item.product.name}</strong><small>{chosenNames.map((name) => `+ ${name}`).join(", ")}</small></span>
+                  <strong>+ {formatArs(cents)}</strong>
+                </div>
+              );
+            })}
             <div className="order-summary-total"><span>Total</span><strong>{formatArs(totalCents)}</strong></div>
           </section>
         </div>
         <div className="drawer-footer combo-footer">
+          <div className="quantity-stepper">
+            <button aria-label="Quitar un combo" disabled={count <= 1} onClick={() => setCount((value) => Math.max(1, value - 1))} type="button"><Minus /></button>
+            <strong aria-label={`${count} combos`}>{count}</strong>
+            <button aria-label="Agregar otro combo" onClick={() => setCount((value) => value + 1)} type="button"><Plus /></button>
+          </div>
           <button className="primary-action" disabled={Boolean(unavailable) || !valid} onClick={submit} type="button">
-            {unavailable ? "Combo no disponible" : <>Agregar combo <span>{formatArs(totalCents)}</span></>}
+            {unavailable ? "Combo no disponible" : <>{editing ? "Guardar cambios" : "Agregar combo"} <span>{formatArs(totalCents)}</span></>}
           </button>
         </div>
       </div>
@@ -776,8 +860,10 @@ export function unitGroupsOf(product: Product, selected: SelectedOptions, quanti
 }
 
 /** The option groups of a product (size, extras…), with how many of the units carry each extra. */
-function OptionGroups({ product, selected, setSelected, quantity, extraUnits, setExtraUnits }: {
+function OptionGroups({ product, selected, setSelected, quantity, extraUnits, setExtraUnits, namePrefix = "" }: {
   product: Product;
+  /** Keeps the inputs of two products of a combo apart: radios of the same group id would otherwise be one group. */
+  namePrefix?: string;
   selected: SelectedOptions;
   setSelected: (update: (current: SelectedOptions) => SelectedOptions) => void;
   quantity: number;
@@ -828,7 +914,7 @@ function OptionGroups({ product, selected, setSelected, quantity, extraUnits, se
                         <input
                           checked={checked}
                           disabled={!isAvailable}
-                          name={group.id}
+                          name={`${namePrefix}${group.id}`}
                           onChange={() => {
                             if (!isAvailable) return;
                             setExtraUnits((current) => {
@@ -1108,6 +1194,7 @@ function CartSection({
   promotion,
   promotions,
   onAddCombo,
+  onEditCombo,
   onChange,
   onEditLine,
   storageDegraded
@@ -1122,6 +1209,8 @@ function CartSection({
   promotions: readonly PromotionRule[];
   /** One more of a combo already in the cart. */
   onAddCombo: (combo: PromotionRule) => void;
+  /** Open the detail of a combo already in the cart to change its choices. */
+  onEditCombo: (combo: PromotionRule) => void;
   onChange: (cart: CartLine[]) => void;
   onEditLine: (line: CartLine) => void;
   storageDegraded?: boolean;
@@ -1149,9 +1238,6 @@ function CartSection({
             <strong>{line.quantity}× {line.productName}</strong>
             <small>{detail}</small>
           </span>
-          <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
-            Editar
-          </button>
         </li>
       );
     }
@@ -1218,6 +1304,9 @@ function CartSection({
                       <strong>{count}</strong>
                       <button aria-label={`Agregar otro ${combo.name}`} onClick={() => onAddCombo(combo)} type="button"><Plus /></button>
                     </div>
+                    <button aria-label={`Editar ${combo.name}`} className="cart-action-btn" onClick={() => onEditCombo(combo)} type="button">
+                      Editar
+                    </button>
                     <button aria-label={`Quitar ${combo.name} del carrito`} className="cart-action-btn text-danger" onClick={() => onChange(cart.filter((line) => line.comboId !== combo.id))} type="button">
                       Eliminar
                     </button>

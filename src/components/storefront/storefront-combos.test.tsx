@@ -157,6 +157,31 @@ describe("combos in the menu", () => {
     expect(getCartSnapshot().find((line) => line.productId === "papas")?.quantity).toBe(2);
   });
 
+  it("with two different products, each one has its own extras, apart in the detail and in the summary", async () => {
+    promotions = [combo({ items: [{ productSlug: "oklahoma-onion", quantity: 1 }, { productSlug: "crispy-chicken-bunker", quantity: 1 }] })];
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    const detail = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    const burger = within(within(detail).getByRole("region", { name: "Opciones de Oklahoma Onion" }));
+    const chicken = within(within(detail).getByRole("region", { name: "Opciones de Crispy Chicken Búnker" }));
+    expect(within(detail).getByRole("heading", { name: "1× Oklahoma Onion" })).toBeInTheDocument();
+    expect(within(detail).getByRole("heading", { name: "1× Crispy Chicken Búnker" })).toBeInTheDocument();
+
+    // Choosing the bread of one does not touch the other's: separate inputs.
+    await user.click(chicken.getByRole("radio", { name: /Pan de papa/ }));
+    expect(chicken.getByRole("radio", { name: /Pan de papa/ })).toBeChecked();
+    expect(burger.getByRole("radio", { name: /Doble/ })).toBeChecked();
+    await user.click(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+
+    const summary = within(within(detail).getByRole("region", { name: "Resumen del combo" }));
+    expect(summary.getByText("Oklahoma Onion")).toBeInTheDocument();
+    expect(summary.getByText("+ Extra bacon ahumado")).toBeInTheDocument();
+    expect(summary.queryByText("Crispy Chicken Búnker")).toBeNull();
+  });
+
   it("shows the combo's price in the cart tray, not the sum of the products", async () => {
     const user = userEvent.setup();
     renderStore();
@@ -214,6 +239,62 @@ describe("combos in the menu", () => {
 
     await user.click(cart.getByRole("button", { name: "Quitar un Combo Oklahoma" }));
     expect(getCartSnapshot()).toHaveLength(0);
+  });
+
+  it("edits a combo of the cart as a whole in its detail, with what was already chosen", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    const first = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    await user.click(within(within(first).getByRole("region", { name: "Opciones de Oklahoma Onion" })).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    await user.click(within(first).getByRole("button", { name: /Agregar combo/ }));
+
+    const cart = within(document.getElementById("carrito") as HTMLElement);
+    // The combo has one Edit; its products are not edited one by one.
+    expect(cart.queryByRole("button", { name: "Editar Oklahoma Onion" })).toBeNull();
+    await user.click(cart.getByRole("button", { name: "Editar Combo Oklahoma" }));
+
+    const edit = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    const burger = within(within(edit).getByRole("region", { name: "Opciones de Oklahoma Onion" }));
+    expect(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ })).toBeChecked();
+    expect(within(edit).getByRole("button", { name: /Guardar cambios/ })).toHaveTextContent("$ 10.400");
+
+    await user.click(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    await user.click(within(edit).getByRole("button", { name: /Guardar cambios/ }));
+
+    expect(screen.queryByRole("dialog", { name: "Combo Oklahoma" })).toBeNull();
+    expect(getCartSnapshot().find((line) => line.productId === "oklahoma")?.selectedOptions.extras ?? []).toEqual([]);
+    expect(cart.getByText("1 combo")).toBeInTheDocument();
+    expect(cart.getByText("Promo aplicada")).toBeInTheDocument();
+  });
+
+  it("edits several combos together: each product's quantity is the combo's times how many there are", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Combo Oklahoma" })).getByRole("button", { name: /Agregar combo/ }));
+    const cart = within(document.getElementById("carrito") as HTMLElement);
+    await user.click(cart.getByRole("button", { name: "Agregar otro Combo Oklahoma" }));
+    await user.click(cart.getByRole("button", { name: "Editar Combo Oklahoma" }));
+
+    const edit = await screen.findByRole("dialog", { name: /Combo Oklahoma/ });
+    expect(within(edit).getByText(/2 combos/)).toBeInTheDocument();
+    const burger = within(within(edit).getByRole("region", { name: "Opciones de Oklahoma Onion" }));
+    await user.click(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    // Two burgers: the extra can go on one or both.
+    await user.click(burger.getByRole("button", { name: "Quitar Extra bacon ahumado de una unidad" }));
+    await user.click(within(edit).getByRole("button", { name: /Guardar cambios/ }));
+
+    expect(getCartSnapshot().map((line) => [line.productId, line.quantity, line.selectedOptions.extras ?? []])).toEqual([
+      ["oklahoma", 1, ["bacon"]],
+      ["oklahoma", 1, []],
+      ["papas", 4, []]
+    ]);
+    expect(cart.getByText("2 combos")).toBeInTheDocument();
   });
 
   it("only applies the combo's price to what was added from the combo, not to the same products ordered alone", async () => {
