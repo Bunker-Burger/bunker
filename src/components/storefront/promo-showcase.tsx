@@ -54,12 +54,14 @@ export function PromoShowcase({ promotions, layout, onAdd }: { promotions: reado
   return layout === "section" ? <PromoSection onAdd={onAdd} promotions={promotions} /> : <PromoBanner label="Promociones" onAdd={onAdd} promotions={promotions} />;
 }
 
+type ComboProduct = Pick<Product, "id" | "name" | "priceCents">;
+
 /** What a combo is made of, e.g. "1× Doble búnker + 1× Papas clásicas"; null if a product is gone. */
-export function comboContents(combo: PromotionRule, products: readonly Product[]) {
+export function comboContents(combo: PromotionRule, products: readonly ComboProduct[]) {
   const byId = new Map(products.map((product) => [product.id, product]));
   const parts = combo.items.map((item) => ({ product: byId.get(item.productId), quantity: item.quantity }));
   if (parts.some((part) => !part.product)) return null;
-  const found = parts as Array<{ product: Product; quantity: number }>;
+  const found = parts as Array<{ product: ComboProduct; quantity: number }>;
   return {
     text: found.map((part) => `${part.quantity}× ${part.product.name}`).join(" + "),
     normalCents: found.reduce((sum, part) => sum + part.product.priceCents * BigInt(part.quantity), 0n)
@@ -67,7 +69,7 @@ export function comboContents(combo: PromotionRule, products: readonly Product[]
 }
 
 /** The "Combos" section of the menu: each combo as a card; tapping it adds its products to the cart. */
-export function ComboSection({ combos, products, onAdd }: { combos: readonly PromotionRule[]; products: readonly Product[]; onAdd: (combo: PromotionRule) => void }) {
+export function ComboSection({ combos, products, onAdd }: { combos: readonly PromotionRule[]; products: readonly ComboProduct[]; onAdd: (combo: PromotionRule) => void }) {
   const cards = combos.flatMap((combo) => {
     const contents = comboContents(combo, products);
     return contents && combo.mechanic.type === "fixed_price" ? [{ combo, contents, priceCents: combo.mechanic.fixedPriceCents }] : [];

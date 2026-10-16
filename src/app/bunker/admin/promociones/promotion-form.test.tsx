@@ -204,11 +204,38 @@ describe("PromotionForm preview", () => {
     const photo = { url: null, maxBytes: 5 * 1024 * 1024, minSide: 320, maxSide: 4096 };
     render(<PromotionForm defaults={defaults()} deliveryFeeCents="120000" photo={photo} products={products} timezone="America/Argentina/Tucuman" />);
     const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
-    expect(within(preview).getByText(/Subí una foto para verla/)).toBeInTheDocument();
+    // Without a photo the promotion reaches the menu as the price on its products' cards.
+    expect(within(preview).getByText(/Sin foto no aparece arriba de la carta/)).toBeInTheDocument();
+    expect(within(preview).getByRole("heading", { name: "Smash" })).toBeInTheDocument();
+    expect(within(preview).getByText("$ 6.630")).toBeInTheDocument();
 
     await userEvent.upload(screen.getByLabelText("Subir foto de la promo"), new File(["png"], "banner.png", { type: "image/png" }));
     await userEvent.type(screen.getByRole("textbox", { name: /Nombre de la promoción/ }), "Jueves de birra");
     expect(await within(preview).findByRole("region", { name: "Vista previa del banner" })).toBeInTheDocument();
     expect(within(preview).getAllByRole("heading", { name: "Jueves de birra" })).toHaveLength(2);
+  });
+
+  it("previews a combo without a photo as its card of the Combos section (issue #54)", async () => {
+    render(
+      <PromotionForm
+        defaults={defaults({ type: "fixed_price", fixedPrice: "9000", items: [{ productId: SMASH, quantity: "1" }, { productId: PAPAS, quantity: "1" }] })}
+        deliveryFeeCents="120000"
+        products={products}
+        timezone="America/Argentina/Tucuman"
+      />
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: /Nombre de la promoción/ }), "Combo Smash");
+    const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
+    const section = await within(preview).findByRole("region", { name: "Combos" });
+    expect(within(section).getByRole("heading", { name: "Combo Smash" })).toBeInTheDocument();
+    expect(within(section).getByText("1× Smash + 1× Papas")).toBeInTheDocument();
+    expect(within(section).getByText("$ 9.000")).toBeInTheDocument();
+    expect(within(section).getByText("$ 11.300", { selector: "s" })).toBeInTheDocument();
+  });
+
+  it("explains a promotion that changes no card price when it has no photo", () => {
+    render(<PromotionForm defaults={defaults({ type: "free_delivery", channels: ["delivery"] })} deliveryFeeCents="120000" products={products} timezone="America/Argentina/Tucuman" />);
+    const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
+    expect(within(preview).getByText(/no cambia el precio de las tarjetas/)).toBeInTheDocument();
   });
 });
