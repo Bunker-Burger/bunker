@@ -376,11 +376,14 @@ export function Storefront({
   };
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
-  // The tray shows what the products cost with the promotion applied (delivery aside), like the checkout will.
-  const trayDiscount = (() => {
-    if (cart.length === 0 || now === null) return 0n;
-    return quoteCart(toPromotionLines(cart, products), promotions, fulfilment, 0n, { now, timezone }).promotion?.productDiscountCents ?? 0n;
+  // The promotion that takes something off the products (delivery aside), as the checkout will apply it:
+  // the tray and the cart screen show the total with it.
+  const cartPromotion = (() => {
+    if (cart.length === 0 || now === null) return null;
+    const applied = quoteCart(toPromotionLines(cart, products), promotions, fulfilment, 0n, { now, timezone }).promotion;
+    return applied && applied.productDiscountCents > 0n ? { name: applied.name, discountCents: applied.productDiscountCents } : null;
   })();
+  const trayDiscount = cartPromotion?.discountCents ?? 0n;
 
   // A new screen starts at its top with focus on its title, as a page load would.
   const shownView = useRef<StoreView>(view);
@@ -498,6 +501,7 @@ export function Storefront({
         onChange={setCart}
         onEditLine={handleEditLine}
         products={products}
+        promotion={cartPromotion}
         subtotal={subtotal}
         storageDegraded={storageDegraded}
       />
@@ -543,7 +547,17 @@ export function Storefront({
           promotion={cardContext ? promotionalPrice(activeProduct, promotions, cardContext) : null}
           onClose={closeProduct}
           onSubmit={(submittedLine) => {
-            if (editingLine) {
+            if (editingLine && submittedLine.quantity < editingLine.quantity) {
+              // Only some of the units were changed: the rest stay as they were, in their own line.
+              setCart((current) =>
+                addCartLine(
+                  current.map((line) => (line.id === editingLine.id ? { ...line, quantity: editingLine.quantity - submittedLine.quantity } : line)),
+                  submittedLine
+                )
+              );
+              setNotice(`${submittedLine.quantity} de ${editingLine.quantity} ${submittedLine.productName} se actualizaron en el carrito.`);
+              setEditingLine(null);
+            } else if (editingLine) {
               setCart((current) =>
                 editCartLine(current, editingLine.id, {
                   selectedOptions: submittedLine.selectedOptions,
@@ -648,11 +662,17 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
   const unitPrice = calculateConfiguredUnitPrice(product, selected);
   // Order summary as in the capture: this product as configured plus what is already in the cart.
   const otherLines = cart.filter((line) => line.id !== initialLine?.id);
+  // Editing a line of several units: the stepper is how many of them change; the rest stay as they were.
+  const unitsInLine = initialLine && initialLine.quantity > 1 ? initialLine.quantity : 0;
+  const unitsKept = unitsInLine > 0 ? unitsInLine - quantity : 0;
   const chosen = applicableGroups.flatMap((group) =>
     group.options.filter((option) => (selected[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => option.name)
   );
-  const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity;
-  const summaryTotal = otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) + unitPrice * BigInt(quantity);
+  const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity + unitsKept;
+  const summaryTotal =
+    otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) +
+    unitPrice * BigInt(quantity) +
+    (initialLine ? initialLine.unitPriceCents * BigInt(unitsKept) : 0n);
 
   return (
     <div className="drawer-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -686,6 +706,16 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
               <p>{product.description}</p>
             </div>
           </div>
+
+          {unitsInLine > 0 ? (
+            <section aria-label="Unidades a cambiar" className="drawer-card edit-scope">
+              <h3>Cambiar {quantity} de {unitsInLine}</h3>
+              <p>
+                Tenés {unitsInLine} en el carrito. Con − y + de abajo elegís a cuántas aplicar estos cambios
+                {unitsKept > 0 ? `; las otras ${unitsKept} quedan como estaban.` : "."}
+              </p>
+            </section>
+          ) : null}
 
           {applicableGroups.map((group) => {
             const groupSelections = selected[group.id] ?? [];
@@ -770,6 +800,15 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
               </span>
               <strong>{formatArs(unitPrice * BigInt(quantity))}</strong>
             </div>
+            {unitsKept > 0 && initialLine ? (
+              <div className="order-summary-line">
+                <span>
+                  <strong>{unitsKept}× {initialLine.productName}</strong>
+                  <small>Quedan como estaban</small>
+                </span>
+                <strong>{formatArs(initialLine.unitPriceCents * BigInt(unitsKept))}</strong>
+              </div>
+            ) : null}
             {otherLines.map((line) => (
               <div className="order-summary-line" key={line.id}>
                 <span>
@@ -786,7 +825,7 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
           <div className="quantity-stepper">
             <button aria-label="Disminuir cantidad" disabled={quantity === 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} type="button"><Minus /></button>
             <strong>{quantity}</strong>
-            <button aria-label="Aumentar cantidad" onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
+            <button aria-label="Aumentar cantidad" disabled={unitsInLine > 0 && quantity >= unitsInLine} onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
           </div>
           <button
             className="primary-action"
@@ -800,7 +839,7 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
             {!product.inStock ? (
               "Producto agotado"
             ) : initialLine ? (
-              <>Guardar cambios <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
+              <>{unitsInLine > 0 && unitsKept > 0 ? `Guardar cambios en ${quantity} de ${unitsInLine}` : "Guardar cambios"} <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
             ) : (
               <>Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
             )}
@@ -840,6 +879,7 @@ function CartSection({
   cart,
   products,
   subtotal,
+  promotion,
   onChange,
   onEditLine,
   storageDegraded
@@ -848,6 +888,8 @@ function CartSection({
   cart: CartLine[];
   products: readonly Product[];
   subtotal: bigint;
+  /** The promotion taking something off the products right now, if any. */
+  promotion: { name: string; discountCents: bigint } | null;
   onChange: (cart: CartLine[]) => void;
   onEditLine: (line: CartLine) => void;
   storageDegraded?: boolean;
@@ -895,7 +937,15 @@ function CartSection({
               </div>
             );
           })}
-          <div className="order-summary-total"><span>Subtotal</span><strong>{formatArs(subtotal)}</strong></div>
+          {promotion ? (
+            <>
+              <div className="order-summary-line"><span><strong>Productos</strong></span><strong>{formatArs(subtotal)}</strong></div>
+              <div className="order-summary-line promo-applied"><span><strong>{promotion.name}</strong><small>Promo aplicada</small></span><strong>− {formatArs(promotion.discountCents)}</strong></div>
+              <div className="order-summary-total"><span>Subtotal con promo</span><strong>{formatArs(subtotal - promotion.discountCents)}</strong></div>
+            </>
+          ) : (
+            <div className="order-summary-total"><span>Subtotal</span><strong>{formatArs(subtotal)}</strong></div>
+          )}
           <a className="primary-action wide" href="#checkout">Continuar al checkout <ArrowRight aria-hidden="true" /></a>
           <div className="cart-actions-row">
             <button aria-label="Vaciar carrito completo" className="clear-cart-btn" onClick={() => onChange(clearCart())} type="button">

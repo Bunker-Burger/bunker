@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products as fallbackProducts, categories as fixtureCategories } from "@/data/catalog";
 import { revalidateCart, serializeCart } from "@/domain/cart";
 import type { CartLine, Product } from "@/domain/types";
-import { resetCartStoreForTesting } from "@/lib/cart-store";
+import { getCartSnapshot, resetCartStoreForTesting } from "@/lib/cart-store";
 import { serializePublicCatalog, serializePublicCategories, serializePublicProducts } from "@/server/catalog/public-products";
 import { ProductDrawer, Storefront } from "./storefront";
 
@@ -450,6 +450,34 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
 
     expect(screen.getByText("Sin mostaza")).toBeInTheDocument();
+  });
+
+  it("al editar una línea de varias unidades se elige a cuántas aplicar el cambio; el resto queda igual", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const add = screen.getByRole("button", { name: "Agregar Smash Búnker Doble" });
+    await user.click(add);
+    await user.click(add);
+    await user.click(add);
+    expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
+    const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+    expect(within(dialog).getByText("Cambiar 3 de 3")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Aumentar cantidad" })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Disminuir cantidad" }));
+    await user.click(within(dialog).getByRole("button", { name: "Disminuir cantidad" }));
+    expect(within(dialog).getByText("Cambiar 1 de 3")).toBeInTheDocument();
+    expect(within(dialog).getByText(/las otras 2 quedan como estaban/)).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Aclaraciones para la cocina"), "Sin mostaza");
+    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios en 1 de 3/ }));
+
+    expect(getCartSnapshot().map((line) => [line.quantity, line.notes])).toEqual([
+      [2, ""],
+      [1, "Sin mostaza"]
+    ]);
+    expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
   });
 
   it("permite eliminar una línea individual y vaciar el carrito completo", async () => {

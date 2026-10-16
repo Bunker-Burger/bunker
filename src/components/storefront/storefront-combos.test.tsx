@@ -129,6 +129,20 @@ describe("combos in the menu", () => {
     expect(within(tray).getByText("$ 14.200", { selector: "s" })).toBeInTheDocument();
   });
 
+  it("shows the promotion applied in the cart screen, with the total after it", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+
+    const cart = within(document.getElementById("carrito") as HTMLElement);
+    expect(await cart.findByText("Promo aplicada")).toBeInTheDocument();
+    expect(cart.getByText("− $ 4.700")).toBeInTheDocument();
+    const total = cart.getByText("Subtotal con promo").nextElementSibling;
+    expect(total).toHaveTextContent("$ 9.500");
+  });
+
   it("adds it from the promotions banner too", async () => {
     const user = userEvent.setup();
     renderStore();
