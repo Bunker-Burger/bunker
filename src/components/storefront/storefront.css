@@ -64,6 +64,8 @@
 .product-card.hero .product-image-wrap::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--color-surface), transparent 55%, var(--color-scrim)); pointer-events: none; }
 /* Row card (burgers, sandwiches): photo on the left. */
 .product-card.row .product-main { grid-template-columns: 8rem minmax(0, 1fr); min-height: 11rem; }
+/* The photo (or the icon tile) fills the whole left cell. Absolute, because iOS Safari does not resolve height: 100% inside a stretched grid cell and the tile collapsed to a short band. */
+.product-card.row .product-image-wrap > .product-image, .product-card.row .product-image-wrap > .product-placeholder { position: absolute; inset: 0; }
 .product-card.row .product-title-row { flex-wrap: nowrap; }
 .product-card.row .product-title-row h3 { min-width: 0; }
 /* Narrow phones: the price drops under the title instead of being clipped. */
