@@ -85,34 +85,42 @@ describe("ProductForm", () => {
     expect(name).toHaveAccessibleDescription("Ingresá un nombre.");
   });
 
-  it("saves an option's name and extra price from its row, apart from the product (issue #54)", async () => {
-    vi.mocked(saveOptionAction).mockResolvedValue({ status: "success", message: "ok" });
+  it("sends the edited extras with the product, so one button saves everything (issue #54)", async () => {
+    vi.mocked(saveProductAction).mockResolvedValue({ status: "success", message: "ok" });
     render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Tamaño/ }));
+    expect(screen.queryByRole("button", { name: /^Guardar (Doble|Triple)/ })).not.toBeInTheDocument();
 
     const name = screen.getByRole("textbox", { name: "Nombre de Doble" });
     await userEvent.clear(name);
     await userEvent.type(name, "Simple");
-    await userEvent.click(screen.getByRole("button", { name: "Guardar Doble" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crear producto" }));
 
-    await waitFor(() => expect(saveOptionAction).toHaveBeenCalled());
-    const sent = vi.mocked(saveOptionAction).mock.calls.at(-1)![1];
-    expect(Object.fromEntries(sent)).toEqual({ groupId: "g-size", optionId: "o-double", name: "Simple", price: "0", available: "true" });
-    expect(saveProductAction).not.toHaveBeenCalled();
+    await waitFor(() => expect(saveProductAction).toHaveBeenCalled());
+    const sent = vi.mocked(saveProductAction).mock.calls.at(-1)![1];
+    expect(sent.getAll("touchedOption")).toEqual(["g-size|o-double"]);
+    expect(sent.get("optionName:o-double")).toBe("Simple");
+    expect(sent.get("optionPrice:o-double")).toBe("0");
+    expect(sent.get("optionAvailable:o-double")).toBe("true");
+    expect(saveOptionAction).not.toHaveBeenCalled();
   });
 
-  it("adds a new option to an offered group, e.g. one more medallion", async () => {
-    vi.mocked(saveOptionAction).mockResolvedValue({ status: "success", message: "ok" });
+  it("sends a new option typed under a group with the product, e.g. one more medallion", async () => {
+    vi.mocked(saveProductAction).mockResolvedValue({ status: "success", message: "ok" });
     render(<ProductForm categories={categories} defaultCategoryId="c-burgers" optionGroups={groups} />);
     await userEvent.click(screen.getByRole("checkbox", { name: /Ofrecer Extras/ }));
+    expect(screen.queryByRole("button", { name: "Añadir" })).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByRole("textbox", { name: "Nombre de la nueva opción de Extras" }), "Medallón de carne");
     await userEvent.type(screen.getByRole("textbox", { name: "Precio extra de la nueva opción de Extras" }), "1400");
-    await userEvent.click(screen.getByRole("button", { name: "Añadir" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crear producto" }));
 
-    await waitFor(() => expect(saveOptionAction).toHaveBeenCalled());
-    const sent = vi.mocked(saveOptionAction).mock.calls.at(-1)![1];
-    expect(Object.fromEntries(sent)).toEqual({ groupId: "g-extras", available: "true", name: "Medallón de carne", price: "1400" });
+    await waitFor(() => expect(saveProductAction).toHaveBeenCalled());
+    const sent = vi.mocked(saveProductAction).mock.calls.at(-1)![1];
+    expect(sent.getAll("newOptionGroup")).toEqual(["g-extras"]);
+    expect(sent.get("newOptionName:g-extras")).toBe("Medallón de carne");
+    expect(sent.get("newOptionPrice:g-extras")).toBe("1400");
+    expect(sent.getAll("touchedOption")).toEqual([]);
   });
 
   it("moves an option with the arrow keys on its handle and saves the group's new order", async () => {

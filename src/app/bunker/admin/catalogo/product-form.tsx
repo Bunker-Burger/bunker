@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CirclePlus, CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import styles from "../../admin.module.css";
@@ -8,8 +8,8 @@ import { saveProductAction } from "./actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
 import { ProductPreview, type PhotoView } from "./product-preview";
 import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
-import { PriceField, QuickForm } from "../quick-form";
-import { reorderOptionsAction, saveOptionAction } from "./actions";
+import { PriceField } from "../quick-form";
+import { reorderOptionsAction } from "./actions";
 import { IDLE_FORM_STATE } from "./form-state";
 
 export interface ProductFormCategory {
@@ -102,6 +102,10 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     });
   };
   const defaults = new Map(product?.optionGroups.map((link) => [link.groupId, new Set(link.defaultOptionIds)]));
+  // Extras and types are edited right in this form and saved by its button: only the rows touched are sent.
+  const [touched, setTouched] = useState<Set<string>>(() => new Set());
+  const touch = (groupId: string, optionId: string) =>
+    setTouched((current) => (current.has(`${groupId}|${optionId}`) ? current : new Set(current).add(`${groupId}|${optionId}`)));
 
   const type = categories.find((category) => category.id === categoryId)?.type;
   const applicable = optionGroups.filter((group) => type !== undefined && group.applicableTypes.includes(type));
@@ -118,6 +122,9 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
     <>
     <AdminForm action={action} submitLabel={product ? "Guardar producto" : "Crear producto"}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
+      {[...touched].map((entry) => (
+        <input key={entry} name="touchedOption" type="hidden" value={entry} />
+      ))}
       {photo ? <PhotoField onView={setPhotoView} key={`${photo.url ?? ""}-${photo.focal?.x ?? ""}-${photo.focal?.y ?? ""}`} hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
 
       <fieldset className={styles.formCard}>
@@ -203,6 +210,10 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                       data-dragging={dragging?.optionId === option.id || undefined}
                       draggable={armed === option.id}
                       key={option.id}
+                      // Anything edited in the row except the product's own "Por defecto" choice is an edit of the option.
+                      onChange={(event) => {
+                        if (!(event.target instanceof HTMLInputElement) || !event.target.name.startsWith("default:")) touch(group.id, option.id);
+                      }}
                       onDragEnd={() => {
                         if (dragging?.groupId === group.id) saveOrder(group, ordered(group).map((candidate) => candidate.id));
                         setDragging(null);
@@ -245,35 +256,28 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                         />
                         <span aria-hidden="true">Por defecto</span>
                       </label>
-                      {/* Name and price of the option: saved by its own form (below), not by "Guardar producto". */}
+                      {/* Name, price and availability of the option: saved with "Guardar producto". */}
                       <span className={styles.variantName}>
                         <input
                           aria-label={`Nombre de ${option.name}`}
                           className={styles.optionName}
                           defaultValue={option.name}
-                          form={`option-${option.id}`}
                           maxLength={80}
-                          name="name"
+                          name={`optionName:${option.id}`}
                         />
                         {option.available ? null : <span className={styles.badgeMuted}>Sin stock</span>}
                       </span>
-                      <PriceField defaultValue={option.price} form={`option-${option.id}`} label={`Precio extra de ${option.name}`} name="price" />
+                      <PriceField defaultValue={option.price} label={`Precio extra de ${option.name}`} name={`optionPrice:${option.id}`} />
                       <span className={styles.variantActions}>
-                      <label className={styles.variantAvailable}>
-                        <input
-                          aria-label={`${option.name} disponible`}
-                          defaultChecked={option.available}
-                          form={`option-${option.id}`}
-                          name="available"
-                          onChange={(event) => event.currentTarget.form?.requestSubmit()}
-                          type="checkbox"
-                          value="true"
-                        />
-                      </label>
-                      <button aria-label={`Guardar ${option.name}`} className={styles.smallAction} form={`option-${option.id}`} type="submit">
-                        <Check aria-hidden="true" size={16} />
-                        <span className={styles.variantSaveText}>Guardar</span>
-                      </button>
+                        <label className={styles.variantAvailable}>
+                          <input
+                            aria-label={`${option.name} disponible`}
+                            defaultChecked={option.available}
+                            name={`optionAvailable:${option.id}`}
+                            type="checkbox"
+                            value="true"
+                          />
+                        </label>
                       </span>
                     </div>
                   ))}
@@ -286,18 +290,16 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
               ) : null}
               {isAssigned ? (
                 <div className={styles.variantNew}>
+                  <input name="newOptionGroup" type="hidden" value={group.id} />
                   <input
                     aria-label={`Nombre de la nueva opción de ${group.name}`}
                     className={styles.optionName}
-                    form={`new-option-${group.id}`}
                     maxLength={80}
-                    name="name"
-                    placeholder={group.selectionMode === "single" ? "Ej: Doble (2× 100g)" : "Ej: Medallón extra"}
+                    name={`newOptionName:${group.id}`}
+                    placeholder={group.selectionMode === "single" ? "Nueva opción. Ej: Doble (2× 100g)" : "Nueva opción. Ej: Medallón extra"}
                   />
-                  <PriceField defaultValue="" form={`new-option-${group.id}`} label={`Precio extra de la nueva opción de ${group.name}`} name="price" />
-                  <button className={styles.addOptionAction} form={`new-option-${group.id}`} type="submit">
-                    <CirclePlus aria-hidden="true" size={16} /> Añadir
-                  </button>
+                  <PriceField defaultValue="" label={`Precio extra de la nueva opción de ${group.name}`} name={`newOptionPrice:${group.id}`} />
+                  <small className={styles.hint}>Se agrega al guardar el producto.</small>
                 </div>
               ) : null}
             </div>
@@ -317,23 +319,6 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
 
       <ProductPreview categories={categories} photo={photoView} />
     </AdminForm>
-    {/* Forms of the option rows above: HTML ties each row's fields to them with the form attribute. */}
-    {applicable
-      .filter((group) => assigned.has(group.id))
-      .map((group) => (
-        <div className={styles.optionForms} key={group.id}>
-          {group.options.map((option) => (
-            <QuickForm action={saveOptionAction} id={`option-${option.id}`} key={option.id} label={`Precio de ${option.name}`}>
-              <input name="groupId" type="hidden" value={group.id} />
-              <input name="optionId" type="hidden" value={option.id} />
-            </QuickForm>
-          ))}
-          <QuickForm action={saveOptionAction} id={`new-option-${group.id}`} label={`Nueva opción en ${group.name}`}>
-            <input name="groupId" type="hidden" value={group.id} />
-            <input name="available" type="hidden" value="true" />
-          </QuickForm>
-        </div>
-      ))}
     </>
   );
 }

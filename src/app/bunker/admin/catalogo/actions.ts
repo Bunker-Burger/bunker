@@ -78,14 +78,57 @@ export async function moveProductAction(_previous: AdminFormState, form: FormDat
  */
 export async function saveProductAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   const isNew = !form.get("productId");
+  // Options first: publishing the product checks the options it offers.
+  const optionProblems = await saveOptionEdits(form);
   const { state, value } = await perform(saveProduct, form);
-  if (state.status !== "success" || !value) return state;
+  if (state.status !== "success" || !value) {
+    return optionProblems.length > 0 && state.status === "error"
+      ? { ...state, message: `${state.message} Opciones sin guardar: ${optionProblems.join(" ")}` }
+      : state;
+  }
   const photo = await savePhoto(value.productId, form);
+  const withOptions = (message: string) => (optionProblems.length > 0 ? `${message} Opciones sin guardar: ${optionProblems.join(" ")}` : message);
   if (isNew) redirect(`${productEditPath(value.productId)}?creado=1${photo?.status === "error" ? "&foto=0" : ""}`);
   if (photo?.status === "error") {
-    return { ...photo, message: `Producto guardado, pero la foto no: ${photo.fieldErrors?.image ?? photo.message}` };
+    return { ...photo, message: withOptions(`Producto guardado, pero la foto no: ${photo.fieldErrors?.image ?? photo.message}`) };
   }
-  return photo ? { status: "success", message: `${state.message} ${photo.message}` } : state;
+  const message = withOptions(photo ? `${state.message} ${photo.message}` : (state.message ?? "Guardado."));
+  return optionProblems.length > 0 ? { status: "error", message } : { status: "success", message };
+}
+
+/**
+ * The extras and types shown in the product form are saved with it (issue #54): the rows the admin
+ * touched (`touchedOption` = "groupId|optionId") and a new option typed under a group
+ * (`newOptionGroup` + `newOptionName:<groupId>`). Returns what could not be saved.
+ */
+async function saveOptionEdits(form: FormData): Promise<string[]> {
+  const problems: string[] = [];
+  const run = async (data: FormData, name: string) => {
+    const { state } = await perform(saveOption, data);
+    if (state.status === "error") problems.push(`${name}: ${[...Object.values(state.fieldErrors ?? {}), state.message].filter(Boolean)[0]}`);
+  };
+  for (const entry of form.getAll("touchedOption").map(String)) {
+    const [groupId, optionId] = entry.split("|");
+    if (!groupId || !optionId) continue;
+    const data = new FormData();
+    data.set("groupId", groupId);
+    data.set("optionId", optionId);
+    data.set("name", String(form.get(`optionName:${optionId}`) ?? ""));
+    data.set("price", String(form.get(`optionPrice:${optionId}`) ?? ""));
+    if (form.has(`optionAvailable:${optionId}`)) data.set("available", "true");
+    await run(data, String(form.get(`optionName:${optionId}`) ?? "opción"));
+  }
+  for (const groupId of form.getAll("newOptionGroup").map(String)) {
+    const name = String(form.get(`newOptionName:${groupId}`) ?? "").trim();
+    if (name === "") continue;
+    const data = new FormData();
+    data.set("groupId", groupId);
+    data.set("name", name);
+    data.set("price", String(form.get(`newOptionPrice:${groupId}`) ?? ""));
+    data.set("available", "true");
+    await run(data, name);
+  }
+  return problems;
 }
 
 async function savePhoto(productId: string, form: FormData): Promise<AdminFormState | null> {
