@@ -46,6 +46,8 @@
 .product-price { display: flex; flex: 0 0 auto; flex-direction: column-reverse; align-items: flex-end; }
 .product-price strong { color: var(--color-primary); font-family: var(--font-display); font-size: var(--text-price); font-weight: 700; letter-spacing: var(--tracking-display); }
 .compare-at { color: var(--color-muted); font-size: var(--text-body-sm); }
+.cart-tray-total { display: flex; align-items: baseline; gap: .4rem; }
+.cart-tray-total s { color: var(--color-muted); font-size: var(--text-body-sm); }
 .promo-note { display: block; margin-top: .2rem; color: var(--color-primary); font-size: var(--text-badge); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .product-copy p { display: -webkit-box; overflow: hidden; margin: .3rem 0 0; color: var(--color-muted); font-size: var(--text-body-sm); line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 /* Footer line of the card: the category on the left, the add button (absolutely placed) on the right. */

@@ -376,6 +376,11 @@ export function Storefront({
   };
   const itemCount = cart.reduce((total, line) => total + line.quantity, 0);
   const subtotal = cart.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n);
+  // The tray shows what the products cost with the promotion applied (delivery aside), like the checkout will.
+  const trayDiscount = (() => {
+    if (cart.length === 0 || now === null) return 0n;
+    return quoteCart(toPromotionLines(cart, products), promotions, fulfilment, 0n, { now, timezone }).promotion?.productDiscountCents ?? 0n;
+  })();
 
   // A new screen starts at its top with focus on its title, as a page load would.
   const shownView = useRef<StoreView>(view);
@@ -520,7 +525,10 @@ export function Storefront({
           <span className="cart-tray-icon" aria-hidden="true"><ShoppingCart size={18} /></span>
           <span className="cart-tray-copy">
             <small>{itemCount === 1 ? "1 producto" : `${itemCount} productos`}</small>
-            <strong>{formatArs(subtotal)}</strong>
+            <span className="cart-tray-total">
+              <strong>{formatArs(subtotal - trayDiscount)}</strong>
+              {trayDiscount > 0n ? <s><span className="sr-only">Antes</span> {formatArs(subtotal)}</s> : null}
+            </span>
           </span>
           <span className="cart-tray-action">Ver pedido <ArrowRight aria-hidden="true" size={16} /></span>
         </a>

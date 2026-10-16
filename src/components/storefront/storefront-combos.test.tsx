@@ -117,6 +117,18 @@ describe("combos in the menu", () => {
     expect(await screen.findByText("Combo Oklahoma se agregó al carrito.")).toBeInTheDocument();
   });
 
+  it("shows the combo's price in the cart tray, not the sum of the products", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+
+    const tray = await screen.findByRole("link", { name: /Ver pedido/ });
+    expect(within(tray).getByText("$ 9.500")).toBeInTheDocument();
+    expect(within(tray).getByText("$ 14.200", { selector: "s" })).toBeInTheDocument();
+  });
+
   it("adds it from the promotions banner too", async () => {
     const user = userEvent.setup();
     renderStore();

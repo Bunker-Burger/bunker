@@ -97,7 +97,7 @@ export function ComboSection({ combos, products, onAdd }: { combos: readonly Pro
     <section aria-labelledby="seccion-combos" className="menu-category combo-section">
       <div className="menu-heading">
         <h2 id="seccion-combos">Combos</h2>
-        <p>Búnker combos pensados para que disfrutes aun mas</p>
+        <p>Para compartir</p>
       </div>
       <div className="product-grid">
         {cards.map(({ combo, contents, priceCents }) => (
