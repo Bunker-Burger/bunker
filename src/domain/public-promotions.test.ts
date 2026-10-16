@@ -25,7 +25,7 @@ const rule: PromotionRule = {
 const slugs = new Map([["db-burger", "smash-bunker-doble"]]);
 
 describe("public promotions", () => {
-  it("publishes only what the engine needs and the badge: no description, money as a string, products by slug", () => {
+  it("publishes only what the menu needs: the badge and the description, money as a string, products by slug", () => {
     const published = toPublicPromotion(rule, slugs);
     expect(published).toEqual({
       id: "combo",
@@ -41,10 +41,10 @@ describe("public promotions", () => {
         { productSlug: null, quantity: 1 }
       ],
       schedule: [{ dayOfWeek: 5, startsAt: "22:00:00", endsAt: "02:00:00" }],
-      // The tag shown on the banner, photo or not; the description is never published.
-      badgeText: "$1"
+      // The tag shown on the banner, photo or not, and the text of the detail view.
+      badgeText: "$1",
+      description: "¡Todo a $1!"
     });
-    expect(JSON.stringify(published)).not.toMatch(/Todo a|description/);
   });
 
   it("round-trips through JSON into an equivalent engine rule with the storefront's ids", () => {
@@ -52,7 +52,7 @@ describe("public promotions", () => {
     const restored = toPromotionRule(parsed!, new Map([["smash-bunker-doble", "smash-doble"]]));
     expect(restored).toMatchObject({
       active: true,
-      description: "",
+      description: "¡Todo a $1!",
       badgeText: "$1",
       mechanic: { type: "fixed_price", fixedPriceCents: 900000n },
       startsAt: rule.startsAt,

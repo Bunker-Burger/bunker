@@ -29,6 +29,8 @@ export interface PublicPromotion {
   channels: PromotionRule["channels"];
   items: Array<{ productSlug: string | null; quantity: number }>;
   schedule: PromotionRule["schedule"];
+  /** The text the store wrote for the promotion, shown in its detail view (issue #54). */
+  description?: string | undefined;
   /** What the menu's banner shows (issue #54): the photo, when it has one, and the badge, when it has one. */
   imageUrl?: string | null | undefined;
   imageFocalPoint?: { x: number; y: number } | undefined;
@@ -54,6 +56,7 @@ export function toPublicPromotion(rule: PromotionRule, productSlugs: ReadonlyMap
     schedule: rule.schedule,
     ...(rule.imageUrl ? { imageUrl: rule.imageUrl } : {}),
     ...(rule.badgeText ? { badgeText: rule.badgeText } : {}),
+    ...(rule.description.trim() ? { description: rule.description.trim() } : {}),
     ...(rule.imageUrl && rule.imageFocalPoint ? { imageFocalPoint: rule.imageFocalPoint } : {})
   };
 }
@@ -79,7 +82,8 @@ const publicPromotionSchema = z.object({
   schedule: z.array(z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: wallClock, endsAt: wallClock })),
   imageUrl: z.string().url().nullable().optional(),
   imageFocalPoint: z.object({ x: z.number().int().min(0).max(100), y: z.number().int().min(0).max(100) }).optional(),
-  badgeText: z.string().nullable().optional()
+  badgeText: z.string().nullable().optional(),
+  description: z.string().optional()
 });
 
 const publicPromotionsSchema = z.object({ promotions: z.array(publicPromotionSchema) });
@@ -100,7 +104,7 @@ export function toPromotionRule(promotion: PublicPromotion, productIdBySlug: Rea
     id: promotion.id,
     slug: promotion.slug,
     name: promotion.name,
-    description: "",
+    description: promotion.description ?? "",
     badgeText: promotion.badgeText ?? null,
     ...(promotion.imageUrl ? { imageUrl: promotion.imageUrl } : {}),
     ...(promotion.imageUrl && promotion.imageFocalPoint ? { imageFocalPoint: promotion.imageFocalPoint } : {}),

@@ -26,6 +26,7 @@ const combo = (overrides: Partial<PublicPromotion> = {}): PublicPromotion => ({
   schedule: [],
   imageUrl: "https://cdn.test/catalog/s1/promotions/combo.jpg",
   badgeText: "COMBO",
+  description: "Dos hamburguesas bien cargadas con papas para compartir.",
   ...overrides
 });
 
@@ -102,12 +103,29 @@ describe("combos in the menu", () => {
     expect(within(section).getByText("$ 14.200", { selector: "s" })).toBeInTheDocument();
   });
 
-  it("adds the combo's products to the cart when its card is tapped", async () => {
+  it("opens the combo's detail when its card is tapped: description, contents and price, adding nothing yet", async () => {
     const user = userEvent.setup();
     renderStore();
 
     const section = await screen.findByRole("region", { name: "Combos" });
     await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+
+    const detail = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    expect(within(detail).getByText("Dos hamburguesas bien cargadas con papas para compartir.")).toBeInTheDocument();
+    expect(within(detail).getByText("Incluye")).toBeInTheDocument();
+    expect(within(detail).getByText(/Oklahoma Onion/, { selector: "li" })).toBeInTheDocument();
+    expect(within(detail).getByRole("button", { name: /Agregar combo/ })).toHaveTextContent("$ 9.500");
+    expect(getCartSnapshot()).toHaveLength(0);
+  });
+
+  it("adds the combo's products to the cart from its detail", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    const detail = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    await user.click(within(detail).getByRole("button", { name: /Agregar combo/ }));
 
     await waitFor(() => expect(getCartSnapshot()).toHaveLength(2));
     expect(getCartSnapshot().map((line) => [line.productId, line.quantity])).toEqual([
@@ -115,6 +133,26 @@ describe("combos in the menu", () => {
       ["papas", 2]
     ]);
     expect(await screen.findByText("Combo Oklahoma se agregó al carrito.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Combo Oklahoma" })).toBeNull();
+  });
+
+  it("lets the extras of the combo's products be chosen, and adds them on top of the combo's price", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    const detail = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    const burger = within(within(detail).getByRole("region", { name: "Opciones de Oklahoma Onion" }));
+    await user.click(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+
+    expect(within(within(detail).getByRole("region", { name: "Resumen del combo" })).getByText("+ $ 900")).toBeInTheDocument();
+    expect(within(detail).getByRole("button", { name: /Agregar combo/ })).toHaveTextContent("$ 10.400");
+    await user.click(within(detail).getByRole("button", { name: /Agregar combo/ }));
+
+    const burgerLine = getCartSnapshot().find((line) => line.productId === "oklahoma");
+    expect(burgerLine?.selectedOptions.extras).toEqual(["bacon"]);
+    expect(getCartSnapshot().find((line) => line.productId === "papas")?.quantity).toBe(2);
   });
 
   it("shows the combo's price in the cart tray, not the sum of the products", async () => {
@@ -123,6 +161,7 @@ describe("combos in the menu", () => {
 
     const section = await screen.findByRole("region", { name: "Combos" });
     await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Combo Oklahoma" })).getByRole("button", { name: /Agregar combo/ }));
 
     const tray = await screen.findByRole("link", { name: /Ver pedido/ });
     expect(within(tray).getByText("$ 9.500")).toBeInTheDocument();
@@ -135,6 +174,7 @@ describe("combos in the menu", () => {
 
     const section = await screen.findByRole("region", { name: "Combos" });
     await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Combo Oklahoma" })).getByRole("button", { name: /Agregar combo/ }));
 
     const cart = within(document.getElementById("carrito") as HTMLElement);
     expect(await cart.findByText("Promo aplicada")).toBeInTheDocument();
@@ -143,17 +183,17 @@ describe("combos in the menu", () => {
     expect(total).toHaveTextContent("$ 9.500");
   });
 
-  it("adds it from the promotions banner too", async () => {
+  it("opens it from the promotions banner too", async () => {
     const user = userEvent.setup();
     renderStore();
 
     const banner = await screen.findByRole("region", { name: "Promociones" });
     await user.click(within(banner).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
 
-    await waitFor(() => expect(getCartSnapshot()).toHaveLength(2));
+    expect(await screen.findByRole("dialog", { name: "Combo Oklahoma" })).toBeInTheDocument();
   });
 
-  it("adds nothing when a product of the combo is out of stock, and says so", async () => {
+  it("cannot be added while a product of the combo is out of stock, and says so", async () => {
     promotions = [combo({ items: [{ productSlug: "oklahoma-onion", quantity: 1 }, { productSlug: "pulled-pork-bunker", quantity: 1 }] })];
     const user = userEvent.setup();
     renderStore();
@@ -161,7 +201,22 @@ describe("combos in the menu", () => {
     const section = await screen.findByRole("region", { name: "Combos" });
     await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
 
-    expect(await screen.findByText(/Pulled Pork Búnker no está disponible/)).toBeInTheDocument();
+    const detail = await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    expect(within(detail).getByText(/Pulled Pork Búnker no está disponible/)).toBeInTheDocument();
+    expect(within(detail).getByRole("button", { name: "Combo no disponible" })).toBeDisabled();
+    expect(getCartSnapshot()).toHaveLength(0);
+  });
+
+  it("closes with Escape without adding anything", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    await screen.findByRole("dialog", { name: "Combo Oklahoma" });
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Combo Oklahoma" })).toBeNull();
     expect(getCartSnapshot()).toHaveLength(0);
   });
 
