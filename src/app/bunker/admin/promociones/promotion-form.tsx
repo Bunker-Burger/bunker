@@ -296,6 +296,55 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           </div>
         </fieldset>
 
+      {type !== "free_delivery" ? (
+        <fieldset className={styles.fieldset}>
+          <legend>
+            <span className={styles.promoLegend}>
+              <Layers aria-hidden="true" size={18} /> {type === "fixed_price" ? "Productos incluidos en el combo" : "Productos (vacío = todos)"}
+            </span>
+          </legend>
+          <FieldError id="items-error" name="items" />
+          {items.map((item, index) => {
+            const chosen = byId.get(item.productId);
+            return (
+              <div className={styles.comboRow} key={index}>
+                <SelectField
+                  label={`Producto ${index + 1}`}
+                  name="itemProduct"
+                  onChange={(event) => setItems((current) => current.map((row, i) => (i === index ? { ...row, productId: event.target.value } : row)))}
+                  value={item.productId}
+                >
+                  <option value="">Elegí un producto</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} · {formatArs(BigInt(product.priceCents))}
+                      {product.published ? "" : " (borrador)"}
+                    </option>
+                  ))}
+                </SelectField>
+                <TextField
+                  label="Cantidad"
+                  max={20}
+                  min={1}
+                  name="itemQuantity"
+                  onChange={(event) => setItems((current) => current.map((row, i) => (i === index ? { ...row, quantity: event.target.value } : row)))}
+                  prefix="x"
+                  type="number"
+                  value={item.quantity}
+                />
+                <button aria-label={`Quitar producto ${index + 1}`} className={styles.trashAction} onClick={() => setItems((current) => current.filter((_, i) => i !== index))} type="button">
+                  <Trash2 aria-hidden="true" size={18} />
+                </button>
+                {chosen ? <small className={styles.comboPrice}>{formatArs(BigInt(chosen.priceCents))} c/u</small> : null}
+              </div>
+            );
+          })}
+          <button className={styles.addDashed} onClick={() => setItems((current) => [...current, { productId: "", quantity: "1" }])} type="button">
+            <CirclePlus aria-hidden="true" size={18} /> Agregar producto
+          </button>
+        </fieldset>
+      ) : null}
+
         <div className={styles.valueBox}>
           {type === "fixed_price" ? (
             <div className={styles.valuePair}>
@@ -359,54 +408,6 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         </section>
       </fieldset>
 
-      {type !== "free_delivery" ? (
-        <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
-          <legend>
-            <span className={styles.promoLegend}>
-              <Layers aria-hidden="true" size={18} /> {type === "fixed_price" ? "Productos incluidos en el combo" : "Productos (vacío = todos)"}
-            </span>
-          </legend>
-          <FieldError id="items-error" name="items" />
-          {items.map((item, index) => {
-            const chosen = byId.get(item.productId);
-            return (
-              <div className={styles.comboRow} key={index}>
-                <SelectField
-                  label={`Producto ${index + 1}`}
-                  name="itemProduct"
-                  onChange={(event) => setItems((current) => current.map((row, i) => (i === index ? { ...row, productId: event.target.value } : row)))}
-                  value={item.productId}
-                >
-                  <option value="">Elegí un producto</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} · {formatArs(BigInt(product.priceCents))}
-                      {product.published ? "" : " (borrador)"}
-                    </option>
-                  ))}
-                </SelectField>
-                <TextField
-                  label="Cantidad"
-                  max={20}
-                  min={1}
-                  name="itemQuantity"
-                  onChange={(event) => setItems((current) => current.map((row, i) => (i === index ? { ...row, quantity: event.target.value } : row)))}
-                  prefix="x"
-                  type="number"
-                  value={item.quantity}
-                />
-                <button aria-label={`Quitar producto ${index + 1}`} className={styles.trashAction} onClick={() => setItems((current) => current.filter((_, i) => i !== index))} type="button">
-                  <Trash2 aria-hidden="true" size={18} />
-                </button>
-                {chosen ? <small className={styles.comboPrice}>{formatArs(BigInt(chosen.priceCents))} c/u</small> : null}
-              </div>
-            );
-          })}
-          <button className={styles.addDashed} onClick={() => setItems((current) => [...current, { productId: "", quantity: "1" }])} type="button">
-            <CirclePlus aria-hidden="true" size={18} /> Agregar producto
-          </button>
-        </fieldset>
-      ) : null}
 
       <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
         <legend>

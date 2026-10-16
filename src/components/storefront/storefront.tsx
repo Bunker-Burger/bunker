@@ -56,7 +56,7 @@ import {
   type PaymentMethod
 } from "./storefront-state";
 import { focalStyle } from "./focal-style";
-import { PromoShowcase, showcasePromotions, usePromoLayout } from "./promo-showcase";
+import { ComboSection, comboContents, comboPromotions, PromoShowcase, showcasePromotions, usePromoLayout } from "./promo-showcase";
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
@@ -222,6 +222,7 @@ export function Storefront({
   // The card price is what this product alone would cost with the selected fulfilment.
   const promoLayout = usePromoLayout();
   const showcase = useMemo(() => showcasePromotions(promotions, now, timezone), [promotions, now, timezone]);
+  const combos = useMemo(() => comboPromotions(promotions, now, timezone), [promotions, now, timezone]);
   const cardContext = now
     ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
     : null;
@@ -325,6 +326,33 @@ export function Storefront({
     setAddedThisVisit(true);
   };
 
+  // A combo is added as its products, each with its default choices; the cart then applies the combo's price by itself.
+  const addCombo = (combo: PromotionRule) => {
+    const contents = comboContents(combo, products);
+    if (!contents) {
+      setNotice(`No se puede agregar ${combo.name}: falta un producto del combo.`);
+      return;
+    }
+    const lines: CartLine[] = [];
+    for (const item of combo.items) {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      if (!product || !product.inStock) {
+        setNotice(`No se puede agregar ${combo.name}: ${product?.name ?? "un producto"} no está disponible.`);
+        return;
+      }
+      const defaults = getDefaultSelection(product);
+      if (!validateOptionSelection(product, defaults).ok) {
+        setNotice(`No se puede agregar ${combo.name}: configuración incompleta de ${product.name}.`);
+        return;
+      }
+      lines.push(makeCartLine(product, defaults, item.quantity, ""));
+    }
+    setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current));
+    setRevalidationNotice("");
+    setNotice(`${combo.name} se agregó al carrito.`);
+    setAddedThisVisit(true);
+  };
+
   const keyboardOpen = useVirtualKeyboardOpen();
   const view = useStoreView();
 
@@ -421,7 +449,8 @@ export function Storefront({
         {/* The captures open straight on the menu; the page title stays for screen readers and links. */}
         <h1 className="sr-only" id="menu-title" tabIndex={-1}>LA CARTA DEL BÚNKER</h1>
 
-        {query.trim() === "" ? <PromoShowcase layout={promoLayout} promotions={showcase} /> : null}
+        {query.trim() === "" ? <PromoShowcase layout={promoLayout} onAdd={addCombo} promotions={showcase} /> : null}
+        {query.trim() === "" ? <ComboSection combos={combos} onAdd={addCombo} products={products} /> : null}
         <Menu
           categories={categories}
           onAdd={addDirect}

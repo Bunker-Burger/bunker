@@ -13,6 +13,9 @@ interface HomeProps {
   }>;
 }
 
+/** The minute this render happens in, read outside the component so the render itself stays pure. */
+const currentMinute = () => Math.floor(Date.now() / 60_000) * 60_000;
+
 export default async function Home({ searchParams }: HomeProps) {
   const [params, catalogResult, currentAdmin, promotionsResult] = await Promise.all([
     searchParams,
@@ -22,7 +25,7 @@ export default async function Home({ searchParams }: HomeProps) {
   ]);
   // Promotions and the minute they were judged at travel with the page, so the banner and the promo
   // prices are in the first paint; the client keeps re-reading them as before.
-  const renderedAt = Math.floor(Date.now() / 60_000) * 60_000;
+  const renderedAt = currentMinute();
   const productParam = Array.isArray(params.producto) ? params.producto[0] : params.producto;
   const refParam = Array.isArray(params.ref) ? params.ref[0] : params.ref;
   const paymentIdParam =
