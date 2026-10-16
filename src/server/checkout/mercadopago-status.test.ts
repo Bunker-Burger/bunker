@@ -300,7 +300,7 @@ describe("checkMercadoPagoPaymentStatus", () => {
     expect(decodedUrl).toContain("Modalidad: Delivery");
     expect(decodedUrl).toContain("Envío: $1.500");
     expect(decodedUrl).toContain("Te paso la dirección de entrega por este chat.");
-    expect(decodedUrl).toContain("Pago: Mercado Pago acreditado por webhook (ref. mp-pay-delivery-123)");
+    expect(decodedUrl).toContain("Método de pago: Mercado Pago acreditado por webhook (ref. mp-pay-delivery-123)");
   });
 
   it("TC-PICKUP: genera mensaje de WhatsApp con modalidad Retiro en el local sin costo de envío (P2-03)", async () => {

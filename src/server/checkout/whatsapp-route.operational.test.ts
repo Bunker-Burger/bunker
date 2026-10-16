@@ -220,8 +220,8 @@ describe("POST /api/checkout/whatsapp (real route, fake PostgREST transport)", (
     expect(url.hostname).toBe("wa.me");
     expect(url.pathname).toBe("/5493865207458");
     expect(text).toContain("• 2x Smash Búnker Doble — $18.800\n   Opciones: Triple\n   Nota: sin cebolla");
-    expect(text).toContain("Modalidad: Delivery\nSubtotal: $18.800\nEnvío: $1.200\nTotal: $20.000");
-    expect(text).toContain("Pago: Efectivo. Tengo el importe exacto: $20.000.");
+    expect(text).toContain("Modalidad: Delivery\nSubtotal: $18.800\nEnvío: $1.200\nTotal a pagar: $20.000");
+    expect(text).toContain("Método de pago: Efectivo. Tengo el importe exacto: $20.000.");
     expectFreshReadsOnly();
   });
 
@@ -230,7 +230,7 @@ describe("POST /api/checkout/whatsapp (real route, fake PostgREST transport)", (
     expect(response.status).toBe(200);
     const { text, body } = await message(response);
     expect(body).toMatchObject({ deliveryCents: "0", totalCents: "1880000" });
-    expect(text).toContain("Pago: Transferencia de $18.800. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.");
+    expect(text).toContain("Método de pago: Transferencia de $18.800. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.");
     expectFreshReadsOnly();
   });
 

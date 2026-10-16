@@ -83,8 +83,8 @@ describe("prepareWhatsAppCheckout", () => {
     expect(message).toContain("   Nota: sin cebolla");
     expect(message).toContain("• 1x Gaseosa Lata 354ml — $1.400");
     expect(message).toContain("Modalidad: Delivery");
-    expect(message).toContain("Total: $23.200");
-    expect(message).toContain("Pago: Efectivo. Tengo el importe exacto: $23.200.");
+    expect(message).toContain("Total a pagar: $23.200");
+    expect(message).toContain("Método de pago: Efectivo. Tengo el importe exacto: $23.200.");
   });
 
   it("uses the store's current number and transfer copy", async () => {
@@ -93,7 +93,7 @@ describe("prepareWhatsAppCheckout", () => {
       dependencies({ catalog: catalog({ store: { ...catalog().store, whatsappE164: "+5493815550000" } }) })
     );
     expect(result.ok && new URL(result.value.url).pathname).toBe("/5493815550000");
-    expect(result.ok && messageOf(result.value.url)).toContain("Pago: Transferencia de $22.000. ¿Me pasás el alias o CBU?");
+    expect(result.ok && messageOf(result.value.url)).toContain("Método de pago: Transferencia de $22.000. ¿Me pasás el alias o CBU?");
   });
 
   it("applies one persisted promotion and states it in the message", async () => {
@@ -114,7 +114,7 @@ describe("prepareWhatsAppCheckout", () => {
     };
     const result = await prepareWhatsAppCheckout(request, dependencies({ catalog: catalog({ promotions: [promotion] }) }));
     expect(result.ok && result.value.pricing).toMatchObject({ discountCents: 220_000n, totalCents: 2_100_000n });
-    expect(result.ok && messageOf(result.value.url)).toContain("Promoción: Jueves Búnker (10% de descuento en todo el pedido): -$2.200\nTotal: $21.000");
+    expect(result.ok && messageOf(result.value.url)).toContain("Promoción: Jueves Búnker (10% de descuento en todo el pedido): -$2.200\nTotal a pagar: $21.000");
   });
 
   it.each([

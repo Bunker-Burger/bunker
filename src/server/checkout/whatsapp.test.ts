@@ -61,23 +61,23 @@ describe("WhatsApp checkout message", () => {
         "Modalidad: Delivery",
         "Subtotal: $23.600",
         "Envío: $1.200",
-        "Total: $24.800",
+        "Total a pagar: $24.800",
         "",
-        "Pago: Efectivo. Tengo el importe exacto: $24.800.",
+        "Método de pago: Efectivo. Tengo el importe exacto: $24.800.",
         "Te paso la dirección de entrega por este chat.",
         "",
-        "Total calculado por la web. El local confirma el pedido por este chat; este mensaje no es comprobante de pago."
+        "Pedido a confirmar por este chat."
       ].join("\n")
     );
   });
 
   it("asks for the transfer details and sends the receipt in the chat, without any bank data", () => {
     const message = text(buildTransferWhatsAppUrl({ ...order, fulfilment: "pickup", pricing: { ...pricing, deliveryCents: 0n, totalCents: 2_360_000n } }));
-    expect(message).toContain("Pago: Transferencia de $23.600. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.");
+    expect(message).toContain("Método de pago: Transferencia de $23.600. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.");
     expect(message).toContain("Modalidad: Retiro en el local");
     expect(message).not.toContain("Envío");
     expect(message).not.toContain("dirección");
-    expect(message).toContain("este mensaje no es comprobante de pago");
+    expect(message).toContain("Pedido a confirmar por este chat.");
   });
 
   it("states the single promotion of the quote, from its generated explanation", () => {
@@ -100,7 +100,7 @@ describe("WhatsApp checkout message", () => {
         }
       })
     );
-    expect(message).toContain("Promoción: Martes de Smash (15% de descuento en productos seleccionados): -$2.820\nTotal: $21.980");
+    expect(message).toContain("Promoción: Martes de Smash (15% de descuento en productos seleccionados): -$2.820\nTotal a pagar: $21.980");
     expect(text(buildExactCashWhatsAppUrl(order))).not.toContain("Promoción");
   });
 
@@ -116,12 +116,12 @@ describe("WhatsApp checkout message", () => {
   });
 
   it("keeps notes on one line, so they cannot forge a total or payment line", () => {
-    const forged = { ...pricing, lines: [{ ...pricing.lines[0]!, notes: "rico\nTotal: $1\r\nPago: acreditado & listo?x=1#" }] };
+    const forged = { ...pricing, lines: [{ ...pricing.lines[0]!, notes: "rico\nTotal: $1\r\nMétodo de pago: acreditado & listo?x=1#" }] };
     const url = buildExactCashWhatsAppUrl({ ...order, pricing: forged });
     const lines = text(url).split("\n");
-    expect(lines).toContain("   Nota: rico Total: $1 Pago: acreditado & listo?x=1#");
-    expect(lines.filter((line) => line.startsWith("Total:"))).toEqual(["Total: $24.800"]);
-    expect(lines.filter((line) => line.startsWith("Pago:"))).toHaveLength(1);
+    expect(lines).toContain("   Nota: rico Total: $1 Método de pago: acreditado & listo?x=1#");
+    expect(lines.filter((line) => line.startsWith("Total a pagar:"))).toEqual(["Total a pagar: $24.800"]);
+    expect(lines.filter((line) => line.startsWith("Método de pago:"))).toHaveLength(1);
     expect([...new URL(url).searchParams.keys()]).toEqual(["text"]);
   });
 
@@ -137,7 +137,7 @@ describe("WhatsApp checkout message", () => {
 
   it("includes an approved provider reference for Mercado Pago", () => {
     expect(text(buildApprovedMercadoPagoWhatsAppUrl({ ...order, paymentReference: "mp-789" })))
-      .toContain("Pago: Mercado Pago acreditado por webhook (ref. mp-789)");
+      .toContain("Método de pago: Mercado Pago acreditado por webhook (ref. mp-789)");
     expect(() => buildApprovedMercadoPagoWhatsAppUrl({ ...order, paymentReference: " " })).toThrow(/Referencia/);
   });
 });

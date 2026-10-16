@@ -10,7 +10,7 @@ export interface WhatsAppOrder {
 }
 
 const NOT_A_RECEIPT =
-  "Total calculado por la web. El local confirma el pedido por este chat; este mensaje no es comprobante de pago.";
+  "Pedido a confirmar por este chat.";
 
 /** ARS without decimals, plain ASCII so the text reads the same in every WhatsApp client. */
 export function formatWhatsAppArs(cents: bigint): string {
@@ -46,7 +46,7 @@ function totalsLines(order: WhatsAppOrder): string[] {
     ...(pricing.promotion
       ? [`Promoción: ${oneLine(pricing.promotion.name)} (${pricing.promotion.explanation}): -${formatWhatsAppArs(pricing.discountCents)}`]
       : []),
-    `Total: ${formatWhatsAppArs(pricing.totalCents)}`
+    `Total a pagar: ${formatWhatsAppArs(pricing.totalCents)}`
   ];
 }
 
@@ -74,7 +74,7 @@ function orderMessage(order: WhatsAppOrder, payment: string, closing: string): s
 /** Cash orders: the customer brings the exact amount; the text never claims a payment. */
 export function buildExactCashWhatsAppUrl(order: WhatsAppOrder): string {
   const total = formatWhatsAppArs(order.pricing.totalCents);
-  return buildUrl(order.businessPhone, orderMessage(order, `Pago: Efectivo. Tengo el importe exacto: ${total}.`, NOT_A_RECEIPT));
+  return buildUrl(order.businessPhone, orderMessage(order, `Método de pago: Efectivo. Tengo el importe exacto: ${total}.`, NOT_A_RECEIPT));
 }
 
 /**
@@ -85,7 +85,7 @@ export function buildTransferWhatsAppUrl(order: WhatsAppOrder): string {
   const total = formatWhatsAppArs(order.pricing.totalCents);
   return buildUrl(
     order.businessPhone,
-    orderMessage(order, `Pago: Transferencia de ${total}. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.`, NOT_A_RECEIPT)
+    orderMessage(order, `Método de pago: Transferencia de ${total}. ¿Me pasás el alias o CBU? Te envío el comprobante por este chat.`, NOT_A_RECEIPT)
   );
 }
 
@@ -94,6 +94,6 @@ export function buildApprovedMercadoPagoWhatsAppUrl(order: WhatsAppOrder & { pay
   if (!order.paymentReference.trim()) throw new Error("Referencia de pago requerida");
   return buildUrl(
     order.businessPhone,
-    orderMessage(order, `Pago: Mercado Pago acreditado por webhook (ref. ${oneLine(order.paymentReference)})`, "El local confirma el pedido por este chat.")
+    orderMessage(order, `Método de pago: Mercado Pago acreditado por webhook (ref. ${oneLine(order.paymentReference)})`, "Pedido a confirmar por este chat.")
   );
 }
