@@ -30,18 +30,20 @@ const combo = (overrides: Partial<PublicPromotion> = {}): PublicPromotion => ({
 });
 
 let promotions: PublicPromotion[];
+let categories = fixtureCategories;
 
 beforeEach(() => {
   localStorage.clear();
   resetCartStoreForTesting();
   window.history.replaceState({}, "", "/");
   promotions = [combo()];
+  categories = fixtureCategories;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input instanceof Request ? input.url : input), "http://localhost");
       if (url.pathname === "/api/store/promotions") return Response.json({ promotions });
-      return Response.json(serializePublicCatalog({ products: fixtureProducts, categories: fixtureCategories }));
+      return Response.json(serializePublicCatalog({ products: fixtureProducts, categories }));
     })
   );
 });
@@ -51,6 +53,43 @@ afterEach(() => {
 });
 
 const renderStore = () => render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+
+const comboCategory = (overrides: Partial<(typeof fixtureCategories)[number]> = {}) => ({
+  id: "combos",
+  slug: "combos",
+  name: "Combos",
+  type: "other" as const,
+  sortOrder: 25,
+  visible: true,
+  ...overrides
+});
+
+describe("the Combos section is a category of the menu", () => {
+  it("sits where the store ordered it, between the sandwiches and the sides", async () => {
+    categories = [...fixtureCategories, comboCategory()];
+    renderStore();
+
+    const combos = await screen.findByRole("region", { name: "Combos" });
+    const sandwiches = screen.getByRole("region", { name: "Sándwiches" });
+    const fries = screen.getByRole("region", { name: "Papas" });
+    expect(sandwiches.compareDocumentPosition(combos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(combos.compareDocumentPosition(fries) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("can be ordered last, and hidden with the category", async () => {
+    categories = [...fixtureCategories, comboCategory({ sortOrder: 99 })];
+    const { unmount } = renderStore();
+    const combos = await screen.findByRole("region", { name: "Combos" });
+    const drinks = screen.getByRole("region", { name: "Bebidas" });
+    expect(drinks.compareDocumentPosition(combos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    unmount();
+
+    categories = [...fixtureCategories, comboCategory({ visible: false })];
+    renderStore();
+    await screen.findByRole("region", { name: "Promociones" });
+    expect(screen.queryByRole("region", { name: "Combos" })).toBeNull();
+  });
+});
 
 describe("combos in the menu", () => {
   it("has a Combos section with the contents, the closed price and the normal price struck through", async () => {

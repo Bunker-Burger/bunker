@@ -14,7 +14,7 @@ export interface DashboardCategory {
   name: string;
   slug: string;
   visible: boolean;
-  /** "burger" | "sandwich" | "side" | "drink", as `createCategoryAction` expects. */
+  /** "burger" | "sandwich" | "side" | "drink" | "other" (the Combos section), as `createCategoryAction` expects. */
   kind: string;
   productCount: number;
 }
@@ -23,7 +23,8 @@ const KINDS = [
   { value: "burger", label: "Hamburguesas" },
   { value: "sandwich", label: "Sándwiches" },
   { value: "side", label: "Papas" },
-  { value: "drink", label: "Bebidas" }
+  { value: "drink", label: "Bebidas" },
+  { value: "other", label: "Combos (sin productos)" }
 ] as const;
 
 /** Calls an admin action outside a form (drag and drop) and re-reads the panel when it worked. */

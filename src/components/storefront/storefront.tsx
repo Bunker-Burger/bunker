@@ -223,6 +223,7 @@ export function Storefront({
   const promoLayout = usePromoLayout();
   const showcase = useMemo(() => showcasePromotions(promotions, now, timezone), [promotions, now, timezone]);
   const combos = useMemo(() => comboPromotions(promotions, now, timezone), [promotions, now, timezone]);
+  const hasComboCategory = categories.some((category) => category.type === "other");
   const cardContext = now
     ? { now, timezone, fulfilment, deliveryCents: fulfilment === "delivery" ? deliveryFeeCents ?? 0n : 0n }
     : null;
@@ -353,6 +354,8 @@ export function Storefront({
     setAddedThisVisit(true);
   };
 
+  const comboSection = <ComboSection combos={combos} onAdd={addCombo} products={products} />;
+
   const keyboardOpen = useVirtualKeyboardOpen();
   const view = useStoreView();
 
@@ -450,9 +453,11 @@ export function Storefront({
         <h1 className="sr-only" id="menu-title" tabIndex={-1}>LA CARTA DEL BÚNKER</h1>
 
         {query.trim() === "" ? <PromoShowcase layout={promoLayout} onAdd={addCombo} promotions={showcase} /> : null}
-        {query.trim() === "" ? <ComboSection combos={combos} onAdd={addCombo} products={products} /> : null}
+        {/* Without a Combos category the section goes first; with one, it sits where the store ordered it. */}
+        {query.trim() === "" && !hasComboCategory ? comboSection : null}
         <Menu
           categories={categories}
+          combosSection={query.trim() === "" && hasComboCategory ? comboSection : null}
           onAdd={addDirect}
           onOpen={openProduct}
           products={products}

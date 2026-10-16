@@ -12,7 +12,7 @@ import { PHASE, promotionPhase } from "./promociones/promotion-props";
 import { STATE_LABEL, statusReason } from "./tienda/status-labels";
 
 /** `categories.kind` for each product type (the admin's new-category form speaks kinds). */
-const KIND_BY_TYPE: Record<string, string> = { burger: "burger", sandwich: "sandwich", fries: "side", beverage: "drink" };
+const KIND_BY_TYPE: Record<string, string> = { burger: "burger", sandwich: "sandwich", fries: "side", beverage: "drink", other: "other" };
 
 /** What the promotion is worth, shown where a product shows its price. */
 function valueLabel(mechanic: PromotionMechanic) {

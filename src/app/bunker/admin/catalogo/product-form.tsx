@@ -66,7 +66,9 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = { burger: Hamburger, sandwich
  * server validates everything again and refuses to publish an invalid configuration.
  */
 export function ProductForm({ categories, optionGroups, product, defaultCategoryId, action = saveProductAction, photo }: ProductFormProps) {
-  const [categoryId, setCategoryId] = useState(product?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "");
+  // A default that is not a product category (the Combos section) falls back to the first one.
+  const initialCategory = [product?.categoryId, defaultCategoryId].find((id) => id && categories.some((category) => category.id === id));
+  const [categoryId, setCategoryId] = useState(initialCategory ?? categories[0]?.id ?? "");
   const [photoView, setPhotoView] = useState<PhotoView>({ url: photo?.url ?? null, focal: photo?.focal ?? { x: 50, y: 50 } });
   const [assigned, setAssigned] = useState<Set<string>>(() => new Set(product?.optionGroups.map((link) => link.groupId)));
 

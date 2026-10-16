@@ -1,14 +1,21 @@
 import type { Category, ConfigurableOptionGroup, ProductType } from "@/domain/types";
 
 /** The four product types the admin manages, as stored in `categories.kind`. */
-export const ADMIN_CATEGORY_KINDS = ["burger", "sandwich", "side", "drink"] as const;
+export const PRODUCT_CATEGORY_KINDS = ["burger", "sandwich", "side", "drink"] as const;
+/**
+ * Kinds of section the admin can create: the product types plus "other", the menu's "Combos"
+ * section (issue #54). It holds no products: the menu shows the store's combos in its place, so
+ * the admin orders, hides or renames it like any other category.
+ */
+export const ADMIN_CATEGORY_KINDS = [...PRODUCT_CATEGORY_KINDS, "other"] as const;
 export type AdminCategoryKind = (typeof ADMIN_CATEGORY_KINDS)[number];
 
 export const PRODUCT_TYPE_BY_KIND: Record<AdminCategoryKind, ProductType> = {
   burger: "burger",
   sandwich: "sandwich",
   side: "fries",
-  drink: "beverage"
+  drink: "beverage",
+  other: "other"
 };
 
 export type { AdminError, AdminErrorCode, AdminResult } from "@/server/admin/use-case";

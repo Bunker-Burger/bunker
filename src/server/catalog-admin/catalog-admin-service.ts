@@ -12,7 +12,7 @@ import {
   parseProductForm,
 } from "./input";
 import {
-  ADMIN_CATEGORY_KINDS,
+  PRODUCT_CATEGORY_KINDS,
   PRODUCT_TYPE_BY_KIND,
   type AdminCategoryKind,
   type CatalogAdminRepository,
@@ -169,7 +169,7 @@ export function saveProduct(deps: CatalogAdminDependencies, form: FormData) {
     if (!groups.ok) return failure(deps, "saveProduct", groups.error);
 
     const category = categories.value.find((candidate) => candidate.id === fields.categoryId);
-    if (!category || !(ADMIN_CATEGORY_KINDS as readonly string[]).includes(category.kind)) {
+    if (!category || !(PRODUCT_CATEGORY_KINDS as readonly string[]).includes(category.kind)) {
       return invalid({ categoryId: "Elegí una categoría de Hamburguesas, Sándwiches, Papas o Bebidas." });
     }
     const groupsById = new Map(groups.value.map((group) => [group.id, group]));

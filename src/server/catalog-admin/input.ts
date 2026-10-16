@@ -61,7 +61,7 @@ export function parseCategoryKind(form: FormData): Result<AdminCategoryKind, Fie
   const kind = text(form.get("kind"));
   return (ADMIN_CATEGORY_KINDS as readonly string[]).includes(kind)
     ? ok(kind as AdminCategoryKind)
-    : err({ kind: "Elegí Hamburguesas, Sándwiches, Papas o Bebidas." });
+    : err({ kind: "Elegí Hamburguesas, Sándwiches, Papas, Bebidas o Combos." });
 }
 
 export function parseId(form: FormData, field: string): Result<string, FieldErrors> {

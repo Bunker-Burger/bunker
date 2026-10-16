@@ -1,12 +1,12 @@
 "use client";
 
 import { CupSoda, Flame, Hamburger, Plus, Popcorn, Sandwich, Search, UtensilsCrossed, type LucideIcon } from "lucide-react";
-import { useId, useMemo } from "react";
+import { Fragment, useId, useMemo, type ReactNode } from "react";
 import type { Category, Product, ProductType } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
 import { formatArs } from "@/lib/money";
 import { focalStyle } from "./focal-style";
-import { buildMenuSections, menuCategories } from "./menu-sections";
+import { buildMenuSections, FEATURED_SECTION_ID, menuCategories, type MenuSectionView } from "./menu-sections";
 
 const plural = (count: number) => (count === 1 ? "1 producto" : `${count} productos`);
 
@@ -45,14 +45,27 @@ interface MenuProps {
   /** What the customer typed in the header search (issue #54: the search lives in the header). */
   query?: string;
   onClearQuery?: () => void;
+  /** The "Combos" section, rendered where the store put its Combos category (type "other"). */
+  combosSection?: ReactNode;
 }
 
 /** The public menu: the sections in the configured order, narrowed by the header search. */
-export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavailable = false, query = "", onClearQuery }: MenuProps) {
+export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavailable = false, query = "", onClearQuery, combosSection }: MenuProps) {
   const sectionCategories = useMemo(() => menuCategories(categories), [categories]);
   const sections = buildMenuSections(products, sectionCategories, "all", query);
   const categoryNames = useMemo(() => new Map(sectionCategories.map((category) => [category.id, category.name])), [sectionCategories]);
   const shown = sections.reduce((total, section) => total + section.products.length, 0);
+  // The sections in the store's order, with the Combos category (no products) as a slot among them.
+  const slots = (() => {
+    const byId = new Map(sections.map((section) => [section.id, section]));
+    const comboCategoryIds = new Set(sectionCategories.filter((category) => category.type === "other").map((category) => category.id));
+    const order = [FEATURED_SECTION_ID, ...sectionCategories.map((category) => category.id), "otros"];
+    return order.flatMap((id): Array<{ kind: "section"; id: string; section: MenuSectionView } | { kind: "combos"; id: string }> => {
+      if (comboCategoryIds.has(id)) return [{ kind: "combos", id }];
+      const section = byId.get(id);
+      return section ? [{ kind: "section", id, section }] : [];
+    });
+  })();
   const published = products.some((product) => product.published);
   const narrowed = query.trim() !== "";
 
@@ -94,7 +107,10 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
         </div>
       ) : null}
 
-      {sections.map((section) => (
+      {slots.map((slot) => {
+        if (slot.kind === "combos") return <Fragment key={slot.id}>{combosSection}</Fragment>;
+        const section = slot.section;
+        return (
         <section aria-labelledby={`seccion-${section.id}`} className="menu-category" key={section.id}>
           <div className="menu-heading">
             <h2 id={`seccion-${section.id}`}>{section.title}</h2>
@@ -114,7 +130,8 @@ export function Menu({ products, categories, promotionFor, onOpen, onAdd, unavai
             ))}
           </div>
         </section>
-      ))}
+        );
+      })}
     </>
   );
 }

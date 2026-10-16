@@ -197,10 +197,23 @@ describe("categories", () => {
     expect(repository.categories.at(-1)).toMatchObject({ kind: "side", slug: "papas-fritas", visible: true, sortOrder: 50 });
   });
 
-  it.each([["other"], ["drinks"], [""]])("only accepts the four admin kinds (%j)", async (kind) => {
+  it.each([["drinks"], ["combo"], [""]])("only accepts the admin kinds (%j)", async (kind) => {
     const outcome = await createCategory(deps(), form({ kind, name: "X" }));
     expect(outcome).toMatchObject({ ok: false, fieldErrors: { kind: expect.any(String) } });
     expect(repository.writes).toEqual([]);
+  });
+
+  it("creates the Combos section as a category of kind \"other\", ordered like any other (issue #54)", async () => {
+    const outcome = await createCategory(deps(), form({ kind: "other", name: "Combos", visible: "on" }));
+    expect(outcome).toMatchObject({ ok: true, message: "Categoría “Combos” creada." });
+    expect(repository.categories.at(-1)).toMatchObject({ kind: "other", slug: "combos", visible: true });
+  });
+
+  it("never files a product under the Combos section", async () => {
+    await createCategory(deps(), form({ kind: "other", name: "Combos", visible: "on" }));
+    const combos = repository.categories.at(-1)!.id;
+    const outcome = await saveProduct(deps(), smashForm({ categoryId: combos }));
+    expect(outcome).toMatchObject({ ok: false, fieldErrors: { categoryId: expect.any(String) } });
   });
 
   it("reports a taken slug", async () => {
