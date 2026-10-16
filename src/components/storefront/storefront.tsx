@@ -1625,7 +1625,7 @@ function CheckoutSection({
             <legend><span className="checkout-heading"><Wallet aria-hidden="true" /> Método de pago</span></legend>
             {offered.includes("mercado-pago") ? <PaymentChoice checked={payment === "mercado-pago"} label="Mercado Pago" note={PUBLIC_PAYMENT_NOTE.mercado_pago} onChange={() => setPayment("mercado-pago")} value="mercado-pago" /> : null}
             {offered.includes("transfer") ? <PaymentChoice checked={payment === "transfer"} label="Transferencia bancaria" note={PUBLIC_PAYMENT_NOTE.bank_transfer} onChange={() => setPayment("transfer")} value="transfer" /> : null}
-            {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo exacto" note={PUBLIC_PAYMENT_NOTE.cash} onChange={() => setPayment("cash")} value="cash" /> : null}
+            {offered.includes("cash") ? <PaymentChoice checked={payment === "cash"} label="Efectivo" note={PUBLIC_PAYMENT_NOTE.cash} onChange={() => setPayment("cash")} value="cash" /> : null}
           </fieldset>
 
           {payment === "mercado-pago" ? (

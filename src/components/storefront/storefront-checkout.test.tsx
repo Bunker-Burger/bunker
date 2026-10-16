@@ -242,7 +242,7 @@ describe("WhatsApp checkout (BB-10)", () => {
 
     expect(within(checkout).getByText("Pedí el alias por WhatsApp y enviá el comprobante por ese chat")).toBeInTheDocument();
     expect(within(checkout).queryByText(/CBU|CVU/)).toBeNull();
-    await user.click(within(checkout).getByRole("radio", { name: /Efectivo exacto/ }));
+    await user.click(within(checkout).getByRole("radio", { name: /Efectivo/ }));
 
     await waitFor(() => expect(checkoutRequests().at(-1)?.body).toMatchObject({ paymentMethod: "cash_exact" }));
     expect(await within(checkout).findByRole("link", { name: "Enviar pedido por WhatsApp" })).toHaveAttribute("href", SERVER_URL);

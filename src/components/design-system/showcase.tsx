@@ -212,7 +212,7 @@ export function DesignSystemShowcase() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="transfer">Transferencia</SelectItem>
-                <SelectItem value="cash">Efectivo exacto</SelectItem>
+                <SelectItem value="cash">Efectivo</SelectItem>
                 <SelectItem value="mercado-pago" disabled>Mercado Pago (no disponible)</SelectItem>
               </SelectContent>
             </Select>
