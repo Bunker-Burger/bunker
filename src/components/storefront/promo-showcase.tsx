@@ -79,7 +79,7 @@ export function ComboSection({ combos, products, onAdd }: { combos: readonly Pro
     <section aria-labelledby="seccion-combos" className="menu-category combo-section">
       <div className="menu-heading">
         <h2 id="seccion-combos">Combos</h2>
-        <p>Armados con precio cerrado. Tocá uno y se suma al carrito.</p>
+        <p>Todo junto, a precio de combo. Tocá uno y se agrega completo a tu carrito.</p>
       </div>
       <div className="product-grid">
         {cards.map(({ combo, contents, priceCents }) => (
