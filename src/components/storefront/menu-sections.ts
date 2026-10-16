@@ -23,7 +23,7 @@ export const FEATURED_SECTION_ID = "destacadas";
 const OTHER_SECTION_ID = "otros";
 
 const eyebrows: Partial<Record<ProductType, string>> = {
-  burger: "Smash al fuego",
+  burger: "100% caseras",
   sandwich: "Para los que van por otra cosa",
   fries: "Para acompañar",
   beverage: "Bien frías"
