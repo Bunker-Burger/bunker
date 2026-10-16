@@ -27,7 +27,7 @@ export interface PublicPaymentOption {
 export const PUBLIC_PAYMENT_OPTIONS: readonly PublicPaymentOption[] = [
   { method: "mercado_pago", label: "Mercado Pago", note: "Pagá online de forma segura con tarjeta o dinero en cuenta" },
   { method: "bank_transfer", label: "Transferencia", note: "Pedí el alias por WhatsApp y enviá el comprobante por ese chat" },
-  { method: "cash", label: "Efectivo", note: "Tené el importe justo al recibir o retirar" }
+  { method: "cash", label: "Efectivo", note: "Pagás en efectivo al recibir o retirar" }
 ];
 
 export const PUBLIC_PAYMENT_NOTE = Object.fromEntries(PUBLIC_PAYMENT_OPTIONS.map((option) => [option.method, option.note])) as Record<PaymentMethodKind, string>;
