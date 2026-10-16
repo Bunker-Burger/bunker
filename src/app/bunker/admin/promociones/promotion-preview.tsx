@@ -37,12 +37,17 @@ export function PromotionPreview({
 }) {
   const ref = useRef<HTMLElement>(null);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     const form = ref.current?.closest("form");
     if (!form) return;
     const field = form.elements.namedItem("name");
-    const read = () => setName(field instanceof HTMLInputElement ? field.value.trim() : "");
+    const text = form.elements.namedItem("description");
+    const read = () => {
+      setName(field instanceof HTMLInputElement ? field.value.trim() : "");
+      setDescription(text instanceof HTMLTextAreaElement ? text.value.trim() : "");
+    };
     read();
     form.addEventListener("input", read);
     return () => form.removeEventListener("input", read);
@@ -53,7 +58,7 @@ export function PromotionPreview({
         id: "vista-previa",
         slug: "vista-previa",
         name: name || "Nombre de la promoción",
-        description: "",
+        description,
         badgeText: badge || null,
         imageUrl: photoUrl,
         imageFocalPoint: focal,

@@ -229,6 +229,9 @@ describe("PromotionForm preview", () => {
     expect(within(section).getByRole("heading", { name: "Combo Smash" })).toBeInTheDocument();
     // No description yet: the products' names, without quantities.
     expect(within(section).getByText("Smash + Papas")).toBeInTheDocument();
+    // Then the text the store writes in "Descripción y términos", as it is typed.
+    await userEvent.type(screen.getByRole("textbox", { name: /Descripción y términos/ }), "Dos smash con papas");
+    expect(await within(section).findByText("Dos smash con papas")).toBeInTheDocument();
     expect(within(section).getByText("$ 9.000")).toBeInTheDocument();
     expect(within(section).getByText("$ 11.300", { selector: "s" })).toBeInTheDocument();
   });
