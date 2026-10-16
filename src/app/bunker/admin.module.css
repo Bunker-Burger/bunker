@@ -3469,6 +3469,11 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   max-width: 28rem;
 }
 
+/* The preview is one card wide: the menu's two columns on wide screens would squeeze a row card to half of 28rem. */
+.previewCards :global(.product-grid) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .previewLabel {
   color: var(--color-muted);
   font-size: var(--text-badge);
