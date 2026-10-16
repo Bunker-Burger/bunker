@@ -13,7 +13,7 @@ export const WHATSAPP_QUOTE_TIMEOUT_MS = 10_000;
 
 /** What the browser may send: ids, quantities, notes and choices; never prices or totals. */
 export interface WhatsAppCheckoutRequest {
-  items: Array<{ productId: string; quantity: number; optionSelections: SelectedOptions; notes: string }>;
+  items: Array<{ productId: string; quantity: number; optionSelections: SelectedOptions; notes: string; comboId?: string }>;
   fulfilment: FulfilmentMethod;
   paymentMethod: "cash_exact" | "transfer";
 }

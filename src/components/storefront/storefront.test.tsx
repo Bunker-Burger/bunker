@@ -463,10 +463,10 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
-    expect(within(dialog).queryByText(/En cuántas de las 3/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("En las 3")).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
-    expect(within(dialog).getByText("En cuántas de las 3")).toBeInTheDocument();
+    expect(within(dialog).getByText("En las 3")).toBeInTheDocument();
     // On all three at first: 3 × $ 900, on top of 3 × $ 7.800.
     expect(within(dialog).getByText("+ $ 2.700")).toBeInTheDocument();
 

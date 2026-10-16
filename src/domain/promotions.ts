@@ -15,7 +15,9 @@ import type { FulfilmentMethod, PromotionMechanic, PromotionRule, PromotionWindo
  * Mechanics (`items` are the rule's `promotion_items`):
  * - percent_off: % of the price paid for the listed products (every product when `items` is empty).
  * - fixed_price: combo; each complete set of `items` (product × quantity) costs `fixedPriceCents`
- *   instead of the products' base prices. Option surcharges are still charged.
+ *   instead of the products' base prices. Option surcharges are still charged. It only counts the
+ *   lines added from that combo (`comboId` = the rule's id): the same products ordered on their own
+ *   are not a combo.
  * - buy_x_get_y: per `buy + get` eligible units, the `get` cheapest are free (base price).
  * - free_delivery: the delivery fee is waived (delivery orders only).
  */
@@ -27,6 +29,8 @@ export interface PromotionLine {
   unitPriceCents: bigint;
   /** Product base price, without option surcharges. */
   basePriceCents: bigint;
+  /** The combo (promotion id) the line was added from, if any. */
+  comboId?: string | undefined;
 }
 
 export interface PromotionContext {
@@ -100,7 +104,7 @@ function productDiscount(mechanic: PromotionMechanic, rule: PromotionRule, lines
       let sets = Number.POSITIVE_INFINITY;
       let regular = 0n;
       for (const item of rule.items) {
-        const matching = lines.filter((line) => line.productId === item.productId);
+        const matching = lines.filter((line) => line.productId === item.productId && line.comboId === rule.id);
         const units = matching.reduce((total, line) => total + line.quantity, 0);
         sets = Math.min(sets, Math.floor(units / item.quantity));
         if (matching[0]) regular += matching[0].basePriceCents * BigInt(item.quantity);

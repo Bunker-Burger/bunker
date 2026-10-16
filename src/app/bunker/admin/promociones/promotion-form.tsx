@@ -120,7 +120,7 @@ export function previewRows(
     const product = byId.get(productId);
     if (!product) return null;
     const price = BigInt(product.priceCents);
-    return { productId, quantity, unitPriceCents: price, basePriceCents: price };
+    return { productId, quantity, unitPriceCents: price, basePriceCents: price, comboId: rule.id };
   };
   const total = (lines: PromotionLine[]) => lines.reduce((sum, current) => sum + current.unitPriceCents * BigInt(current.quantity), 0n);
 

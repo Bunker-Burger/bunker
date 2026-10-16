@@ -17,9 +17,10 @@ export function normalizeOptions(options: SelectedOptions): SelectedOptions {
   );
 }
 
-export function cartLineIdentity(line: Pick<CartLine, "productId" | "notes" | "selectedOptions">): string {
+export function cartLineIdentity(line: Pick<CartLine, "productId" | "notes" | "selectedOptions"> & { comboId?: string | undefined }): string {
   return JSON.stringify({
     productId: line.productId,
+    ...(line.comboId ? { comboId: line.comboId } : {}),
     notes: normalizeNotes(line.notes),
     selectedOptions: normalizeOptions(line.selectedOptions)
   });
@@ -30,6 +31,7 @@ export function addCartLine(lines: CartLine[], incoming: CartLine): CartLine[] {
   const normalizedOptions = normalizeOptions(incoming.selectedOptions);
   const identity = cartLineIdentity({
     productId: incoming.productId,
+    comboId: incoming.comboId,
     notes: normalizedNotes,
     selectedOptions: normalizedOptions
   });
@@ -72,6 +74,7 @@ export function updateCartLineNotes(lines: CartLine[], id: string, rawNotes: str
   const normalizedNotes = normalizeNotes(rawNotes);
   const newIdentity = cartLineIdentity({
     productId: current.productId,
+    comboId: current.comboId,
     notes: normalizedNotes,
     selectedOptions: current.selectedOptions
   });
@@ -120,6 +123,7 @@ export function editCartLine(
 
   const newIdentity = cartLineIdentity({
     productId: current.productId,
+    comboId: current.comboId,
     notes: newNotes,
     selectedOptions: newOptions
   });
@@ -218,7 +222,8 @@ export function parsePersistedCart(value: string | null): CartLine[] {
         unitPriceCents: BigInt(line.unitPriceCents),
         quantity: Math.max(1, Math.floor(line.quantity)),
         notes: normalizedNotes,
-        selectedOptions: normalizedOpts
+        selectedOptions: normalizedOpts,
+        ...(typeof line.comboId === "string" && line.comboId ? { comboId: line.comboId } : {})
       }];
     });
   } catch {
@@ -349,6 +354,7 @@ export function revalidateCart(
     const normalizedOpts = validation.value.normalizedSelections;
     const newIdentity = cartLineIdentity({
       productId: product.id,
+      comboId: line.comboId,
       notes: normalizedNotes,
       selectedOptions: normalizedOpts
     });
@@ -361,7 +367,8 @@ export function revalidateCart(
       unitPriceCents: freshUnitPrice,
       quantity: Math.max(1, Math.floor(line.quantity)),
       notes: normalizedNotes,
-      selectedOptions: normalizedOpts
+      selectedOptions: normalizedOpts,
+      ...(line.comboId ? { comboId: line.comboId } : {})
     };
 
     // 7. Fusión por identidad si la poda de opciones provocó colisión

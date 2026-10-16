@@ -7,7 +7,9 @@ const checkoutItemSchema = z.object({
   productId: identifier,
   quantity: z.number().int().min(1).max(20),
   optionSelections: z.record(identifier, z.array(identifier).max(20)).default({}),
-  notes: z.string().trim().max(300).default("")
+  notes: z.string().trim().max(300).default(""),
+  /** The combo (promotion id) the item was added from; the combo's price only counts such items. */
+  comboId: identifier.optional()
 }).strict();
 
 const customerSchema = z.object({
@@ -52,6 +54,7 @@ export function deriveLogicalCheckoutPayloadDigest(checkout: CheckoutRequest): s
     items: [...checkout.items]
       .map((item) => ({
         productId: item.productId,
+        ...(item.comboId ? { comboId: item.comboId } : {}),
         quantity: item.quantity,
         notes: item.notes.trim(),
         optionSelections: Object.keys(item.optionSelections)

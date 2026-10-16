@@ -56,7 +56,8 @@ function priceLine(
       optionId: detail.optionId,
       optionName: detail.optionName
     })),
-    notes: item.notes
+    notes: item.notes,
+    ...(item.comboId ? { comboId: item.comboId } : {})
   };
 }
 

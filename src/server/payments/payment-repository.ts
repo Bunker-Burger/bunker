@@ -55,7 +55,8 @@ function serializeLines(lines: QuoteLine[]): Json {
     unitPriceCents: line.unitPriceCents.toString(),
     basePriceCents: line.basePriceCents.toString(),
     selectedOptions: line.selectedOptions,
-    notes: line.notes
+    notes: line.notes,
+    ...(line.comboId ? { comboId: line.comboId } : {})
   }));
 }
 
@@ -72,7 +73,8 @@ function deserializeLines(json: unknown): QuoteLine[] {
       selectedOptions: Array.isArray(row.selectedOptions)
         ? (row.selectedOptions as Array<{ groupId: string; optionId: string; optionName: string }>)
         : [],
-      notes: String(row.notes ?? "")
+      notes: String(row.notes ?? ""),
+      ...(typeof row.comboId === "string" && row.comboId ? { comboId: row.comboId } : {})
     };
   });
 }

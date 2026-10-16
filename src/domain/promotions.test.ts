@@ -175,11 +175,29 @@ describe("mechanics", () => {
         { productId: "fries", quantity: 1 }
       ]
     });
+    // The lines were added from the combo (their `comboId` is the rule's id).
+    const from = (line: PromotionLine): PromotionLine => ({ ...line, comboId: "combo" });
     // One complete set (burger base 780.000 + fries 350.000 = 1.130.000) → 180.000 off; the
     // extra burger and the burger's 90.000 of options are not discounted.
-    expect(promotionDiscount(combo, [burger(2, 870000n), fries()], context()).productDiscountCents).toBe(180000n);
-    expect(promotionDiscount(combo, [burger(3), fries(3)], context()).productDiscountCents).toBe(540000n);
-    expect(promotionDiscount(combo, [burger(3)], context()).productDiscountCents).toBe(0n);
+    expect(promotionDiscount(combo, [from(burger(2, 870000n)), from(fries())], context()).productDiscountCents).toBe(180000n);
+    expect(promotionDiscount(combo, [from(burger(3)), from(fries(3))], context()).productDiscountCents).toBe(540000n);
+    expect(promotionDiscount(combo, [from(burger(3))], context()).productDiscountCents).toBe(0n);
+  });
+
+  it("fixed_price: the same products ordered on their own, or from another combo, are not the combo", () => {
+    const combo = rule({
+      id: "combo",
+      priority: 1,
+      mechanic: { type: "fixed_price", fixedPriceCents: 950000n },
+      items: [
+        { productId: "burger", quantity: 1 },
+        { productId: "fries", quantity: 1 }
+      ]
+    });
+    expect(promotionDiscount(combo, [burger(), fries()], context()).productDiscountCents).toBe(0n);
+    expect(promotionDiscount(combo, [{ ...burger(), comboId: "otro" }, { ...fries(), comboId: "otro" }], context()).productDiscountCents).toBe(0n);
+    // Half from the combo and half loose: no complete set.
+    expect(promotionDiscount(combo, [{ ...burger(), comboId: "combo" }, fries()], context()).productDiscountCents).toBe(0n);
   });
 
   it("fixed_price that is not cheaper than the regular price is not a promotion", () => {

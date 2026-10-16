@@ -82,6 +82,8 @@ export function comboContents(combo: PromotionRule, products: readonly ComboProd
   const found = parts as Array<{ product: ComboProduct; quantity: number }>;
   return {
     text: found.map((part) => `${part.quantity}× ${part.product.name}`).join(" + "),
+    /** The products' names alone: the quantities are in the combo's title. */
+    names: found.map((part) => part.product.name).join(" + "),
     normalCents: found.reduce((sum, part) => sum + part.product.priceCents * BigInt(part.quantity), 0n)
   };
 }
@@ -115,7 +117,7 @@ export function ComboSection({ combos, products, onAdd }: { combos: readonly Pro
                     {contents.normalCents > priceCents ? <>{" "}<s className="compare-at"><span className="sr-only">Antes</span> {formatArs(contents.normalCents)}</s></> : null}
                   </span>
                 </div>
-                <p>{contents.text}</p>
+                <p>{combo.description || contents.names}</p>
                 <span aria-hidden="true" className="product-meta">Combo</span>
               </div>
             </button>

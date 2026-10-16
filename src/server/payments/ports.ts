@@ -40,6 +40,8 @@ export interface QuoteLine {
   basePriceCents: bigint;
   selectedOptions: Array<{ groupId: string; optionId: string; optionName: string }>;
   notes: string;
+  /** The combo (promotion id) the line was ordered from, if any. */
+  comboId?: string | undefined;
 }
 
 export interface PaymentQuote {

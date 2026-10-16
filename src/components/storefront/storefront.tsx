@@ -35,6 +35,7 @@ import {
   getDefaultSelection,
   validateOptionSelection
 } from "@/domain/catalog";
+import { comboCount, removeOneCombo } from "@/domain/combos";
 import { quoteCart } from "@/domain/pricing";
 import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
 import { toPromotionRule, type PublicPromotion } from "@/domain/public-promotions";
@@ -134,8 +135,9 @@ function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
   }
 }
 
-function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string): CartLine {
+function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string, comboId?: string): CartLine {
   return {
+    ...(comboId ? { comboId } : {}),
     id: product.id,
     productId: product.id,
     productSlug: product.slug,
@@ -337,6 +339,19 @@ export function Storefront({
     }
     setActiveCombo(combo);
   };
+  // One more combo from the cart: the combo again with its standard choices (extras can be edited per line).
+  const addAnotherCombo = (combo: PromotionRule) => {
+    const lines: CartLine[] = [];
+    for (const item of combo.items) {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      if (!product || !product.inStock || !validateOptionSelection(product, getDefaultSelection(product)).ok) {
+        setNotice(`No se puede sumar otro ${combo.name}: ${product?.name ?? "un producto"} no está disponible.`);
+        return;
+      }
+      lines.push(makeCartLine(product, getDefaultSelection(product), item.quantity, "", combo.id));
+    }
+    setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current));
+  };
   const addComboLines = (combo: PromotionRule, lines: CartLine[]) => {
     setCart((current) => lines.reduce((acc, line) => addCartLine(acc, line), current));
     setRevalidationNotice("");
@@ -491,8 +506,10 @@ export function Storefront({
         cart={cart}
         onChange={setCart}
         onEditLine={handleEditLine}
+        onAddCombo={addAnotherCombo}
         products={products}
         promotion={cartPromotion}
+        promotions={promotions}
         subtotal={subtotal}
         storageDegraded={storageDegraded}
       />
@@ -537,7 +554,11 @@ export function Storefront({
           initialLine={editingLine}
           promotion={cardContext ? promotionalPrice(activeProduct, promotions, cardContext) : null}
           onClose={closeProduct}
-          onSubmit={(submittedLine, otherLines = []) => {
+          onSubmit={(drawerLine, drawerOthers = []) => {
+            // A line that came from a combo stays in it when edited.
+            const inCombo = (line: CartLine): CartLine => (editingLine?.comboId ? { ...line, comboId: editingLine.comboId } : line);
+            const submittedLine = inCombo(drawerLine);
+            const otherLines = drawerOthers.map(inCombo);
             if (editingLine && otherLines.length > 0) {
               // Extras for only some of the units: the line comes back split by what each unit carries.
               setCart((current) =>
@@ -646,7 +667,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd }: {
 
   const submit = () => {
     if (unavailable || !valid) return;
-    onAdd(perItem.flatMap((item) => item.groups.map((group) => makeCartLine(item.product, group.selected, group.quantity, notes))));
+    onAdd(perItem.flatMap((item) => item.groups.map((group) => makeCartLine(item.product, group.selected, group.quantity, notes, combo.id))));
   };
 
   return (
@@ -835,15 +856,17 @@ function OptionGroups({ product, selected, setSelected, quantity, extraUnits, se
                         {row}
                         {checked && group.selectionMode === "multiple" && quantity > 1 ? (
                           <div className="option-units">
-                            <span>En cuántas de las {quantity}</span>
-                            <div className="quantity-stepper compact">
+                            <span className="option-units-label">
+                              {unitsWith(option.id) === quantity ? `En las ${quantity}` : `En ${unitsWith(option.id)} de ${quantity}`}
+                            </span>
+                            <div aria-label={`Unidades con ${option.name}`} className="option-units-stepper" role="group">
                               <button
                                 aria-label={`Quitar ${option.name} de una unidad`}
                                 disabled={unitsWith(option.id) <= 1}
                                 onClick={() => setExtraUnits((current) => ({ ...current, [option.id]: Math.max(1, unitsWith(option.id) - 1) }))}
                                 type="button"
                               >
-                                <Minus />
+                                <Minus aria-hidden="true" />
                               </button>
                               <strong>{unitsWith(option.id)}</strong>
                               <button
@@ -852,9 +875,24 @@ function OptionGroups({ product, selected, setSelected, quantity, extraUnits, se
                                 onClick={() => setExtraUnits((current) => ({ ...current, [option.id]: Math.min(quantity, unitsWith(option.id) + 1) }))}
                                 type="button"
                               >
-                                <Plus />
+                                <Plus aria-hidden="true" />
                               </button>
                             </div>
+                            {unitsWith(option.id) < quantity ? (
+                              <button
+                                className="option-units-all"
+                                onClick={() =>
+                                  setExtraUnits((current) => {
+                                    const next = { ...current };
+                                    delete next[option.id];
+                                    return next;
+                                  })
+                                }
+                                type="button"
+                              >
+                                Todas
+                              </button>
+                            ) : null}
                             {option.priceDeltaCents > 0n ? <strong className="option-units-cost">+ {formatArs(option.priceDeltaCents * BigInt(unitsWith(option.id)))}</strong> : null}
                           </div>
                         ) : null}
@@ -1068,6 +1106,8 @@ function CartSection({
   products,
   subtotal,
   promotion,
+  promotions,
+  onAddCombo,
   onChange,
   onEditLine,
   storageDegraded
@@ -1078,11 +1118,66 @@ function CartSection({
   subtotal: bigint;
   /** The promotion taking something off the products right now, if any. */
   promotion: { name: string; discountCents: bigint } | null;
+  /** The store's promotions, to know which combos the cart's lines belong to. */
+  promotions: readonly PromotionRule[];
+  /** One more of a combo already in the cart. */
+  onAddCombo: (combo: PromotionRule) => void;
   onChange: (cart: CartLine[]) => void;
   onEditLine: (line: CartLine) => void;
   storageDegraded?: boolean;
 }) {
   const count = cart.reduce((total, line) => total + line.quantity, 0);
+  // Lines added from a combo that is still offered are shown together, as the combo; the rest one by one.
+  const combosById = new Map(promotions.map((combo) => [combo.id, combo]));
+  const entries = cart.reduce<Array<{ kind: "line"; line: CartLine } | { kind: "combo"; combo: PromotionRule; lines: CartLine[] }>>((list, line) => {
+    const combo = line.comboId ? combosById.get(line.comboId) : undefined;
+    if (!combo) return [...list, { kind: "line", line }];
+    const existing = list.find((entry) => entry.kind === "combo" && entry.combo.id === combo.id);
+    if (existing && existing.kind === "combo") {
+      existing.lines.push(line);
+      return list;
+    }
+    return [...list, { kind: "combo", combo, lines: [line] }];
+  }, []);
+  const renderLine = (line: CartLine, inCombo: boolean) => {
+    const extras = chosenExtras(line, products);
+    const detail = [extras.join(", "), line.notes].filter(Boolean).join(" · ") || "Personalización estándar";
+    if (inCombo) {
+      return (
+        <li className="cart-combo-item" key={line.id}>
+          <span>
+            <strong>{line.quantity}× {line.productName}</strong>
+            <small>{detail}</small>
+          </span>
+          <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
+            Editar
+          </button>
+        </li>
+      );
+    }
+    return (
+      <div className="cart-line" key={line.id}>
+        <div className="cart-line-copy">
+          <strong>{line.productName}</strong>
+          <small>{detail}</small>
+        </div>
+        <strong className="cart-line-price">{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
+        <div className="cart-line-actions">
+          <div className="quantity-stepper compact">
+            <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
+            <strong>{line.quantity}</strong>
+            <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+          </div>
+          <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
+            Editar
+          </button>
+          <button aria-label={`Quitar ${line.productName} del carrito`} className="cart-action-btn text-danger" onClick={() => onChange(removeCartLine(cart, line.id))} type="button">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    );
+  };
   return (
     <section aria-labelledby="cart-title" className="store-view order-section" data-active={active} id="carrito">
       <ViewBar back="#menu" backLabel="Seguir pidiendo" title="Tu pedido" titleId="cart-title" />
@@ -1100,28 +1195,35 @@ function CartSection({
             <h3>Resumen de tu pedido</h3>
             <span className="option-badge">{count === 1 ? "1 item" : `${count} items`}</span>
           </header>
-          {cart.map((line) => {
-            const extras = chosenExtras(line, products);
+          {entries.map((entry) => {
+            if (entry.kind === "line") return renderLine(entry.line, false);
+            const { combo, lines } = entry;
+            const count = comboCount(cart, combo);
+            const fixedCents = combo.mechanic.type === "fixed_price" ? combo.mechanic.fixedPriceCents : 0n;
+            const extrasCents = lines.reduce((total, line) => {
+              const base = products.find((product) => product.id === line.productId)?.priceCents ?? line.unitPriceCents;
+              return total + (line.unitPriceCents > base ? (line.unitPriceCents - base) * BigInt(line.quantity) : 0n);
+            }, 0n);
             return (
-              <div className="cart-line" key={line.id}>
-                <div className="cart-line-copy">
-                  <strong>{line.productName}</strong>
-                  <small>{[extras.join(", "), line.notes].filter(Boolean).join(" · ") || "Personalización estándar"}</small>
-                </div>
-                <strong className="cart-line-price">{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
-                <div className="cart-line-actions">
-                  <div className="quantity-stepper compact">
-                    <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
-                    <strong>{line.quantity}</strong>
-                    <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
+              <div className="cart-combo" key={`combo-${combo.id}`}>
+                <div className="cart-line">
+                  <div className="cart-line-copy">
+                    <strong>{combo.name}</strong>
+                    <small>{count === 1 ? "1 combo" : count > 1 ? `${count} combos` : "Combo incompleto"}</small>
                   </div>
-                  <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
-                    Editar
-                  </button>
-                  <button aria-label={`Quitar ${line.productName} del carrito`} className="cart-action-btn text-danger" onClick={() => onChange(removeCartLine(cart, line.id))} type="button">
-                    Eliminar
-                  </button>
+                  <strong className="cart-line-price">{formatArs(fixedCents * BigInt(count) + extrasCents)}</strong>
+                  <div className="cart-line-actions">
+                    <div className="quantity-stepper compact">
+                      <button aria-label={`Quitar un ${combo.name}`} onClick={() => onChange(removeOneCombo(cart, combo))} type="button"><Minus /></button>
+                      <strong>{count}</strong>
+                      <button aria-label={`Agregar otro ${combo.name}`} onClick={() => onAddCombo(combo)} type="button"><Plus /></button>
+                    </div>
+                    <button aria-label={`Quitar ${combo.name} del carrito`} className="cart-action-btn text-danger" onClick={() => onChange(cart.filter((line) => line.comboId !== combo.id))} type="button">
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
+                <ul className="cart-combo-items">{lines.map((line) => renderLine(line, true))}</ul>
               </div>
             );
           })}
@@ -1154,7 +1256,8 @@ function toPromotionLines(cart: CartLine[], catalogProducts: readonly Product[])
       productId: line.productId,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
-      basePriceCents: basePriceCents > line.unitPriceCents ? line.unitPriceCents : basePriceCents
+      basePriceCents: basePriceCents > line.unitPriceCents ? line.unitPriceCents : basePriceCents,
+      ...(line.comboId ? { comboId: line.comboId } : {})
     };
   });
 }
@@ -1272,7 +1375,8 @@ function CheckoutSection({
           productId: line.productId,
           quantity: line.quantity,
           optionSelections: canonicalSelections(line.selectedOptions),
-          notes: line.notes
+          notes: line.notes,
+          ...(line.comboId ? { comboId: line.comboId } : {})
         })),
         fulfilment,
         paymentMethod: "mercado_pago" as const,
@@ -1338,7 +1442,8 @@ function CheckoutSection({
               productId: line.productId,
               quantity: line.quantity,
               optionSelections: canonicalSelections(line.selectedOptions),
-              notes: line.notes
+              notes: line.notes,
+              ...(line.comboId ? { comboId: line.comboId } : {})
             })),
             fulfilment,
             paymentMethod: payment === "cash" ? "cash_exact" : "transfer"

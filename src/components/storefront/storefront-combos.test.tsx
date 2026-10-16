@@ -98,7 +98,9 @@ describe("combos in the menu", () => {
 
     const section = await screen.findByRole("region", { name: "Combos" });
     expect(within(section).getByText("Combo Oklahoma")).toBeInTheDocument();
-    expect(within(section).getByText("1× Oklahoma Onion + 2× Papas Búnker")).toBeInTheDocument();
+    // The card shows the store's description; the quantities of each product are in the detail.
+    expect(within(section).getByText("Dos hamburguesas bien cargadas con papas para compartir.")).toBeInTheDocument();
+    expect(within(section).queryByText(/1× Oklahoma/)).toBeNull();
     expect(within(section).getByText("$ 9.500")).toBeInTheDocument();
     expect(within(section).getByText("$ 14.200", { selector: "s" })).toBeInTheDocument();
   });
@@ -181,6 +183,53 @@ describe("combos in the menu", () => {
     expect(cart.getByText("− $ 4.700")).toBeInTheDocument();
     const total = cart.getByText("Subtotal con promo").nextElementSibling;
     expect(total).toHaveTextContent("$ 9.500");
+  });
+
+  it("in the cart a combo is one unit: + adds another combo, − takes one away", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    const section = await screen.findByRole("region", { name: "Combos" });
+    await user.click(within(section).getByRole("button", { name: "Agregar combo Combo Oklahoma al carrito" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Combo Oklahoma" })).getByRole("button", { name: /Agregar combo/ }));
+
+    const cart = within(document.getElementById("carrito") as HTMLElement);
+    expect(cart.getByText("1 combo")).toBeInTheDocument();
+
+    await user.click(cart.getByRole("button", { name: "Agregar otro Combo Oklahoma" }));
+    expect(cart.getByText("2 combos")).toBeInTheDocument();
+    expect(getCartSnapshot().map((line) => [line.productId, line.quantity])).toEqual([
+      ["oklahoma", 2],
+      ["papas", 4]
+    ]);
+    // Two combos: the combo price twice, 2 × $ 4.700 off.
+    expect(cart.getByText("− $ 9.400")).toBeInTheDocument();
+
+    await user.click(cart.getByRole("button", { name: "Quitar un Combo Oklahoma" }));
+    expect(cart.getByText("1 combo")).toBeInTheDocument();
+    expect(getCartSnapshot().map((line) => [line.productId, line.quantity])).toEqual([
+      ["oklahoma", 1],
+      ["papas", 2]
+    ]);
+
+    await user.click(cart.getByRole("button", { name: "Quitar un Combo Oklahoma" }));
+    expect(getCartSnapshot()).toHaveLength(0);
+  });
+
+  it("only applies the combo's price to what was added from the combo, not to the same products ordered alone", async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    await screen.findByRole("region", { name: "Combos" });
+    await user.click(screen.getByRole("button", { name: "Agregar Oklahoma Onion" }));
+    await user.click(screen.getByRole("button", { name: "Agregar Papas Búnker" }));
+    await user.click(screen.getByRole("button", { name: "Agregar Papas Búnker" }));
+
+    const cart = within(document.getElementById("carrito") as HTMLElement);
+    expect(cart.queryByText("Promo aplicada")).toBeNull();
+    const tray = await screen.findByRole("link", { name: /Ver pedido/ });
+    expect(within(tray).getByText("$ 14.200")).toBeInTheDocument();
+    expect(within(tray).queryByText("$ 14.200", { selector: "s" })).toBeNull();
   });
 
   it("opens it from the promotions banner too", async () => {

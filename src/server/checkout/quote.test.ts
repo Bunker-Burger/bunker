@@ -141,7 +141,8 @@ describe("createAuthoritativeQuote", () => {
             productId: "burger-1",
             quantity: 2,
             optionSelections: { size: ["triple"], extras: ["bacon", "cheddar"] },
-            notes: "Sin sal"
+            notes: "Sin sal",
+            comboId: "combo-burger-1"
           }
         ],
         fulfilment: "delivery",
@@ -424,7 +425,8 @@ describe("createAuthoritativeQuote", () => {
             productId: "burger-opt",
             quantity: 1,
             optionSelections: { sauce: [] },
-            notes: ""
+            notes: "",
+            comboId: "combo-burger-opt"
           }
         ],
         fulfilment: "pickup",
@@ -435,6 +437,25 @@ describe("createAuthoritativeQuote", () => {
 
     // One unit under the default one-item combo: 50.000 off the base price.
     expect(quote.totalCents).toBe(780000n - 50000n);
+  });
+
+  it("el combo solo se aplica a lo pedido desde el combo: los mismos productos sueltos pagan el precio normal", async () => {
+    const { repository, quotes, storeStatus } = createTestContext();
+    const checkout = (comboId?: string) => ({
+      items: [{ productId: "burger-1", quantity: 1, optionSelections: { size: ["double"] }, notes: "", ...(comboId ? { comboId } : {}) }],
+      fulfilment: "pickup" as const,
+      paymentMethod: "transfer" as const
+    });
+    const dependencies = { repository, quotes, storeStatus, createId: () => "q", now: () => new Date("2026-10-06T12:00:00Z") };
+
+    const loose = await createAuthoritativeQuote(checkout(), dependencies);
+    const fromCombo = await createAuthoritativeQuote(checkout("combo-burger-1"), dependencies);
+    const fromOther = await createAuthoritativeQuote(checkout("otro-combo"), dependencies);
+
+    expect(loose.discountCents).toBe(0n);
+    expect(fromOther.discountCents).toBe(0n);
+    expect(fromCombo.discountCents).toBe(50000n);
+    expect(fromCombo.lines[0]?.comboId).toBe("combo-burger-1");
   });
 });
 

@@ -60,7 +60,7 @@ describe("previewRows", () => {
         ? [{ productId: SMASH, quantity: 1, unitPriceCents: 780000n, basePriceCents: 780000n }]
         : mechanic.type === "buy_x_get_y"
           ? [{ productId: PAPAS, quantity: 3, unitPriceCents: 350000n, basePriceCents: 350000n }]
-          : items.map((item) => ({ productId: item.productId, quantity: item.quantity, unitPriceCents: price.get(item.productId)!, basePriceCents: price.get(item.productId)! }));
+          : items.map((item) => ({ productId: item.productId, quantity: item.quantity, unitPriceCents: price.get(item.productId)!, basePriceCents: price.get(item.productId)!, comboId: "r" }));
     const quote = quoteCart(lines, [rule], fulfilment, fee, { now: new Date(), timezone: "UTC" });
     const productTotal = lines.reduce((sum, line) => sum + line.unitPriceCents * BigInt(line.quantity), 0n);
     if (mechanic.type === "free_delivery") expect(row?.promoCents).toBe(quote.deliveryCents - (quote.promotion?.deliveryDiscountCents ?? 0n));
@@ -227,7 +227,8 @@ describe("PromotionForm preview", () => {
     const preview = screen.getByRole("region", { name: "Así se verá en la carta" });
     const section = await within(preview).findByRole("region", { name: "Combos" });
     expect(within(section).getByRole("heading", { name: "Combo Smash" })).toBeInTheDocument();
-    expect(within(section).getByText("1× Smash + 1× Papas")).toBeInTheDocument();
+    // No description yet: the products' names, without quantities.
+    expect(within(section).getByText("Smash + Papas")).toBeInTheDocument();
     expect(within(section).getByText("$ 9.000")).toBeInTheDocument();
     expect(within(section).getByText("$ 11.300", { selector: "s" })).toBeInTheDocument();
   });

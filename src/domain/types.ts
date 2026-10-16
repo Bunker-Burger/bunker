@@ -124,6 +124,8 @@ export interface CartLine {
   quantity: number;
   notes: string;
   selectedOptions: SelectedOptions;
+  /** The combo (promotion id) this line was added from; only such lines get the combo's price. */
+  comboId?: string | undefined;
 }
 
 export type CartIssueCode =
