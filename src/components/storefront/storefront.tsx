@@ -19,7 +19,7 @@ import { MapPin,
   Wallet,
   X
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   addCartLine,
   clearCart,
@@ -546,16 +546,13 @@ export function Storefront({
           initialLine={editingLine}
           promotion={cardContext ? promotionalPrice(activeProduct, promotions, cardContext) : null}
           onClose={closeProduct}
-          onSubmit={(submittedLine) => {
-            if (editingLine && submittedLine.quantity < editingLine.quantity) {
-              // Only some of the units were changed: the rest stay as they were, in their own line.
+          onSubmit={(submittedLine, otherLines = []) => {
+            if (editingLine && otherLines.length > 0) {
+              // Extras for only some of the units: the line comes back split by what each unit carries.
               setCart((current) =>
-                addCartLine(
-                  current.map((line) => (line.id === editingLine.id ? { ...line, quantity: editingLine.quantity - submittedLine.quantity } : line)),
-                  submittedLine
-                )
+                [submittedLine, ...otherLines].reduce((lines, line) => addCartLine(lines, line), current.filter((line) => line.id !== editingLine.id))
               );
-              setNotice(`${submittedLine.quantity} de ${editingLine.quantity} ${submittedLine.productName} se actualizaron en el carrito.`);
+              setNotice(`${submittedLine.productName} se actualizó en el carrito.`);
               setEditingLine(null);
             } else if (editingLine) {
               setCart((current) =>
@@ -569,7 +566,7 @@ export function Storefront({
               setNotice(`${submittedLine.productName} se actualizó en el carrito.`);
               setEditingLine(null);
             } else {
-              setCart((current) => addCartLine(current, submittedLine));
+              setCart((current) => [submittedLine, ...otherLines].reduce((lines, line) => addCartLine(lines, line), current));
               setNotice(`${submittedLine.productName} se agregó al carrito.`);
               setAddedThisVisit(true);
             }
@@ -615,10 +612,13 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
   cart?: readonly CartLine[];
   initialLine?: CartLine | null;
   onClose: () => void;
-  onSubmit: (line: CartLine) => void;
+  /** The line to add or edit and, when extras go to only some of the units, the other lines the quantity splits into. */
+  onSubmit: (line: CartLine, otherLines?: CartLine[]) => void;
 }) {
   const [selected, setSelected] = useState<SelectedOptions>(() => initialLine?.selectedOptions ?? getDefaultSelection(product));
   const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
+  // With several units, each extra can go on only some of them: how many carry it (all, when not set).
+  const [extraUnits, setExtraUnits] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -657,22 +657,33 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
   }, [slug]);
 
   const applicableGroups = getApplicableOptionGroups(product);
-  const validation = validateOptionSelection(product, selected);
-  const isValid = validation.ok;
-  const unitPrice = calculateConfiguredUnitPrice(product, selected);
+  const unitsWith = (optionId: string) => Math.min(extraUnits[optionId] ?? quantity, quantity);
+  // The units grouped by what they carry: the first units take the extras, up to each extra's count.
+  const unitGroups = (() => {
+    const groups = new Map<string, { selected: SelectedOptions; quantity: number }>();
+    for (let unit = 0; unit < quantity; unit += 1) {
+      const options: SelectedOptions = {};
+      for (const [groupId, ids] of Object.entries(selected)) {
+        const multiple = applicableGroups.find((group) => group.id === groupId)?.selectionMode === "multiple";
+        options[groupId] = multiple ? ids.filter((id) => unit < unitsWith(id)) : ids;
+      }
+      const key = JSON.stringify(options);
+      const found = groups.get(key);
+      if (found) found.quantity += 1;
+      else groups.set(key, { selected: options, quantity: 1 });
+    }
+    return [...groups.values()];
+  })();
+  const isValid = unitGroups.every((group) => validateOptionSelection(product, group.selected).ok);
+  const lineTotal = unitGroups.reduce((total, group) => total + calculateConfiguredUnitPrice(product, group.selected) * BigInt(group.quantity), 0n);
   // Order summary as in the capture: this product as configured plus what is already in the cart.
   const otherLines = cart.filter((line) => line.id !== initialLine?.id);
-  // Editing a line of several units: the stepper is how many of them change; the rest stay as they were.
-  const unitsInLine = initialLine && initialLine.quantity > 1 ? initialLine.quantity : 0;
-  const unitsKept = unitsInLine > 0 ? unitsInLine - quantity : 0;
-  const chosen = applicableGroups.flatMap((group) =>
-    group.options.filter((option) => (selected[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => option.name)
-  );
-  const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity + unitsKept;
-  const summaryTotal =
-    otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) +
-    unitPrice * BigInt(quantity) +
-    (initialLine ? initialLine.unitPriceCents * BigInt(unitsKept) : 0n);
+  const extrasOf = (options: SelectedOptions) =>
+    applicableGroups.flatMap((group) =>
+      group.options.filter((option) => (options[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => option.name)
+    );
+  const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity;
+  const summaryTotal = otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) + lineTotal;
 
   return (
     <div className="drawer-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -707,16 +718,6 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
             </div>
           </div>
 
-          {unitsInLine > 0 ? (
-            <section aria-label="Unidades a cambiar" className="drawer-card edit-scope">
-              <h3>Cambiar {quantity} de {unitsInLine}</h3>
-              <p>
-                Tenés {unitsInLine} en el carrito. Con − y + de abajo elegís a cuántas aplicar estos cambios
-                {unitsKept > 0 ? `; las otras ${unitsKept} quedan como estaban.` : "."}
-              </p>
-            </section>
-          ) : null}
-
           {applicableGroups.map((group) => {
             const groupSelections = selected[group.id] ?? [];
             const isOptionalSingle = group.selectionMode === "single" && !group.required;
@@ -750,8 +751,8 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
                     const checked = groupSelections.includes(option.id);
                     const inputType = group.selectionMode === "single" ? "radio" : "checkbox";
                     const isAvailable = option.available;
-                    return (
-                      <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " unavailable" : ""}`} key={option.id}>
+                    const row = (
+                      <label className={`option-row${checked ? " selected" : ""}${!isAvailable ? " unavailable" : ""}`}>
                         <span>{option.name}{!isAvailable ? <small> (Sin stock)</small> : null}</span>
                         {option.priceDeltaCents > 0n ? <strong>+ {formatArs(option.priceDeltaCents)}</strong> : <small>Incluido</small>}
                         <input
@@ -760,6 +761,11 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
                           name={group.id}
                           onChange={() => {
                             if (!isAvailable) return;
+                            setExtraUnits((current) => {
+                              const next = { ...current };
+                              delete next[option.id];
+                              return next;
+                            });
                             setSelected((current) =>
                               toggleOption(current, group.id, option.id, group.maxSelections, isAvailable, group.selectionMode, group.required)
                             );
@@ -774,6 +780,36 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
                           type={inputType}
                         />
                       </label>
+                    );
+                    return (
+                      <Fragment key={option.id}>
+                        {row}
+                        {checked && group.selectionMode === "multiple" && quantity > 1 ? (
+                          <div className="option-units">
+                            <span>En cuántas de las {quantity}</span>
+                            <div className="quantity-stepper compact">
+                              <button
+                                aria-label={`Quitar ${option.name} de una unidad`}
+                                disabled={unitsWith(option.id) <= 1}
+                                onClick={() => setExtraUnits((current) => ({ ...current, [option.id]: Math.max(1, unitsWith(option.id) - 1) }))}
+                                type="button"
+                              >
+                                <Minus />
+                              </button>
+                              <strong>{unitsWith(option.id)}</strong>
+                              <button
+                                aria-label={`Poner ${option.name} en una unidad más`}
+                                disabled={unitsWith(option.id) >= quantity}
+                                onClick={() => setExtraUnits((current) => ({ ...current, [option.id]: Math.min(quantity, unitsWith(option.id) + 1) }))}
+                                type="button"
+                              >
+                                <Plus />
+                              </button>
+                            </div>
+                            {option.priceDeltaCents > 0n ? <strong className="option-units-cost">+ {formatArs(option.priceDeltaCents * BigInt(unitsWith(option.id)))}</strong> : null}
+                          </div>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </div>
@@ -793,22 +829,18 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
               <h3 id={`${summaryId}-title`}>Resumen de tu pedido</h3>
               <span className="option-badge">{summaryCount === 1 ? "1 item" : `${summaryCount} items`}</span>
             </header>
-            <div className="order-summary-line current">
-              <span>
-                <strong>{quantity > 1 ? `${quantity}× ` : ""}{product.name}</strong>
-                <small>{chosen.length ? chosen.map((name) => `+ ${name}`).join(", ") : "Personalización estándar"}</small>
-              </span>
-              <strong>{formatArs(unitPrice * BigInt(quantity))}</strong>
-            </div>
-            {unitsKept > 0 && initialLine ? (
-              <div className="order-summary-line">
-                <span>
-                  <strong>{unitsKept}× {initialLine.productName}</strong>
-                  <small>Quedan como estaban</small>
-                </span>
-                <strong>{formatArs(initialLine.unitPriceCents * BigInt(unitsKept))}</strong>
-              </div>
-            ) : null}
+            {unitGroups.map((group) => {
+              const names = extrasOf(group.selected);
+              return (
+                <div className="order-summary-line current" key={JSON.stringify(group.selected)}>
+                  <span>
+                    <strong>{group.quantity > 1 ? `${group.quantity}× ` : ""}{product.name}</strong>
+                    <small>{names.length ? names.map((name) => `+ ${name}`).join(", ") : "Personalización estándar"}</small>
+                  </span>
+                  <strong>{formatArs(calculateConfiguredUnitPrice(product, group.selected) * BigInt(group.quantity))}</strong>
+                </div>
+              );
+            })}
             {otherLines.map((line) => (
               <div className="order-summary-line" key={line.id}>
                 <span>
@@ -825,23 +857,27 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
           <div className="quantity-stepper">
             <button aria-label="Disminuir cantidad" disabled={quantity === 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} type="button"><Minus /></button>
             <strong>{quantity}</strong>
-            <button aria-label="Aumentar cantidad" disabled={unitsInLine > 0 && quantity >= unitsInLine} onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
+            <button aria-label="Aumentar cantidad" onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
           </div>
           <button
             className="primary-action"
             disabled={!isValid || !product.inStock}
             onClick={() => {
               if (!isValid || !product.inStock) return;
-              onSubmit(makeCartLine(product, selected, quantity, notes));
+              const [first, ...rest] = unitGroups;
+              if (!first) return;
+              const line = makeCartLine(product, first.selected, first.quantity, notes);
+              if (rest.length === 0) onSubmit(line);
+              else onSubmit(line, rest.map((group) => makeCartLine(product, group.selected, group.quantity, notes)));
             }}
             type="button"
           >
             {!product.inStock ? (
               "Producto agotado"
             ) : initialLine ? (
-              <>{unitsInLine > 0 && unitsKept > 0 ? `Guardar cambios en ${quantity} de ${unitsInLine}` : "Guardar cambios"} <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
+              <>Guardar cambios <span>{formatArs(lineTotal)}</span></>
             ) : (
-              <>Agregar {quantity} al carrito <span>{formatArs(unitPrice * BigInt(quantity))}</span></>
+              <>Agregar {quantity} al carrito <span>{formatArs(lineTotal)}</span></>
             )}
           </button>
         </div>

@@ -452,7 +452,7 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     expect(screen.getByText("Sin mostaza")).toBeInTheDocument();
   });
 
-  it("al editar una línea de varias unidades se elige a cuántas aplicar el cambio; el resto queda igual", async () => {
+  it("con varias unidades cada extra se pone en tantas como se elija, y se suma aparte al total", async () => {
     const user = userEvent.setup();
     render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
     const add = screen.getByRole("button", { name: "Agregar Smash Búnker Doble" });
@@ -463,20 +463,25 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
-    expect(within(dialog).getByText("Cambiar 3 de 3")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Aumentar cantidad" })).toBeDisabled();
+    expect(within(dialog).queryByText(/En cuántas de las 3/)).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "Disminuir cantidad" }));
-    await user.click(within(dialog).getByRole("button", { name: "Disminuir cantidad" }));
-    expect(within(dialog).getByText("Cambiar 1 de 3")).toBeInTheDocument();
-    expect(within(dialog).getByText(/las otras 2 quedan como estaban/)).toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText("Aclaraciones para la cocina"), "Sin mostaza");
-    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios en 1 de 3/ }));
+    await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    expect(within(dialog).getByText("En cuántas de las 3")).toBeInTheDocument();
+    // On all three at first: 3 × $ 900, on top of 3 × $ 7.800.
+    expect(within(dialog).getByText("+ $ 2.700")).toBeInTheDocument();
 
-    expect(getCartSnapshot().map((line) => [line.quantity, line.notes])).toEqual([
-      [2, ""],
-      [1, "Sin mostaza"]
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de una unidad" }));
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de una unidad" }));
+    expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 900");
+    expect(within(dialog).getByRole("button", { name: /Guardar cambios/ })).toHaveTextContent("$ 24.300");
+    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
+
+    const lines = getCartSnapshot();
+    expect(lines.map((line) => [line.quantity, line.selectedOptions.extras ?? []])).toEqual([
+      [1, ["bacon"]],
+      [2, []]
     ]);
+    expect(lines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n)).toBe(2430000n);
     expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
   });
 
