@@ -6,7 +6,7 @@ import type { FulfilmentMethod, PromotionMechanic } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { savePromotionAction } from "@/app/bunker/admin/promociones/actions";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./promociones.module.css";
 import { PhotoField, type PhotoValue } from "@/components/admin/catalogo/photo-field";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
 import { BADGE_SUGGESTIONS, DAY_CHIPS, MECHANIC_HINT, TYPES, WEEKDAYS, mechanicFrom, previewRows, uniformSchedule } from "./promotion-form-model";
