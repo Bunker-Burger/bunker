@@ -86,6 +86,7 @@ import { OrderReturnModal } from "./order-return-modal";
 import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
 import { useStoreView, type StoreView } from "./use-store-view";
 import { makeCartLine, toPromotionLines } from "./cart-lines";
+import { ViewBar } from "./shared/view-bar";
 import "./storefront.css";
 
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
@@ -1162,21 +1163,6 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
             )}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/** Top bar of the cart and checkout screens: back arrow, store kicker and the screen title. */
-function ViewBar({ back, backLabel, title, titleId }: { back: string; backLabel: string; title: string; titleId: string }) {
-  return (
-    <div className="view-bar">
-      <a aria-label={backLabel} className="view-back" href={back}>
-        <ArrowLeft aria-hidden="true" size={20} />
-      </a>
-      <div>
-        <span>BÚNKER BURGUER</span>
-        <h2 id={titleId} tabIndex={-1}>{title}</h2>
       </div>
     </div>
   );
