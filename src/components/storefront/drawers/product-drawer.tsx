@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Minus, NotebookPen, Plus } from "lucide-react";
+import { ArrowLeft, NotebookPen } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   calculateConfiguredUnitPrice,
@@ -11,6 +11,7 @@ import {
 import { type PromotionalPrice } from "@/domain/promotions";
 import type { CartLine, Product, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
 import { OptionGroups, unitGroupsOf } from "./option-groups";
@@ -172,11 +173,14 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
           </section>
         </div>
         <div className="drawer-footer">
-          <div className="quantity-stepper">
-            <button aria-label="Disminuir cantidad" disabled={quantity === 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} type="button"><Minus /></button>
-            <strong>{quantity}</strong>
-            <button aria-label="Aumentar cantidad" onClick={() => setQuantity((value) => value + 1)} type="button"><Plus /></button>
-          </div>
+          <QuantityStepper
+            decrementDisabled={quantity === 1}
+            decrementLabel="Disminuir cantidad"
+            incrementLabel="Aumentar cantidad"
+            onDecrement={() => setQuantity((value) => Math.max(1, value - 1))}
+            onIncrement={() => setQuantity((value) => value + 1)}
+            value={quantity}
+          />
           <button
             className="primary-action"
             disabled={!isValid || !product.inStock}

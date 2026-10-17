@@ -2,9 +2,7 @@
 
 import {
   ArrowRight,
-  Minus,
   NotebookPen,
-  Plus,
   ShoppingCart
 } from "lucide-react";
 import { clearCart, removeCartLine } from "@/domain/cart";
@@ -13,6 +11,7 @@ import { comboCount, removeOneCombo } from "@/domain/combos";
 import type { CartLine, Product, PromotionRule } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { changeLineQuantity } from "../storefront-state";
+import { QuantityStepper } from "../shared/quantity-stepper";
 import { ViewBar } from "../shared/view-bar";
 
 /** "+ Extra bacon, + Cheddar": the paid choices of a cart line, read from the catalog. */
@@ -87,11 +86,14 @@ export function CartSection({
         </div>
         <strong className="cart-line-price">{formatArs(line.unitPriceCents * BigInt(line.quantity))}</strong>
         <div className="cart-line-actions">
-          <div className="quantity-stepper compact">
-            <button aria-label={`Quitar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, -1))} type="button"><Minus /></button>
-            <strong>{line.quantity}</strong>
-            <button aria-label={`Agregar uno de ${line.productName}`} onClick={() => onChange(changeLineQuantity(cart, line.id, 1))} type="button"><Plus /></button>
-          </div>
+          <QuantityStepper
+            compact
+            decrementLabel={`Quitar uno de ${line.productName}`}
+            incrementLabel={`Agregar uno de ${line.productName}`}
+            onDecrement={() => onChange(changeLineQuantity(cart, line.id, -1))}
+            onIncrement={() => onChange(changeLineQuantity(cart, line.id, 1))}
+            value={line.quantity}
+          />
           <button aria-label={`Editar ${line.productName}`} className="cart-action-btn" onClick={() => onEditLine(line)} type="button">
             Editar
           </button>
@@ -137,11 +139,14 @@ export function CartSection({
                   </div>
                   <strong className="cart-line-price">{formatArs(fixedCents * BigInt(count) + extrasCents)}</strong>
                   <div className="cart-line-actions">
-                    <div className="quantity-stepper compact">
-                      <button aria-label={`Quitar un ${combo.name}`} onClick={() => onChange(removeOneCombo(cart, combo))} type="button"><Minus /></button>
-                      <strong>{count}</strong>
-                      <button aria-label={`Agregar otro ${combo.name}`} onClick={() => onAddCombo(combo)} type="button"><Plus /></button>
-                    </div>
+                    <QuantityStepper
+                      compact
+                      decrementLabel={`Quitar un ${combo.name}`}
+                      incrementLabel={`Agregar otro ${combo.name}`}
+                      onDecrement={() => onChange(removeOneCombo(cart, combo))}
+                      onIncrement={() => onAddCombo(combo)}
+                      value={count}
+                    />
                     <button aria-label={`Editar ${combo.name}`} className="cart-action-btn" onClick={() => onEditCombo(combo)} type="button">
                       Editar
                     </button>

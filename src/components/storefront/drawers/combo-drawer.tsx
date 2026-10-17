@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Minus, NotebookPen, Plus } from "lucide-react";
+import { ArrowLeft, NotebookPen } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   calculateConfiguredUnitPrice,
@@ -10,6 +10,7 @@ import {
 } from "@/domain/catalog";
 import type { CartLine, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
 import { OptionGroups, unitGroupsOf } from "./option-groups";
@@ -191,11 +192,15 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
           </section>
         </div>
         <div className="drawer-footer combo-footer">
-          <div className="quantity-stepper">
-            <button aria-label="Quitar un combo" disabled={count <= 1} onClick={() => setCount((value) => Math.max(1, value - 1))} type="button"><Minus /></button>
-            <strong aria-label={`${count} combos`}>{count}</strong>
-            <button aria-label="Agregar otro combo" onClick={() => setCount((value) => value + 1)} type="button"><Plus /></button>
-          </div>
+          <QuantityStepper
+            decrementDisabled={count <= 1}
+            decrementLabel="Quitar un combo"
+            incrementLabel="Agregar otro combo"
+            onDecrement={() => setCount((value) => Math.max(1, value - 1))}
+            onIncrement={() => setCount((value) => value + 1)}
+            value={count}
+            valueLabel={`${count} combos`}
+          />
           <button className="primary-action" disabled={Boolean(unavailable) || !valid} onClick={submit} type="button">
             {unavailable ? "Combo no disponible" : <>{editing ? "Guardar cambios" : "Agregar combo"} <span>{formatArs(totalCents)}</span></>}
           </button>
