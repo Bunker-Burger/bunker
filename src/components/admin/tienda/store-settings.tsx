@@ -4,7 +4,7 @@ import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck
 import type { ReactNode } from "react";
 import { ARS_DECIMAL } from "@/lib/money";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./tienda.module.css";
 import { useOrderSaver } from "@/components/admin/dashboard/category-tools";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "@/components/admin/dashboard/quick-form";
 import { addShiftAction, deleteShiftAction, reorderPaymentMethodsAction, saveStoreContactAction, savePaymentMethodAction } from "@/app/bunker/admin/tienda/actions";
