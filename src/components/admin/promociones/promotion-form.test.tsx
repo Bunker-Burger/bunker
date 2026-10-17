@@ -3,10 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { quoteCart } from "@/domain/pricing";
 import type { PromotionRule } from "@/domain/types";
-import type { AdminFormState } from "../form-state";
+import type { AdminFormState } from "@/app/bunker/admin/form-state";
 import { PromotionForm, previewRows, type PromotionFormProduct, type PromotionFormValues } from "./promotion-form";
 
-vi.mock("./actions", () => ({ savePromotionAction: vi.fn() }));
+vi.mock("@/app/bunker/admin/promociones/actions", () => ({ savePromotionAction: vi.fn() }));
 
 const SMASH = "0199b2c8-40b0-7000-8000-000000000201";
 const PAPAS = "0199b2c8-40b0-7000-8000-000000000206";

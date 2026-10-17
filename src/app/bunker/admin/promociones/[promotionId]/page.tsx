@@ -6,7 +6,7 @@ import { AdminForm } from "@/components/admin/shared/admin-form";
 import { AdminPageBar } from "@/components/admin/shared/page-bar";
 import { ADMIN_PANEL_PATH } from "../../paths";
 import { deletePromotionAction } from "../actions";
-import { PromotionForm } from "../promotion-form";
+import { PromotionForm } from "@/components/admin/promociones/promotion-form";
 import { formProducts, promotionValues } from "../promotion-props";
 
 type Params = Promise<{ promotionId: string }>;

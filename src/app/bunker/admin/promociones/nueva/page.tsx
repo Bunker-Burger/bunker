@@ -3,7 +3,7 @@ import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { ADMIN_PANEL_PATH } from "../../paths";
 import { AdminPageBar } from "@/components/admin/shared/page-bar";
-import { PromotionForm } from "../promotion-form";
+import { PromotionForm } from "@/components/admin/promociones/promotion-form";
 import { formProducts, newPromotionValues } from "../promotion-props";
 
 export default async function NewPromotionPage() {

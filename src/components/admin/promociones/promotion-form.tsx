@@ -5,11 +5,11 @@ import { useState } from "react";
 import { promotionDiscount, type PromotionLine } from "@/domain/promotions";
 import type { FulfilmentMethod, PromotionMechanic, PromotionRule } from "@/domain/types";
 import { formatArs } from "@/lib/money";
-import styles from "../../admin.module.css";
+import styles from "@/app/bunker/admin.module.css";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
 import { PhotoField, type PhotoValue } from "@/components/admin/catalogo/photo-field";
 import { PromotionPreview } from "./promotion-preview";
-import { savePromotionAction } from "./actions";
+import { savePromotionAction } from "@/app/bunker/admin/promociones/actions";
 
 export interface PromotionFormProduct {
   id: string;
