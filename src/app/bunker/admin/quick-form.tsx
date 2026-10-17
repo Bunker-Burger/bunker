@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { ARS_DECIMAL } from "@/lib/money";
 import styles from "../admin.module.css";
 import { IDLE_FORM_STATE, type AdminFormState } from "./form-state";
 
@@ -64,12 +65,11 @@ export function QuickToggle({ name, defaultChecked, label, onLabel, offLabel }: 
   );
 }
 
-const ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
 /** "7800" → "7.800"; what the admin parsers expect stays in the hidden field ("7800", "7800.5"). */
 export function PriceField({ name, defaultValue, label, id, form }: { name: string; defaultValue: string; label?: string; id?: string; form?: string }) {
   const [plain, setPlain] = useState(defaultValue);
-  const [shown, setShown] = useState(() => (defaultValue === "" ? "" : ARS.format(Number(defaultValue))));
+  const [shown, setShown] = useState(() => (defaultValue === "" ? "" : ARS_DECIMAL.format(Number(defaultValue))));
   return (
     <span className={styles.priceInput}>
       <span aria-hidden="true">$</span>
@@ -79,7 +79,7 @@ export function PriceField({ name, defaultValue, label, id, form }: { name: stri
         form={form}
         id={id}
         inputMode="decimal"
-        onBlur={() => setShown(plain === "" ? "" : ARS.format(Number(plain)))}
+        onBlur={() => setShown(plain === "" ? "" : ARS_DECIMAL.format(Number(plain)))}
         onChange={(event) => {
           // Dots are thousands, a comma is the decimal separator (es-AR).
           const typed = event.target.value.replace(/[^\d,]/g, "");

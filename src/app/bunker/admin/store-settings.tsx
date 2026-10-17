@@ -2,6 +2,7 @@
 
 import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { ARS_DECIMAL } from "@/lib/money";
 import styles from "../admin.module.css";
 import { useOrderSaver } from "./category-tools";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
@@ -87,11 +88,10 @@ function CollapsibleCard({ icon: Icon, title, titleId, summary, children }: { ic
   );
 }
 
-const ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
 /** "$ 1.200 · +5491100000000", or that orders are off without a fee. */
 function deliverySummary(deliveryFee: string, whatsapp: string) {
-  const fee = deliveryFee === "" ? "Sin costo de delivery: no se toman pedidos" : `Envío $ ${ARS.format(Number(deliveryFee))}`;
+  const fee = deliveryFee === "" ? "Sin costo de delivery: no se toman pedidos" : `Envío $ ${ARS_DECIMAL.format(Number(deliveryFee))}`;
   return `${fee} · ${whatsapp}`;
 }
 
