@@ -12,27 +12,6 @@ import type {
 import { ok, type Result } from "@/lib/result";
 
 /**
- * Resolves structured applicable product types from category kinds.
- */
-export function resolveOptionGroupApplicability(
-  categoryKinds?: readonly string[]
-): readonly ProductType[] {
-  if (!categoryKinds || categoryKinds.length === 0) {
-    return [];
-  }
-  const kindsMap: Record<string, ProductType> = {
-    burger: "burger",
-    sandwich: "sandwich",
-    side: "fries",
-    drink: "beverage",
-    other: "other"
-  };
-  return categoryKinds
-    .map((k) => kindsMap[k])
-    .filter((t): t is ProductType => Boolean(t));
-}
-
-/**
  * Checks whether an option group is applicable to a given product.
  * Strictly checks structured applicable types without text heuristics or hardcoded UUID registries.
  */
