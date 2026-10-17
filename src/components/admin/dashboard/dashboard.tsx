@@ -14,7 +14,7 @@ import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "@/app/bunker/admin/pat
 import { reorderPromotionsAction, setPromotionActiveAction } from "@/app/bunker/admin/promociones/actions";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
 import { useDragOrder } from "./use-drag-order";
-import { StoreSettings, type StoreSettingsProps } from "@/app/bunker/admin/store-settings";
+import { StoreSettings, type StoreSettingsProps } from "@/components/admin/tienda/store-settings";
 import { setStoreStatusAction } from "@/app/bunker/admin/tienda/actions";
 import { OVERRIDE_OPTIONS } from "@/app/bunker/admin/tienda/status-labels";
 
