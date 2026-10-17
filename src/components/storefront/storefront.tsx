@@ -45,7 +45,7 @@ import {
   PromoShowcase,
   showcasePromotions,
   usePromoLayout
-} from "./promo-showcase";
+} from "./promo/promo-showcase";
 import { useNow } from "./use-now";
 import { usePublicCatalog } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";

@@ -5,8 +5,8 @@ import { useSyncExternalStore } from "react";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
 import type { Product, PromotionRule } from "@/domain/types";
 import { formatArs } from "@/lib/money";
-import { CompareAt } from "./shared/compare-at";
-import { focalStyle } from "./focal-style";
+import { CompareAt } from "../shared/compare-at";
+import { focalStyle } from "../focal-style";
 
 /*
  * Promotions at the top of the menu (issue #54); one without a photo gets the same dark tile with
