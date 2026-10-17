@@ -9,6 +9,7 @@ import { ADMIN_CATALOG_PATH } from "@/app/bunker/admin/catalogo/form-state";
 import { ADMIN_PROMOTIONS_PATH } from "@/app/bunker/admin/paths";
 import { setStoreStatusAction } from "@/app/bunker/admin/tienda/actions";
 import { OVERRIDE_OPTIONS } from "@/app/bunker/admin/tienda/status-labels";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import type { ProductFormValues } from "@/components/admin/catalogo/product-form";
 import { StoreSettings, type StoreSettingsProps } from "@/components/admin/tienda/store-settings";
@@ -105,7 +106,7 @@ export function AdminDashboard({
           <strong>{promotions.filter((promotion) => promotion.running).length}</strong>
         </div>
       </div>
-      <section aria-labelledby="store-state-title" className={styles.statusCard}>
+      <section aria-labelledby="store-state-title" className={shared.statusCard}>
         <div className={styles.statusHead}>
           <span className={styles.statusTitle}>
             <Store aria-hidden="true" size={18} />
@@ -119,7 +120,7 @@ export function AdminDashboard({
         <QuickForm action={setStoreStatusAction} className={styles.modeForm} label="Modo del local">
           <label htmlFor="store-mode">Modo</label>
           <select
-            className={styles.categorySelect}
+            className={shared.categorySelect}
             defaultValue={store.statusOverride}
             id="store-mode"
             key={store.statusOverride}
@@ -154,7 +155,7 @@ export function AdminDashboard({
       </div>
 
       <section aria-labelledby="prices-title" className={styles.prices}>
-        <div className={styles.pricesHead}>
+        <div className={shared.pricesHead}>
           <div>
             <h2 id="prices-title">Gestión de precios &amp; stock</h2>
             <p>Activá, pausá o actualizá precios y promociones.</p>
@@ -174,7 +175,7 @@ export function AdminDashboard({
         <h3 className={styles.promosTitle} id="promos-title">
           <Tag aria-hidden="true" size={20} /> Promociones &amp; combos activos
         </h3>
-        <p className={styles.hint}>
+        <p className={shared.hint}>
           Nunca se acumulan: a cada pedido se le aplica una sola, la primera de esta lista que le dé descuento.
           {needle === "" && promotions.length > 1 ? " Arrastralas por su asa para cambiar el orden." : null}
         </p>

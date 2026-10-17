@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "../../../../admin.module.css";
 import { deleteProductAction } from "../../actions";
 import { AdminForm } from "@/components/admin/shared/admin-form";
@@ -17,9 +18,9 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   if (!view.ok) {
     return (
-      <section className={styles.adminPanel} aria-labelledby="product-title">
+      <section className={shared.adminPanel} aria-labelledby="product-title">
         <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Producto" titleId="product-title" />
-        <p className={styles.error} role="alert">No pudimos cargar el catálogo. Recargá la página en unos segundos.</p>
+        <p className={shared.error} role="alert">No pudimos cargar el catálogo. Recargá la página en unos segundos.</p>
       </section>
     );
   }
@@ -29,18 +30,18 @@ export default async function EditProductPage({ params, searchParams }: { params
   const category = view.value.catalog.categories.find((candidate) => candidate.id === product.categoryId);
 
   return (
-    <section className={styles.adminPanel} aria-labelledby="product-title">
+    <section className={shared.adminPanel} aria-labelledby="product-title">
       <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title={product.name} titleId="product-title" />
       <p>
         {product.published ? "Publicado" : "Borrador"}
         {category ? ` · ${category.name}` : null}
       </p>
       {creado === "1" && foto === "0" ? (
-        <p className={styles.error} role="alert">
+        <p className={shared.error} role="alert">
           Producto creado, pero la foto no se pudo subir. Probá de nuevo desde “Foto del producto”.
         </p>
       ) : creado === "1" ? (
-        <p className={styles.success} role="status">
+        <p className={shared.success} role="status">
           Producto creado.
         </p>
       ) : null}
@@ -62,11 +63,11 @@ export default async function EditProductPage({ params, searchParams }: { params
         />
       </section>
 
-      <section aria-labelledby="danger-title" className={styles.tabPanel}>
+      <section aria-labelledby="danger-title" className={shared.tabPanel}>
         <h2 id="danger-title">Eliminar</h2>
-        <details className={styles.disclosure}>
+        <details className={shared.disclosure}>
           <summary>Eliminar producto</summary>
-          <p className={styles.hint}>
+          <p className={shared.hint}>
             Se borra el producto con su foto y sus opciones. No se puede deshacer. Si está en una promoción, despublicalo en su lugar.
           </p>
           <AdminForm action={deleteProductAction} pendingLabel="Eliminando…" submitLabel={`Eliminar ${product.name}`} submitVariant="danger">

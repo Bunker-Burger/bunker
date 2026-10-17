@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { FulfilmentMethod, PromotionMechanic } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { savePromotionAction } from "@/app/bunker/admin/promociones/actions";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { PhotoField, type PhotoValue } from "@/components/admin/catalogo/photo-field";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
@@ -102,12 +103,12 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           uploadLabel="Subir foto de la promo"
         />
       ) : null}
-      <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
+      <fieldset className={`${shared.formCard} ${shared.promoCard}`}>
         <legend>
-          <span className={styles.promoLegend}>
+          <span className={shared.promoLegend}>
             <Zap aria-hidden="true" size={18} /> Datos de la promoción
           </span>
-          <small className={styles.requiredTag}>Requerido *</small>
+          <small className={shared.requiredTag}>Requerido *</small>
         </legend>
         <TextField defaultValue={defaults.name} hint="Máx. 60 caracteres." label="Nombre de la promoción" maxLength={60} name="name" required />
         {defaults.id ? <input name="slug" type="hidden" value={defaults.slug} /> : null}
@@ -143,20 +144,20 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         <TextAreaField defaultValue={defaults.description} label="Descripción y términos" maxLength={1000} name="description" rows={3} />
       </fieldset>
 
-      <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
+      <fieldset className={`${shared.formCard} ${shared.promoCard}`}>
         <legend>
-          <span className={styles.promoLegend}>Mecánica y valor comercial</span>
-          <small className={styles.requiredTag}>Tarifa activa</small>
+          <span className={shared.promoLegend}>Mecánica y valor comercial</span>
+          <small className={shared.requiredTag}>Tarifa activa</small>
         </legend>
-        <fieldset className={styles.mechanicTiles}>
+        <fieldset className={shared.mechanicTiles}>
           <legend className="sr-only">Tipo</legend>
           <div>
             {TYPES.map((option) => {
               const Icon = MECHANIC_ICON[option.value];
               return (
-                <label className={option.value === type ? styles.mechanicTileActive : styles.mechanicTile} key={option.value}>
+                <label className={option.value === type ? shared.mechanicTileActive : shared.mechanicTile} key={option.value}>
                   <input checked={option.value === type} name="type" onChange={() => setType(option.value)} type="radio" value={option.value} />
-                  <span className={styles.tileIcons} aria-hidden="true">
+                  <span className={shared.tileIcons} aria-hidden="true">
                     <Icon size={20} />
                     {option.value === type ? <CircleCheck size={18} /> : null}
                   </span>
@@ -169,9 +170,9 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         </fieldset>
 
       {type !== "free_delivery" ? (
-        <fieldset className={styles.fieldset}>
+        <fieldset className={shared.fieldset}>
           <legend>
-            <span className={styles.promoLegend}>
+            <span className={shared.promoLegend}>
               <Layers aria-hidden="true" size={18} /> {type === "fixed_price" ? "Productos incluidos en el combo" : "Productos (vacío = todos)"}
             </span>
           </legend>
@@ -179,7 +180,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           {items.map((item, index) => {
             const chosen = byId.get(item.productId);
             return (
-              <div className={styles.comboRow} key={index}>
+              <div className={shared.comboRow} key={index}>
                 <SelectField
                   label={`Producto ${index + 1}`}
                   name="itemProduct"
@@ -236,7 +237,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
               <TextField label="Gratis" max={99} min={1} name="getQuantity" onChange={(event) => setGetQuantity(event.target.value)} type="number" value={getQuantity} />
             </div>
           ) : null}
-          {type === "free_delivery" ? <p className={styles.hint}>El envío a domicilio queda en $ 0 mientras la promoción esté vigente.</p> : null}
+          {type === "free_delivery" ? <p className={shared.hint}>El envío a domicilio queda en $ 0 mientras la promoción esté vigente.</p> : null}
           {saving !== null && saving > 0n ? (
             <p className={styles.savingBox}>
               <span>Ahorro para el cliente:</span>
@@ -251,7 +252,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         <section aria-labelledby="preview-title" className={styles.preview}>
           <h3 id="preview-title">Vista previa de precios</h3>
           {rows.length === 0 ? (
-            <p className={styles.hint}>
+            <p className={shared.hint}>
               {mechanic ? (type === "free_delivery" ? "Configurá la tarifa de delivery para ver el ahorro." : "Elegí productos para ver los precios.") : "Completá los datos del descuento para ver los precios."}
             </p>
           ) : (
@@ -276,25 +277,25 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
               </tbody>
             </table>
           )}
-          <p className={styles.hint}>Precios de ejemplo con esta promo, sin tener en cuenta fechas ni horarios.</p>
+          <p className={shared.hint}>Precios de ejemplo con esta promo, sin tener en cuenta fechas ni horarios.</p>
         </section>
       </fieldset>
 
-      <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
+      <fieldset className={`${shared.formCard} ${shared.promoCard}`}>
         <legend>
-          <span className={styles.promoLegend}>
+          <span className={shared.promoLegend}>
             <Clock aria-hidden="true" size={18} /> Reglas de activación y vigencia
           </span>
-          <small className={styles.requiredTag}>Calendario</small>
+          <small className={shared.requiredTag}>Calendario</small>
         </legend>
         <div className={styles.valuePair}>
           <TextField defaultValue={defaults.startsAt} label="Vigente desde" name="startsAt" required type="datetime-local" />
           <TextField defaultValue={defaults.endsAt} label="Hasta" name="endsAt" required type="datetime-local" />
         </div>
-        <small className={styles.hint}>Fechas y horas de {timezone}.</small>
+        <small className={shared.hint}>Fechas y horas de {timezone}.</small>
 
         {byDay ? (
-          <fieldset className={styles.fieldset}>
+          <fieldset className={shared.fieldset}>
             <legend>Franjas semanales (vacío = todo el período)</legend>
             <FieldError id="schedule-error" name="schedule" />
             {schedule.map((window, index) => (
@@ -340,7 +341,7 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
                 </button>
               ))}
             </div>
-            <small className={styles.hint}>
+            <small className={shared.hint}>
               {days.length === 0 ? "Sin días marcados: rige todo el período." : `Activa: ${DAY_CHIPS.filter((day) => days.includes(day.value)).map((day) => day.name).join(", ")}.`}
             </small>
             <div className={styles.valuePair}>
@@ -370,21 +371,21 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
         )}
       </fieldset>
 
-      <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
+      <fieldset className={`${shared.formCard} ${shared.promoCard}`}>
         <legend>
-          <span className={styles.promoLegend}>
+          <span className={shared.promoLegend}>
             <SlidersHorizontal aria-hidden="true" size={18} /> Estado y canales de venta
           </span>
-          <small className={styles.requiredTag}>Inmediato</small>
+          <small className={shared.requiredTag}>Inmediato</small>
         </legend>
-        <div className={styles.checkGroup}>
+        <div className={shared.checkGroup}>
           <CheckboxField defaultChecked={defaults.active} hint="Una promoción pausada no se aplica aunque esté en fecha." label="Activa" name="active" />
         </div>
-        <fieldset className={`${styles.fieldset} ${styles.checkGroup}`}>
+        <fieldset className={`${shared.fieldset} ${shared.checkGroup}`}>
           <legend>Canales de venta</legend>
           <FieldError id="channel-error" name="channel" />
           {(["delivery", "pickup"] as const).map((channel) => (
-            <div className={styles.checkField} key={channel}>
+            <div className={shared.checkField} key={channel}>
               <input checked={channels.includes(channel)} id={`channel-${channel}`} name="channel" onChange={(event) => toggleChannel(channel, event.target.checked)} type="checkbox" value={channel} />
               <label htmlFor={`channel-${channel}`}>{channel === "delivery" ? "Delivery" : "Retiro en el local"}</label>
             </div>

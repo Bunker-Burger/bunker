@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import "@/components/storefront/storefront.css";
 import { layoutFor, ProductCard } from "@/components/storefront/menu";
 import type { Product, ProductType } from "@/domain/types";
-import styles from "@/app/bunker/admin.module.css";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import type { ProductFormCategory } from "./product-form";
 
 export interface PhotoView {
@@ -92,17 +92,17 @@ export function ProductPreview({ categories, photo }: { categories: ProductFormC
   } satisfies Product;
 
   return (
-    <section aria-labelledby="menu-preview-title" className={styles.previewCard} ref={ref}>
-      <h2 className={styles.cardTitle} id="menu-preview-title">
+    <section aria-labelledby="menu-preview-title" className={shared.previewCard} ref={ref}>
+      <h2 className={shared.cardTitle} id="menu-preview-title">
         <Eye aria-hidden="true" size={20} /> Así se verá en la carta
       </h2>
-      <p className={styles.hint}>Se actualiza mientras completás el formulario. Las promociones vigentes se suman solas.</p>
-      <div className={styles.previewCards} inert>
-        {product.featured ? <span className={styles.previewLabel}>En “Las más pedidas”</span> : null}
+      <p className={shared.hint}>Se actualiza mientras completás el formulario. Las promociones vigentes se suman solas.</p>
+      <div className={shared.previewCards} inert>
+        {product.featured ? <span className={shared.previewLabel}>En “Las más pedidas”</span> : null}
         {product.featured ? (
           <ProductCard categoryName={category?.name ?? null} layout="hero" onAdd={() => {}} onOpen={() => {}} product={product} promotion={null} />
         ) : null}
-        {product.featured ? <span className={styles.previewLabel}>En {category?.name ?? "su categoría"}</span> : null}
+        {product.featured ? <span className={shared.previewLabel}>En {category?.name ?? "su categoría"}</span> : null}
         <ProductCard categoryName={category?.name ?? null} layout={layoutFor(product, false)} onAdd={() => {}} onOpen={() => {}} product={product} promotion={null} />
       </div>
     </section>

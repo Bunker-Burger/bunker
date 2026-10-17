@@ -2,6 +2,7 @@
 
 import { Camera, Move } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { FieldError } from "@/components/admin/shared/admin-form";
 import { PhotoDropzoneContent } from "./photo-dropzone";
@@ -89,21 +90,21 @@ export function PhotoField({
 
   const label = photo.url ? replaceLabel : uploadLabel;
   return (
-    <fieldset className={styles.formCard}>
+    <fieldset className={shared.formCard}>
       <legend>
-        <span className={styles.promoLegend}>
+        <span className={shared.promoLegend}>
           <Camera aria-hidden="true" size={18} /> {legend}
         </span>
       </legend>
-      <div className={styles.field}>
-        <label className={styles.dropzone} htmlFor="photo-file">
+      <div className={shared.field}>
+        <label className={shared.dropzone} htmlFor="photo-file">
           <PhotoDropzoneContent detail="Formato JPG, PNG, WebP o AVIF, cuadrado o 16:9 · Alta resolución" title={label} />
         </label>
         <input
           accept={ACCEPTED_IMAGE_TYPES}
           aria-describedby="photo-hint photo-error"
           aria-label={label}
-          className={styles.dropzoneInput}
+          className={shared.dropzoneInput}
           id="photo-file"
           name="image"
           onChange={(event) => {
@@ -114,10 +115,10 @@ export function PhotoField({
           }}
           type="file"
         />
-        <small className={styles.hint} id="photo-hint">
+        <small className={shared.hint} id="photo-hint">
           {hint} JPEG, PNG, WebP o AVIF; hasta 5 MB y entre {photo.minSide} y {photo.maxSide} px por lado.
         </small>
-        {localWarning ? <span className={styles.fieldError}>{localWarning}</span> : null}
+        {localWarning ? <span className={shared.fieldError}>{localWarning}</span> : null}
         <FieldError id="photo-error" name="image" />
       </div>
 
@@ -155,7 +156,7 @@ export function PhotoField({
       ) : null}
 
       {photo.url ? (
-        <label className={styles.visibleCheck}>
+        <label className={shared.visibleCheck}>
           <input checked={remove} name="removeImage" onChange={(event) => setRemove(event.target.checked)} type="checkbox" value="true" /> Quitar la foto al guardar
         </label>
       ) : null}

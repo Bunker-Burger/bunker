@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { ARS_DECIMAL } from "@/lib/money";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { IDLE_FORM_STATE, type AdminFormState } from "@/app/bunker/admin/form-state";
 
@@ -23,7 +24,7 @@ export function QuickForm({ action, children, className, label, id }: { action: 
     <form action={formAction} aria-label={label} className={className} id={id} noValidate>
       {children}
       {state.status === "error" && state.message ? (
-        <p className={styles.quickError} role="alert">
+        <p className={shared.quickError} role="alert">
           {[state.message, ...Object.values(state.fieldErrors ?? {}), ...(state.issues ?? [])].join(" ")}
         </p>
       ) : null}
@@ -71,7 +72,7 @@ export function PriceField({ name, defaultValue, label, id, form }: { name: stri
   const [plain, setPlain] = useState(defaultValue);
   const [shown, setShown] = useState(() => (defaultValue === "" ? "" : ARS_DECIMAL.format(Number(defaultValue))));
   return (
-    <span className={styles.priceInput}>
+    <span className={shared.priceInput}>
       <span aria-hidden="true">$</span>
       <input
         aria-label={label}

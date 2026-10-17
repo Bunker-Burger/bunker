@@ -4,6 +4,7 @@ import { Flame, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { reorderPromotionsAction, setPromotionActiveAction } from "@/app/bunker/admin/promociones/actions";
 import { promotionEditPath } from "@/app/bunker/admin/paths";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { useOrderSaver } from "./category-tools";
 import type { DashboardPromotion } from "./dashboard";
@@ -19,16 +20,16 @@ export function PromotionRows({ promotions, sortable }: { promotions: DashboardP
   return (
     <>
       {message ? (
-        <p className={styles.quickError} role="alert">
+        <p className={shared.quickError} role="alert">
           {message}
         </p>
       ) : null}
       <ul aria-labelledby="promos-title" className={styles.quickList} id="lista-promociones">
-        {list.length === 0 ? <li className={styles.empty}>No hay promociones que coincidan.</li> : null}
+        {list.length === 0 ? <li className={shared.empty}>No hay promociones que coincidan.</li> : null}
         {list.map((promotion, index) => (
-          <li className={`${styles.quickRow} ${styles.quickRowPromo}`} key={promotion.id} {...(draggable ? rowProps(promotion.id) : {})}>
+          <li className={`${shared.quickRow} ${styles.quickRowPromo}`} key={promotion.id} {...(draggable ? rowProps(promotion.id) : {})}>
             {draggable ? (
-              <button className={styles.rowGrip} {...handleProps(promotion.id, index, `Mover ${promotion.name}`)}>
+              <button className={shared.rowGrip} {...handleProps(promotion.id, index, `Mover ${promotion.name}`)}>
                 <GripVertical aria-hidden="true" size={18} />
               </button>
             ) : null}
@@ -42,7 +43,7 @@ export function PromotionRows({ promotions, sortable }: { promotions: DashboardP
               name={promotion.name}
               tag={promotion.badgeText}
             />
-            <QuickForm action={setPromotionActiveAction} className={styles.quickControls} label={`Estado de ${promotion.name}`}>
+            <QuickForm action={setPromotionActiveAction} className={shared.quickControls} label={`Estado de ${promotion.name}`}>
               <span className={styles.priceValue}>{promotion.valueLabel}</span>
               <Link className={styles.smallActionLink} href={promotionEditPath(promotion.id)}>
                 Editar

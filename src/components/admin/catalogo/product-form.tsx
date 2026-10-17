@@ -3,6 +3,7 @@
 import { CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { saveProductAction } from "@/app/bunker/admin/catalogo/actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
@@ -132,11 +133,11 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
       ))}
       {photo ? <PhotoField onView={setPhotoView} key={`${photo.url ?? ""}-${photo.focal?.x ?? ""}-${photo.focal?.y ?? ""}`} hint="Se ve en la tarjeta del producto en la carta." legend="Foto del producto" photo={photo} replaceLabel="Reemplazar foto" uploadLabel="Subir foto del producto" /> : null}
 
-      <fieldset className={styles.formCard}>
+      <fieldset className={shared.formCard}>
         <legend>
-          Información básica <small className={styles.requiredTag}>Requerido *</small>
+          Información básica <small className={shared.requiredTag}>Requerido *</small>
         </legend>
-        <fieldset className={styles.choicePills}>
+        <fieldset className={shared.choicePills}>
           <legend>
             Categoría <span className={styles.activeTag}>Selección activa</span>
           </legend>
@@ -145,7 +146,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
             {categories.map((category) => {
               const Icon = CATEGORY_ICONS[category.type] ?? UtensilsCrossed;
               return (
-                <label className={category.id === categoryId ? styles.choicePillActive : styles.choicePill} key={category.id}>
+                <label className={category.id === categoryId ? shared.choicePillActive : shared.choicePill} key={category.id}>
                   <input checked={category.id === categoryId} name="categoryId" onChange={() => setCategoryId(category.id)} type="radio" value={category.id} />
                   <Icon aria-hidden="true" size={20} />
                   {sameLabel(category.name, category.tabLabel) ? category.name : `${category.tabLabel} · ${category.name}`}
@@ -173,16 +174,16 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
         />
       </fieldset>
 
-      <fieldset className={styles.formCard}>
+      <fieldset className={shared.formCard}>
         <legend>Opciones de personalización</legend>
         <FieldError id="optionGroups-error" name="optionGroups" />
-        {applicable.length === 0 ? <p className={styles.hint}>No hay grupos de opciones para este tipo de producto.</p> : null}
+        {applicable.length === 0 ? <p className={shared.hint}>No hay grupos de opciones para este tipo de producto.</p> : null}
         {applicable.map((group) => {
           const isAssigned = assigned.has(group.id);
           const groupDefaults = defaults.get(group.id) ?? new Set<string>();
           return (
             <div className={styles.optionGroup} key={group.id}>
-              <div className={styles.checkField}>
+              <div className={shared.checkField}>
                 <input
                   checked={isAssigned}
                   id={`offer-${group.id}`}
@@ -196,22 +197,22 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                 </label>
               </div>
               {isAssigned ? (
-                <fieldset className={styles.defaults}>
+                <fieldset className={shared.defaults}>
                   <legend>Opciones de {group.name}</legend>
-                  <p className={styles.hint}>
+                  <p className={shared.hint}>
                     {group.selectionMode === "single"
                       ? "En la carta se muestran todas; el cliente elige una. La marcada como “Por defecto” viene elegida."
                       : "En la carta se muestran todas; el cliente suma las que quiera. Las marcadas como “Por defecto” vienen incluidas."}
                   </p>
                   {group.selectionMode === "single" && !group.required ? (
-                    <label className={styles.checkField}>
+                    <label className={shared.checkField}>
                       <input defaultChecked={groupDefaults.size === 0} name={`default:${group.id}`} type="radio" value="" />
                       <span>Ninguna por defecto</span>
                     </label>
                   ) : null}
                   {ordered(group).map((option, index) => (
                     <div
-                      className={styles.variantRow}
+                      className={shared.variantRow}
                       data-dragging={dragging?.optionId === option.id || undefined}
                       draggable={armed === option.id}
                       key={option.id}
@@ -237,7 +238,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                     >
                       <button
                         aria-label={`Mover ${option.name} (flechas arriba y abajo)`}
-                        className={styles.dragHandle}
+                        className={shared.dragHandle}
                         onKeyDown={(event) => {
                           if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
                           event.preventDefault();
@@ -250,7 +251,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                       >
                         <GripVertical aria-hidden="true" size={18} />
                       </button>
-                      <label className={styles.defaultChip}>
+                      <label className={shared.defaultChip}>
                         <input
                           aria-label={`${option.name} por defecto${option.available ? "" : " (sin stock)"}`}
                           defaultChecked={groupDefaults.has(option.id)}
@@ -262,18 +263,18 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                         <span aria-hidden="true">Por defecto</span>
                       </label>
                       {/* Name, price and availability of the option: saved with "Guardar producto". */}
-                      <span className={styles.variantName}>
+                      <span className={shared.variantName}>
                         <input
                           aria-label={`Nombre de ${option.name}`}
-                          className={styles.optionName}
+                          className={shared.optionName}
                           defaultValue={option.name}
                           maxLength={80}
                           name={`optionName:${option.id}`}
                         />
-                        {option.available ? null : <span className={styles.badgeMuted}>Sin stock</span>}
+                        {option.available ? null : <span className={shared.badgeMuted}>Sin stock</span>}
                       </span>
                       <PriceField defaultValue={option.price} label={`Precio extra de ${option.name}`} name={`optionPrice:${option.id}`} />
-                      <span className={styles.variantActions}>
+                      <span className={shared.variantActions}>
                         <label className={styles.variantAvailable}>
                           <input
                             aria-label={`${option.name} disponible`}
@@ -287,7 +288,7 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                     </div>
                   ))}
                   {orderMessage[group.id] ? (
-                    <p className={styles.quickError} role="alert">
+                    <p className={shared.quickError} role="alert">
                       {orderMessage[group.id]}
                     </p>
                   ) : null}
@@ -298,13 +299,13 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
                   <input name="newOptionGroup" type="hidden" value={group.id} />
                   <input
                     aria-label={`Nombre de la nueva opción de ${group.name}`}
-                    className={styles.optionName}
+                    className={shared.optionName}
                     maxLength={80}
                     name={`newOptionName:${group.id}`}
                     placeholder={group.selectionMode === "single" ? "Nueva opción. Ej: Doble (2× 100g)" : "Nueva opción. Ej: Medallón extra"}
                   />
                   <PriceField defaultValue="" label={`Precio extra de la nueva opción de ${group.name}`} name={`newOptionPrice:${group.id}`} />
-                  <small className={styles.hint}>Se agrega al guardar el producto.</small>
+                  <small className={shared.hint}>Se agrega al guardar el producto.</small>
                 </div>
               ) : null}
             </div>
@@ -312,14 +313,14 @@ export function ProductForm({ categories, optionGroups, product, defaultCategory
         })}
       </fieldset>
 
-      <fieldset className={styles.formCard}>
+      <fieldset className={shared.formCard}>
         <legend>Estado y stock en cocina</legend>
-        <div className={styles.checkGroup}>
+        <div className={shared.checkGroup}>
           <CheckboxField defaultChecked={product?.inStock ?? true} label="Con stock" name="inStock" hint="Sin stock se muestra como agotado." />
           <CheckboxField defaultChecked={product?.featured ?? false} label="Destacado" name="featured" />
           <CheckboxField defaultChecked={product?.published ?? false} hint="Sólo se publica si la configuración es válida." label="Publicado" name="published" />
         </div>
-        {type === "beverage" ? <p className={styles.hint}>Las bebidas se guardan siempre sin alcohol.</p> : null}
+        {type === "beverage" ? <p className={shared.hint}>Las bebidas se guardan siempre sin alcohol.</p> : null}
       </fieldset>
 
       <ProductPreview categories={categories} photo={photoView} />

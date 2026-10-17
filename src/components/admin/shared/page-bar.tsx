@@ -1,10 +1,10 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./admin-shared.module.css";
 
 /**
  * Top bar of the admin screens in the canonical captures (issue #54): round back arrow, the screen
- * title in amber and the logo. It replaces the panel header on these screens (see admin.module.css).
+ * title in amber and the logo. It replaces the panel header on these screens (see admin-shared.module.css).
  */
 export function AdminPageBar({ backHref, backLabel, title, titleId }: { backHref: string; backLabel: string; title: string; titleId: string }) {
   return (

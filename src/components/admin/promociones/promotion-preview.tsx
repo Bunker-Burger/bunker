@@ -6,7 +6,7 @@ import "@/components/storefront/storefront.css";
 import { ComboSection, isCombo } from "@/components/storefront/promo/combo-section";
 import { PromoBanner, PromoSection } from "@/components/storefront/promo/promo-cards";
 import type { PromotionMechanic, PromotionRule } from "@/domain/types";
-import styles from "@/app/bunker/admin.module.css";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 
 export interface PreviewProduct {
   id: string;
@@ -78,28 +78,28 @@ export function PromotionPreview({
   const combo = rule !== null && isCombo(rule);
 
   return (
-    <section aria-labelledby="menu-preview-title" className={styles.previewCard} ref={ref}>
-      <h2 className={styles.cardTitle} id="menu-preview-title">
+    <section aria-labelledby="menu-preview-title" className={shared.previewCard} ref={ref}>
+      <h2 className={shared.cardTitle} id="menu-preview-title">
         <Eye aria-hidden="true" size={20} /> Así se verá en la carta
       </h2>
       {!rule ? (
-        <p className={styles.hint}>Completá la mecánica para ver la vista previa.</p>
+        <p className={shared.hint}>Completá la mecánica para ver la vista previa.</p>
       ) : (
         <>
-          <p className={styles.hint}>Se muestra mientras la promoción está vigente. Se actualiza mientras completás el formulario.</p>
-          <div className={styles.previewCards} inert>
-            <span className={styles.previewLabel}>Banner arriba de la carta</span>
+          <p className={shared.hint}>Se muestra mientras la promoción está vigente. Se actualiza mientras completás el formulario.</p>
+          <div className={shared.previewCards} inert>
+            <span className={shared.previewLabel}>Banner arriba de la carta</span>
             <PromoBanner label="Vista previa del banner" promotions={[rule]} />
-            <span className={styles.previewLabel}>Sección “Promociones”</span>
+            <span className={shared.previewLabel}>Sección “Promociones”</span>
             <PromoSection promotions={[rule]} />
             {combo ? (
               <>
-                <span className={styles.previewLabel}>Sección “Combos”</span>
+                <span className={shared.previewLabel}>Sección “Combos”</span>
                 <ComboSection combos={[rule]} onAdd={NOOP} products={priced} />
               </>
             ) : null}
           </div>
-          {!photoUrl ? <p className={styles.hint}>Sin foto se muestra con un ícono. Subí una foto para lucirla en el banner.</p> : null}
+          {!photoUrl ? <p className={shared.hint}>Sin foto se muestra con un ícono. Subí una foto para lucirla en el banner.</p> : null}
         </>
       )}
     </section>

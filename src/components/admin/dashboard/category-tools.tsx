@@ -3,6 +3,7 @@
 import { Check, CirclePlus, GripVertical, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { createCategoryAction, deleteCategoryAction, reorderCategoriesAction, updateCategoryAction } from "@/app/bunker/admin/catalogo/actions";
 import { IDLE_FORM_STATE, type AdminFormState } from "@/app/bunker/admin/form-state";
@@ -68,13 +69,13 @@ export function CategoryTools({
 
   return (
     <div className={styles.categoryTools}>
-      <div aria-label="Categorías de la carta, en su orden" className={styles.categoryPills} role="group">
+      <div aria-label="Categorías de la carta, en su orden" className={shared.categoryPills} role="group">
         <button aria-pressed={selected === null} onClick={() => onSelect(null)} type="button">
           Todas ({totalProducts})
         </button>
         {list.map((category, index) => (
-          <span className={styles.categoryPill} data-hidden={!category.visible || undefined} key={category.id} {...rowProps(category.id)}>
-            <button className={styles.pillGrip} {...handleProps(category.id, index, `Mover ${category.name}`)}>
+          <span className={shared.categoryPill} data-hidden={!category.visible || undefined} key={category.id} {...rowProps(category.id)}>
+            <button className={shared.pillGrip} {...handleProps(category.id, index, `Mover ${category.name}`)}>
               <GripVertical aria-hidden="true" size={14} />
             </button>
             <button aria-pressed={selected === category.id} onClick={() => onSelect(category.id)} type="button">
@@ -83,20 +84,20 @@ export function CategoryTools({
             </button>
           </span>
         ))}
-        <button aria-expanded={adding} className={styles.addCategory} onClick={() => setAdding((value) => !value)} type="button">
+        <button aria-expanded={adding} className={shared.addCategory} onClick={() => setAdding((value) => !value)} type="button">
           <CirclePlus aria-hidden="true" size={14} /> Categoría
         </button>
       </div>
       {message ? (
-        <p className={styles.quickError} role="alert">
+        <p className={shared.quickError} role="alert">
           {message}
         </p>
       ) : null}
 
       {adding ? (
         <QuickForm action={createCategoryAction} className={styles.categoryForm} label="Nueva categoría">
-          <input aria-label="Nombre de la categoría" className={styles.optionName} maxLength={60} name="name" placeholder="Ej: Clásicas" required />
-          <select aria-label="Tipo de productos" className={styles.categorySelect} defaultValue="burger" name="kind">
+          <input aria-label="Nombre de la categoría" className={shared.optionName} maxLength={60} name="name" placeholder="Ej: Clásicas" required />
+          <select aria-label="Tipo de productos" className={shared.categorySelect} defaultValue="burger" name="kind">
             {KINDS.map((kind) => (
               <option key={kind.value} value={kind.value}>
                 {kind.label}
@@ -104,7 +105,7 @@ export function CategoryTools({
             ))}
           </select>
           <input name="visible" type="hidden" value="true" />
-          <QuickSubmit className={styles.smallAction}>Crear</QuickSubmit>
+          <QuickSubmit className={shared.smallAction}>Crear</QuickSubmit>
         </QuickForm>
       ) : null}
 
@@ -114,11 +115,11 @@ export function CategoryTools({
             <input name="categoryId" type="hidden" value={current.id} />
             {/* The link stays the same when the category is renamed. */}
             <input name="slug" type="hidden" value={current.slug} />
-            <input aria-label={`Nombre de ${current.name}`} className={styles.optionName} defaultValue={current.name} maxLength={60} name="name" required />
-            <label className={styles.visibleCheck}>
+            <input aria-label={`Nombre de ${current.name}`} className={shared.optionName} defaultValue={current.name} maxLength={60} name="name" required />
+            <label className={shared.visibleCheck}>
               <input defaultChecked={current.visible} name="visible" type="checkbox" value="true" /> Visible en la carta
             </label>
-            <QuickSubmit ariaLabel={`Guardar ${current.name}`} className={styles.smallAction}>
+            <QuickSubmit ariaLabel={`Guardar ${current.name}`} className={shared.smallAction}>
               <Check aria-hidden="true" size={14} /> Guardar
             </QuickSubmit>
           </QuickForm>
@@ -130,7 +131,7 @@ export function CategoryTools({
               </QuickSubmit>
             </QuickForm>
           ) : (
-            <p className={styles.hint}>Arrastrá los productos por su asa para ordenarlos en la carta. Para eliminar la categoría, primero dejala sin productos.</p>
+            <p className={shared.hint}>Arrastrá los productos por su asa para ordenarlos en la carta. Para eliminar la categoría, primero dejala sin productos.</p>
           )}
         </div>
       ) : null}

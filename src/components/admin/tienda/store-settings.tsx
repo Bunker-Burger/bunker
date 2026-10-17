@@ -3,6 +3,7 @@
 import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ARS_DECIMAL } from "@/lib/money";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import styles from "@/app/bunker/admin.module.css";
 import { useOrderSaver } from "@/components/admin/dashboard/category-tools";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "@/components/admin/dashboard/quick-form";
@@ -45,21 +46,21 @@ export interface StoreSettingsProps {
  */
 export function StoreSettings({ deliveryFee, whatsapp, pickupAddress, pickupMapsUrl, timezone, shifts, paymentMethods, mercadoPagoNote }: StoreSettingsProps) {
   return (
-    <div className={styles.settingsColumn}>
+    <div className={shared.settingsColumn}>
       <CollapsibleCard icon={Truck} summary={deliverySummary(deliveryFee, whatsapp)} title="Delivery, retiro y WhatsApp" titleId="delivery-title">
-        {deliveryFee === "" ? <p className={styles.error}>Cargá el costo de delivery: sin él no se pueden tomar pedidos.</p> : null}
-        <QuickForm action={saveStoreContactAction} className={styles.settingsForm} label="Delivery, retiro y WhatsApp">
+        {deliveryFee === "" ? <p className={shared.error}>Cargá el costo de delivery: sin él no se pueden tomar pedidos.</p> : null}
+        <QuickForm action={saveStoreContactAction} className={shared.settingsForm} label="Delivery, retiro y WhatsApp">
           <label htmlFor="quick-delivery">Costo de delivery</label>
           <PriceField defaultValue={deliveryFee} id="quick-delivery" name="deliveryFee" />
           <label htmlFor="quick-whatsapp">WhatsApp del local</label>
-          <input autoComplete="tel" className={styles.optionName} defaultValue={whatsapp} id="quick-whatsapp" inputMode="tel" name="whatsapp" required />
-          <small className={styles.hint}>Con código de país, por ejemplo +54 9 381 555-1234. Los pedidos llegan a este número.</small>
+          <input autoComplete="tel" className={shared.optionName} defaultValue={whatsapp} id="quick-whatsapp" inputMode="tel" name="whatsapp" required />
+          <small className={shared.hint}>Con código de país, por ejemplo +54 9 381 555-1234. Los pedidos llegan a este número.</small>
           <label htmlFor="quick-pickup">Dirección para retirar</label>
-          <input className={styles.optionName} defaultValue={pickupAddress} id="quick-pickup" maxLength={200} name="pickupAddress" placeholder="Ej: San Lorenzo 877, Aguilares, Tucumán" />
+          <input className={shared.optionName} defaultValue={pickupAddress} id="quick-pickup" maxLength={200} name="pickupAddress" placeholder="Ej: San Lorenzo 877, Aguilares, Tucumán" />
           <label htmlFor="quick-maps">Enlace de Google Maps</label>
-          <input className={styles.optionName} defaultValue={pickupMapsUrl} id="quick-maps" inputMode="url" maxLength={500} name="pickupMapsUrl" placeholder="https://maps.app.goo.gl/…" type="url" />
-          <small className={styles.hint}>Se muestran al elegir “Retiro en local” en el pedido, con un botón “Cómo llegar”.</small>
-          <QuickSubmit className={styles.smallAction}>Guardar</QuickSubmit>
+          <input className={shared.optionName} defaultValue={pickupMapsUrl} id="quick-maps" inputMode="url" maxLength={500} name="pickupMapsUrl" placeholder="https://maps.app.goo.gl/…" type="url" />
+          <small className={shared.hint}>Se muestran al elegir “Retiro en local” en el pedido, con un botón “Cómo llegar”.</small>
+          <QuickSubmit className={shared.smallAction}>Guardar</QuickSubmit>
         </QuickForm>
       </CollapsibleCard>
 
@@ -73,7 +74,7 @@ export function StoreSettings({ deliveryFee, whatsapp, pickupAddress, pickupMaps
 /** Collapsed by default: icon and title, a one-line summary, and an arrow that opens it. */
 function CollapsibleCard({ icon: Icon, title, titleId, summary, children }: { icon: LucideIcon; title: string; titleId: string; summary: string; children: ReactNode }) {
   return (
-    <details className={`${styles.deliveryCard} ${styles.collapsibleCard}`}>
+    <details className={`${shared.deliveryCard} ${styles.collapsibleCard}`}>
       <summary>
         <span className={styles.collapsibleHead}>
           <h2 id={titleId}>
@@ -126,7 +127,7 @@ function OpeningHours({ shifts, timezone }: { shifts: SettingsShift[]; timezone:
   return (
     <CollapsibleCard icon={CalendarClock} summary={hoursSummary(shifts)} title="Horarios" titleId="hours-title">
 
-      <p className={styles.hint}>Con el modo “Seguir los horarios”, el local abre y cierra solo. Hora de {city}.</p>
+      <p className={shared.hint}>Con el modo “Seguir los horarios”, el local abre y cierra solo. Hora de {city}.</p>
       <ul aria-label="Turnos" className={styles.weekList}>
         {WEEK_ORDER.map((day) => {
           const dayShifts = shifts.filter((shift) => shift.dayOfWeek === day);
@@ -157,11 +158,11 @@ function OpeningHours({ shifts, timezone }: { shifts: SettingsShift[]; timezone:
         })}
       </ul>
 
-      <QuickForm action={addShiftAction} className={styles.shiftForm} label="Agregar turno">
-        <span className={styles.shiftFormTitle}>Agregar turno</span>
+      <QuickForm action={addShiftAction} className={shared.shiftForm} label="Agregar turno">
+        <span className={shared.shiftFormTitle}>Agregar turno</span>
         <label>
           Día
-          <select className={styles.categorySelect} defaultValue="1" name="dayOfWeek">
+          <select className={shared.categorySelect} defaultValue="1" name="dayOfWeek">
             {WEEK_ORDER.map((day) => (
               <option key={day} value={day}>
                 {WEEKDAYS[day]}
@@ -171,14 +172,14 @@ function OpeningHours({ shifts, timezone }: { shifts: SettingsShift[]; timezone:
         </label>
         <label>
           Abre
-          <input className={styles.optionName} defaultValue="19:30" name="opensAt" required type="time" />
+          <input className={shared.optionName} defaultValue="19:30" name="opensAt" required type="time" />
         </label>
         <label>
           Cierra
-          <input className={styles.optionName} defaultValue="00:00" name="closesAt" required type="time" />
+          <input className={shared.optionName} defaultValue="00:00" name="closesAt" required type="time" />
         </label>
-        <small className={styles.hint}>Si cierra antes de la hora en que abre, termina al día siguiente (por ejemplo 19:30 a 01:30).</small>
-        <QuickSubmit className={styles.smallAction}>
+        <small className={shared.hint}>Si cierra antes de la hora en que abre, termina al día siguiente (por ejemplo 19:30 a 01:30).</small>
+        <QuickSubmit className={shared.smallAction}>
           <CirclePlus aria-hidden="true" size={14} /> Agregar turno
         </QuickSubmit>
       </QuickForm>
@@ -194,16 +195,16 @@ function PaymentMethods({ methods, mercadoPagoNote }: { methods: SettingsPayment
   );
   return (
     <CollapsibleCard icon={CreditCard} summary={paymentsSummary(list)} title="Medios de pago" titleId="payments-title">
-      <p className={styles.hint}>Arrastralos para elegir en qué orden los ve el cliente.</p>
+      <p className={shared.hint}>Arrastralos para elegir en qué orden los ve el cliente.</p>
       {message ? (
-        <p className={styles.quickError} role="alert">
+        <p className={shared.quickError} role="alert">
           {message}
         </p>
       ) : null}
       <ul aria-label="Medios de pago" className={styles.methodList}>
         {list.map((method, index) => (
           <li key={method.id} {...rowProps(method.id)}>
-            <button className={styles.rowGrip} {...handleProps(method.id, index, `Mover ${method.name}`)}>
+            <button className={shared.rowGrip} {...handleProps(method.id, index, `Mover ${method.name}`)}>
               <GripVertical aria-hidden="true" size={18} />
             </button>
             <span className={styles.methodInfo}>
