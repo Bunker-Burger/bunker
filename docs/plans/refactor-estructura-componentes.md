@@ -38,32 +38,34 @@ Otros >400 (`rate-limit.ts`, `payment-repository.ts`, `catalog-admin-service.ts`
 
 | Línea | Símbolo | Usado por |
 |---|---|---|
-| 72-75 | `INVALID_PRODUCT_NOTICE`, `PENDING_PRODUCT_NOTICE`, `UNVERIFIED_PRODUCT_NOTICE`, `DEFAULT_PAYMENT_METHODS` | Storefront |
+| 72-75 | `INVALID_PRODUCT_NOTICE`, `PENDING_PRODUCT_NOTICE`, `UNVERIFIED_PRODUCT_NOTICE`, `DEFAULT_PAYMENT_METHODS` | Storefront (solo; `DEFAULT_PAYMENT_METHODS` en L155) |
 | 77 | `VIEW_TITLES` | Storefront |
 | 80 | `textKey()` | Storefront |
 | 86 | `removeProductParam()` | Storefront |
 | 93 | `CREDIT_WHATSAPP_URL` | footer dentro de Storefront |
 | 95 | `export interface StorefrontProps` | Storefront |
 | 118 | `FOCUSABLE` | trapFocus |
-| 121 | `trapFocus(event, container)` | ProductDrawer, ComboDrawer |
-| 138 | `makeCartLine(...)` | Storefront, ComboDrawer, ProductDrawer |
+| 121 | `trapFocus(event, container)` | **solo ProductDrawer** (L1032) |
+| 138 | `makeCartLine(...)` | Storefront (L326, L351), ComboDrawer (L743), ProductDrawer (L1145, L1147) |
 | 152-651 | `export function Storefront` | `src/app/page.tsx`, 11 tests |
 | 652 | `export interface ComboDrawerState` | ComboDrawer, comboDrawerState |
 | 662 | `export function comboDrawerState` | Storefront |
 | 696-841 | `export function ComboDrawer` | Storefront |
 | 842 | `const unitsWithExtra` | unitGroupsOf, OptionGroups |
-| 845 | `export function unitGroupsOf` | ComboDrawer, ProductDrawer, Storefront |
+| 845 | `export function unitGroupsOf` | ComboDrawer (L729), ProductDrawer (L1049) |
 | 863-995 | `function OptionGroups` | ComboDrawer, ProductDrawer |
 | 996-1165 | `export function ProductDrawer` | Storefront, `storefront.test.tsx` (L9, 165, 226, 305) |
 | 1166 | `function ViewBar` | CartSection, CheckoutSection |
-| 1181 | `function chosenExtras` | CartSection |
+| 1181 | `function chosenExtras` | **solo** CartSection (L1232) |
 | 1189-1340 | `function CartSection` | Storefront |
-| 1341 | `function toPromotionLines` | Storefront, CheckoutSection |
-| 1355 | `function canonicalSelections` | CheckoutSection |
+| 1341 | `function toPromotionLines` | Storefront (L397), CheckoutSection (L1431) |
+| 1355 | `function canonicalSelections` | **solo** CheckoutSection (L1466, L1533) |
 | 1364 | `const CHECKOUT_ERRORS` | CheckoutSection |
 | 1371-1759 | `function CheckoutSection` | Storefront |
 | 1760 | `const PAYMENT_ICONS` | PaymentChoice |
 | 1762 | `function PaymentChoice` | CheckoutSection |
+
+> Validé esta tabla con `codegraph_callers` y grep el 2026-10-17. El relevamiento automático original tenía errores: decía que ComboDrawer usa `trapFocus` y que Storefront usa `unitGroupsOf`, y no es así.
 
 **Importadores externos:** solo `Storefront` (`src/app/page.tsx` y 11 tests) y `ProductDrawer` (`storefront.test.tsx`). Nadie de afuera importa `ComboDrawer`, `comboDrawerState`, `unitGroupsOf`, `OptionGroups`, `CartSection`, `CheckoutSection`, `ViewBar` ni `PaymentChoice`.
 
@@ -101,7 +103,7 @@ Cada ítem va con `grep -rn "<nombre>" src tests scripts` **antes** de borrar; s
    - Si una regla combina una clase muerta con una viva (`.a, .muerta {…}` o `.viva .muerta`), borrá solo el selector muerto.
 7. **Exports internos innecesarios** (quitar solo la palabra `export`; el código queda):
    - `StorefrontProps` (`storefront.tsx`), `PromoLayout` (`promo-showcase.tsx`).
-   - `DashboardProduct`, `DashboardPromotion` y `DashboardStore` (`dashboard.tsx`), si siguen sin importadores externos.
+   - **NO** les quites el `export` a `DashboardProduct`, `DashboardPromotion` ni `DashboardStore`. En la fase 5 se parte `dashboard.tsx`, y los archivos nuevos (`product-rows.tsx`, `promotion-rows.tsx`) los van a importar.
 
 **Gate de fase 1:** typecheck, lint y test en verde. Además, `pnpm build` una vez (por los CSS modules).
 
@@ -111,38 +113,37 @@ Estructura objetivo, dentro de `src/components/storefront/`:
 
 ```
 storefront.tsx                 ← SOLO Storefront (+ sus constantes privadas). NO se renombra.
-storefront-helpers.ts          ← makeCartLine, textKey, removeProductParam, toPromotionLines, canonicalSelections, chosenExtras (sin "use client", sin JSX)
+cart-lines.ts                  ← makeCartLine + toPromotionLines (únicos helpers con usuarios en 2+ archivos; sin "use client", sin JSX)
 shared/
-  focus-trap.ts                ← FOCUSABLE + trapFocus (sin "use client"; solo DOM)
-  view-bar.tsx                 ← ViewBar
+  view-bar.tsx                 ← ViewBar (CartSection + CheckoutSection)
   quantity-stepper.tsx         ← NUEVO componente (fase 3)
-  price.tsx                    ← NUEVO componente (fase 3)
+  compare-at.tsx               ← NUEVO componente (fase 3)
 drawers/
   option-groups.tsx            ← OptionGroups + unitsWithExtra + unitGroupsOf
-  product-drawer.tsx           ← ProductDrawer
+  product-drawer.tsx           ← ProductDrawer + FOCUSABLE + trapFocus (su único usuario)
   combo-drawer.tsx             ← ComboDrawer + ComboDrawerState + comboDrawerState
 cart/
-  cart-section.tsx             ← CartSection
+  cart-section.tsx             ← CartSection + chosenExtras (su único usuario)
 checkout/
-  checkout-section.tsx         ← CheckoutSection + CHECKOUT_ERRORS
+  checkout-section.tsx         ← CheckoutSection + CHECKOUT_ERRORS + canonicalSelections (su único usuario)
   payment-choice.tsx           ← PaymentChoice + PAYMENT_ICONS
 ```
 
 Orden de pasos (un commit cada uno; correr `pnpm typecheck && pnpm test src/components/storefront` después de cada uno):
 
-1. **`storefront-helpers.ts`**: mover `makeCartLine`, `textKey`, `removeProductParam`, `toPromotionLines`, `canonicalSelections` y `chosenExtras`, todos con `export`.
-   - Importarlos en `storefront.tsx`.
-   - Revisá qué tipos y funciones de `@/domain/*` necesitan, y movelos también a los imports del nuevo archivo.
-2. **`shared/focus-trap.ts`**: `FOCUSABLE` y `trapFocus`.
-3. **`shared/view-bar.tsx`**: `ViewBar` (con `"use client"` solo si usa algo de cliente; si es JSX puro con `<a>`, igual dejalo con `"use client"` por consistencia con la carpeta).
+1. **`cart-lines.ts`**: mover `makeCartLine` y `toPromotionLines` (con `export`) e importarlos en `storefront.tsx`.
+   - Los helpers que usa **un solo** componente **se quedan en `storefront.tsx`**: `textKey`, `removeProductParam`, `CREDIT_WHATSAPP_URL`, `VIEW_TITLES` y `DEFAULT_PAYMENT_METHODS` (este último solo lo usa Storefront).
+   - Los otros helpers se van con su componente, cada uno en su paso: `trapFocus` con ProductDrawer, `chosenExtras` con CartSection y `canonicalSelections` con CheckoutSection.
+2. *(eliminado: `trapFocus` va dentro de `product-drawer.tsx`, ver paso 5)*
+3. **`shared/view-bar.tsx`**: `ViewBar`. Es JSX puro, sin hooks, así que **no** lleva `"use client"`. Lo importan componentes cliente y con eso alcanza.
 4. **`drawers/option-groups.tsx`**: `OptionGroups` (export), `unitsWithExtra` (export solo si otro archivo lo usa) y `unitGroupsOf` (export).
-5. **`drawers/product-drawer.tsx`**: `ProductDrawer`.
+5. **`drawers/product-drawer.tsx`**: `ProductDrawer`, más `FOCUSABLE` y `trapFocus` (privados, sin export).
    - En `storefront.tsx`, re-exportalo para no romper `storefront.test.tsx:9`: `export { ProductDrawer } from "./drawers/product-drawer";`.
    - Alternativa preferida: cambiar el import del test a `import { ProductDrawer } from "./drawers/product-drawer";` y `import { Storefront } from "./storefront";`. Elegí esta y **no** dejes el re-export.
 6. **`drawers/combo-drawer.tsx`**: `ComboDrawerState`, `comboDrawerState` y `ComboDrawer`.
 7. **`cart/cart-section.tsx`**: `CartSection`. Necesita `ViewBar`, `chosenExtras`, `comboCount`/`comboLines`/`removeOneCombo` (`@/domain/combos`), `changeLineQuantity`/`removeCartLine` (`@/domain/cart`) y los iconos `Minus`/`Plus`.
 8. **`checkout/payment-choice.tsx`** (`PaymentChoice` + `PAYMENT_ICONS`) y luego **`checkout/checkout-section.tsx`** (`CheckoutSection` + `CHECKOUT_ERRORS`).
-   - Si `CheckoutSection` usa `DEFAULT_PAYMENT_METHODS`, pasalo por props o movelo junto. No lo dupliques.
+   - CheckoutSection **no** usa `DEFAULT_PAYMENT_METHODS` (solo Storefront, en L155), así que se queda en `storefront.tsx`.
 9. Limpiar los imports que quedaron sin uso en `storefront.tsx` (lint `no-unused-vars`). Objetivo: **`storefront.tsx` ≤ ~550 líneas**.
 
 **Reglas de esta fase:**
@@ -162,8 +163,8 @@ Hay 4 steppers con el mismo markup `<div className="quantity-stepper[ compact]">
 
 | Dónde | aria dec / inc | dec | inc | disabled |
 |---|---|---|---|---|
-| ComboDrawer (contador de combos) | "Quitar un combo" / "Agregar otro combo" | `setCount(max(1, c-1))` | `setCount(c+1)` | dec si `count<=1` |
-| ProductDrawer (cantidad) | "Disminuir cantidad" / (ver el de inc en el código) | `max(1, q-1)` | `q+1` | dec si `quantity===1` |
+| ComboDrawer (contador de combos, L827) | "Quitar un combo" / "Agregar otro combo" | `setCount(max(1, c-1))` | `setCount(c+1)` | dec si `count<=1` |
+| ProductDrawer (cantidad, L1133) | "Disminuir cantidad" / "Aumentar cantidad" | `max(1, q-1)` | `q+1` | dec si `quantity===1` |
 | CartSection, línea suelta (`compact`) | `Quitar uno de ${name}` / `Agregar uno de ${name}` | `changeLineQuantity(cart,id,-1)` | `+1` | ninguno |
 | CartSection, combo (`compact`) | `Quitar un ${combo.name}` / `Agregar otro ${combo.name}` | `removeOneCombo` | `onAddCombo` | ninguno |
 
@@ -186,13 +187,19 @@ export function QuantityStepper({ value, onDecrement, onIncrement, decrementLabe
 - **No** reemplaces el mini-stepper de unidades por extra de `OptionGroups` (`.option-units-stepper`): tiene otro markup y clase.
 - Test nuevo: `shared/quantity-stepper.test.tsx`. Cubrí que renderiza el valor, que llama `onDecrement`/`onIncrement`, que `decrementDisabled` deshabilita y que `compact` agrega la clase.
 
-### 4.2 `Price` (`shared/price.tsx`)
+### 4.2 `CompareAt` (`shared/compare-at.tsx`)
 
-Patrón repetido: `formatArs(cents)` y, si hay precio anterior, `<s className="compare-at"><span className="sr-only">Antes</span>{formatArs(compare)}</s>`. Aparece en:
-- `menu.tsx` ~L172.
-- `promo-showcase.tsx` ~L116.
-- La bandeja del carrito en `storefront.tsx` ~L551 (`<s>` sin clase).
-- `ProductDrawer` ~L1077 (`<s className="compare-at">` **sin** sr-only).
+Patrón repetido: el precio anterior tachado. Hay **5 sitios** verificados y **no son idénticos**:
+
+| Sitio | Markup exacto actual |
+|---|---|
+| `menu.tsx` L173 | `{" "}<s className="compare-at"><span className="sr-only">Antes</span> {formatArs(x)}</s>` |
+| `promo-showcase.tsx` L117 | igual que en menu (con `{" "}` antes) |
+| `storefront.tsx` L551 (bandeja) | `<s><span className="sr-only">Antes</span> {formatArs(subtotal)}</s>`: **sin clase**, sin `{" "}` |
+| `storefront.tsx` L763 (ComboDrawer) | `<s className="compare-at"><span className="sr-only">Antes</span> {formatArs(x)}</s>`: sin `{" "}` |
+| `storefront.tsx` L1078 (ProductDrawer) | `<s className="compare-at">{formatArs(x)}</s>`: **sin sr-only y sin espacio** |
+
+El `{" "}` previo queda **afuera** del componente, donde está hoy. Con `srLabel`, el contenido es `<span className="sr-only">Antes</span> {formatArs(cents)}`, con el espacio. Sin `srLabel`, es solo `{formatArs(cents)}`.
 
 ```tsx
 export function CompareAt({ cents, srLabel = true, className = "compare-at" }: { cents: bigint; srLabel?: boolean; className?: string | undefined })
@@ -200,20 +207,20 @@ export function CompareAt({ cents, srLabel = true, className = "compare-at" }: {
 
 - Extraé **solo** el `<s>` tachado (no el precio principal: cada sitio lo envuelve distinto).
 - Respetá las diferencias: donde hoy no hay `sr-only`, pasá `srLabel={false}`; donde no hay clase, pasá `className=""` y no renderices el atributo si es vacío. **No uniformes el markup**: sería un cambio de comportamiento (lectores de pantalla y tests).
-- Test nuevo: `shared/price.test.tsx`.
+- Test nuevo: `shared/compare-at.test.tsx`.
 
-### 4.3 `useEscapeKey` (`src/components/storefront/shared/use-escape-key.ts`)
+### 4.3 ~~`useEscapeKey`~~: descartado
 
-- `ComboDrawer` (~L722) y `ProductDrawer` (~L1031) registran `keydown` Escape → `onClose` (ProductDrawer vía `onCloseRef`). `order-return-modal.tsx:46` hace lo mismo.
-- Extraé un hook `useEscapeKey(onClose: () => void, enabled = true)` con el patrón del ref (el de ProductDrawer, que evita re-suscribir) y usalo en los 3.
-- Ojo: si alguno combina Escape con `trapFocus` en el mismo handler, dejá `trapFocus` donde está y extraé solo el Escape.
-- **El buscador del menú (`storefront.tsx` ~L442, `closeSearch`) no se toca.**
+Lo revisé en el código: los 3 handlers de Escape **no** son iguales, y extraerlos cambia el comportamiento.
+- `ProductDrawer` (L1031) maneja Escape **y** Tab/`trapFocus` en el mismo handler. Además maneja el foco de retorno, el scroll y `body.drawer-open`.
+- `ComboDrawer` (L722) se suscribe una sola vez, con un `eslint-disable` puesto a propósito.
+- `order-return-modal.tsx:46` se vuelve a suscribir cuando cambia `onClose`.
 
-### 4.4 Iconos de mecánica de promo duplicados
+Un hook común cambiaría cuándo se suscribe cada uno, así que **no se hace**.
 
-- `MECHANIC_ICON` existe en `promo-showcase.tsx:36` y en `promotion-form.tsx:158`. Comparalos.
-- **Si son idénticos**, movelos a `src/components/storefront/promo/mechanic-icons.ts` (sin `"use client"`; solo un objeto de componentes lucide) e importalos en ambos.
-- **Si difieren**, no los unifiques. Anotalo en el PR.
+### 4.4 ~~Iconos de mecánica de promo~~: descartado
+
+Verificado: **no son iguales**. `promo-showcase.tsx:36` usa `fixed_price: Layers` y `promotion-form.tsx:158` usa `fixed_price: Package`; el resto coincide. Son decisiones visuales distintas (carta y admin), así que no se unifican.
 
 ### 4.5 Formato de pesos duplicado en el admin
 
@@ -231,7 +238,6 @@ Destino `src/components/storefront/promo/`:
 promo/promo-showcase.tsx   ← PromoShowcase, showcasePromotions, usePromoLayout (+ subscribe, LAYOUTS, readLayout), PromoTile
 promo/combo-section.tsx    ← ComboSection, comboContents, isCombo, comboPromotions
 promo/promo-cards.tsx      ← PromoSection, PromoBanner
-promo/mechanic-icons.ts    ← (de fase 3.4)
 ```
 
 Pasos:
@@ -272,6 +278,15 @@ Reglas:
 - Los archivos movidos importan `styles from "../bunker/admin.module.css"` o similar. Reemplazá **todas** esas rutas por el alias absoluto `@/app/bunker/admin.module.css`. Así no dependen de la profundidad. Se mueve en la fase 6.
 - Los imports **de** acciones (`./actions`, `../catalogo/actions`) pasan a `@/app/bunker/admin/catalogo/actions`, etc.
 - Los imports **hacia** los movidos (en `page.tsx`, `layout.tsx` y `productos/[productId]/page.tsx`) pasan a `@/components/admin/...`.
+- **Mocks que hay que actualizar** (verificados):
+  - `catalogo/product-form.test.tsx:8` tiene `vi.mock("./actions", …)`. Pasa a `vi.mock("@/app/bunker/admin/catalogo/actions", …)`, y en el `product-form.tsx` movido el import de acciones usa esa misma ruta.
+  - `logout-form.test.tsx:8` tiene `vi.mock("../actions", …)` (las acciones de `src/app/bunker/actions.ts`). Pasa a `vi.mock("@/app/bunker/actions", …)`, igual que el import de `logout-form.tsx`.
+- **No les agregues `"use client"` a los server components.** Hoy `page-bar.tsx` y `catalogo/photo-dropzone.tsx` **no** lo tienen: movelos tal cual. Si se lo agregás, terminan en el bundle del cliente.
+- Estos no son UI y se quedan en `app/`:
+  - `admin-action.ts` (`server-only`).
+  - `form-state.ts` y `catalogo/form-state.ts` (re-exporta `../form-state`).
+  - `paths.ts`, `*-props.ts` y `tienda/status-labels.ts`.
+  - `actions.ts` (`"use server"`).
 - Tests movidos: los que importan acciones relativas (`product-form.test.tsx` importa `./actions` y `./form-state`) pasan a `@/app/bunker/admin/catalogo/actions` y `.../form-state`. Los `vi.mock("./actions")` con ruta relativa **también hay que actualizarlos a la ruta nueva**. Si no, el mock deja de aplicarse y el test puede pasar o fallar por la razón equivocada. Revisá cada `vi.mock(` de los tests movidos.
 - `page.test.tsx` y `layout.test.tsx` se quedan donde están (prueban rutas); solo cambian sus imports si referencian algo movido.
 - **Partir `dashboard.tsx`** (después de moverlo):
@@ -311,6 +326,78 @@ Reglas:
 
 **Gate de fase 6:** typecheck, lint, test y build, más la revisión visual del admin en mobile (375px) y desktop: barras sticky, preview de promo y drag de categorías. Adjuntá capturas en el PR.
 
+## 7.5 Árbol final (cómo queda `src/` al terminar)
+
+Solo las carpetas que cambian. Los tests siguen al lado de su archivo y no se listan. Referencias: ★ nuevo, ← de dónde viene, ✗ se borra.
+
+```
+src/
+├── app/bunker/
+│   ├── page.tsx · login-form.tsx · actions.ts      (login; importan login.module.css o admin-shared)
+│   ├── admin.module.css                            ✗ (fase 6)
+│   └── admin/                                      ← solo rutas, actions y helpers de datos
+│       ├── layout.tsx · page.tsx
+│       ├── admin-action.ts · form-state.ts · paths.ts
+│       ├── catalogo/   actions.ts · form-state.ts · product-props.ts · productos/{nuevo,[productId]}/page.tsx
+│       ├── promociones/ actions.ts · promotion-props.ts · {nueva,[promotionId]}/page.tsx
+│       └── tienda/     actions.ts · status-labels.ts
+│
+├── components/
+│   ├── admin/                                      ★ (fase 5)
+│   │   ├── shared/
+│   │   │   ├── admin-shared.module.css             ★ (fase 6)
+│   │   │   ├── admin-form.tsx · admin-bottom-nav.tsx · logout-form.tsx
+│   │   │   └── page-bar.tsx                        (server component, sin "use client")
+│   │   ├── dashboard/
+│   │   │   ├── dashboard.module.css                ★
+│   │   │   ├── dashboard.tsx                       (AdminDashboard + ICONS + tipos exportados)
+│   │   │   ├── promotion-rows.tsx · product-rows.tsx · store-switch.tsx   ★ salen de dashboard.tsx
+│   │   │   └── category-tools.tsx · quick-form.tsx · use-drag-order.ts
+│   │   ├── catalogo/
+│   │   │   ├── catalogo.module.css                 ★
+│   │   │   ├── product-form.tsx · product-preview.tsx · photo-field.tsx
+│   │   │   └── photo-dropzone.tsx                  (server component)
+│   │   ├── promociones/
+│   │   │   ├── promociones.module.css              ★
+│   │   │   ├── promotion-form.tsx                  (solo el form)
+│   │   │   ├── promotion-form-model.ts             ★ previewRows, mechanicFrom, cents, uniformSchedule, constantes sin JSX
+│   │   │   └── promotion-preview.tsx
+│   │   └── tienda/
+│   │       ├── tienda.module.css                   ★
+│   │       └── store-settings.tsx
+│   │
+│   └── storefront/
+│       ├── storefront.tsx                          SOLO Storefront (~550; antes 1771). NO se renombra (ruta en cloud-evidence-scope.test.ts)
+│       ├── cart-lines.ts                           ★ makeCartLine + toPromotionLines
+│       ├── storefront.css                          (sin .edit-scope; sigue siendo la única hoja, importada solo acá)
+│       ├── shared/                                 ★
+│       │   ├── view-bar.tsx
+│       │   ├── quantity-stepper.tsx                ★ 4 steppers
+│       │   └── compare-at.tsx                      ★ precio tachado (5 sitios)
+│       ├── drawers/                                ★
+│       │   ├── option-groups.tsx                   OptionGroups + unitGroupsOf + unitsWithExtra
+│       │   ├── product-drawer.tsx                  + trapFocus/FOCUSABLE (privados)
+│       │   └── combo-drawer.tsx                    + ComboDrawerState + comboDrawerState
+│       ├── cart/cart-section.tsx                   ★ + chosenExtras
+│       ├── checkout/
+│       │   ├── checkout-section.tsx                ★ + CHECKOUT_ERRORS + canonicalSelections
+│       │   └── payment-choice.tsx                  ★ + PAYMENT_ICONS
+│       ├── promo/                                  ★ (fase 4)
+│       │   ├── promo-showcase.tsx                  ← ../promo-showcase.tsx (PromoShowcase, PromoTile, usePromoLayout, showcasePromotions)
+│       │   ├── combo-section.tsx                   ★ ComboSection, comboContents, isCombo, comboPromotions
+│       │   └── promo-cards.tsx                     ★ PromoSection + PromoBanner
+│       └── menu.tsx · menu-sections.ts · order-return-modal.tsx · store-toast.tsx
+│           focal-style.ts · storefront-state.ts · use-*.ts   (sin cambios)
+│
+└── lib/money.ts                                    + ARS_DECIMAL (formateador repetido del admin)
+```
+
+**Cambios respecto de la primera versión del árbol**, tras validar con codegraph:
+- `storefront-helpers.ts` pasa a ser `cart-lines.ts` y solo guarda los 2 helpers compartidos. Los demás viven con su único usuario.
+- Se saca `shared/focus-trap.ts`: lo usa únicamente ProductDrawer.
+- Se sacan `shared/use-escape-key.ts` y `promo/mechanic-icons.ts` (ver 4.3 y 4.4).
+- `price.tsx` pasa a llamarse `compare-at.tsx`, porque eso es lo que realmente extrae.
+
 ## 8. Fuera de alcance y avisos
 
 - **E2E (`tests/e2e/*.spec.ts`)**: no se tocan. Si un selector de E2E depende de una ruta de archivo (no debería), anotalo en el PR para agy.
@@ -322,6 +409,7 @@ Reglas:
 
 ## 9. Checklist final del PR de implementación
 
+- [ ] El árbol final coincide con la sección 7.5. Si no coincide, explicá la diferencia en el PR.
 - [ ] Fases 1 a 6 hechas, con un commit por paso.
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` y `pnpm build` en verde. Pegá la línea de resumen de vitest (archivos y tests).
 - [ ] `storefront.tsx` ≤ ~550 líneas; ningún archivo de `src/components/storefront/**` > 450.
