@@ -55,6 +55,7 @@ import { OrderReturnModal } from "./order-return-modal";
 import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
 import { useStoreView, type StoreView } from "./use-store-view";
 import { makeCartLine, toPromotionLines } from "./cart-lines";
+import { CompareAt } from "./shared/compare-at";
 import { ProductDrawer } from "./drawers/product-drawer";
 import { ComboDrawer, comboDrawerState } from "./drawers/combo-drawer";
 import { CartSection } from "./cart/cart-section";
@@ -506,7 +507,7 @@ export function Storefront({
             <small>{itemCount === 1 ? "1 producto" : `${itemCount} productos`}</small>
             <span className="cart-tray-total">
               <strong>{formatArs(subtotal - trayDiscount)}</strong>
-              {trayDiscount > 0n ? <s><span className="sr-only">Antes</span> {formatArs(subtotal)}</s> : null}
+              {trayDiscount > 0n ? <CompareAt cents={subtotal} className="" /> : null}
             </span>
           </span>
           <span className="cart-tray-action">Ver pedido <ArrowRight aria-hidden="true" size={16} /></span>

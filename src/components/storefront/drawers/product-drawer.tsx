@@ -11,6 +11,7 @@ import {
 import { type PromotionalPrice } from "@/domain/promotions";
 import type { CartLine, Product, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { CompareAt } from "../shared/compare-at";
 import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
@@ -118,7 +119,7 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
                 <h2>{product.name}</h2>
                 <span className="product-price">
                   <strong>{formatArs(promotion?.priceCents ?? product.priceCents)}</strong>
-                  {promotion ? <s className="compare-at">{formatArs(promotion.compareAtPriceCents)}</s> : null}
+                  {promotion ? <CompareAt cents={promotion.compareAtPriceCents} srLabel={false} /> : null}
                 </span>
               </div>
               <p className="sr-only" id={summaryId}>

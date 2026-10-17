@@ -10,6 +10,7 @@ import {
 } from "@/domain/catalog";
 import type { CartLine, Product, PromotionRule, SelectedOptions } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { CompareAt } from "../shared/compare-at";
 import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
@@ -128,7 +129,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
                 <h2 id={titleId}>{combo.name}{count > 1 ? <small className="combo-copies"> · {count} combos</small> : null}</h2>
                 <span className="product-price">
                   <strong>{formatArs(fixedCents)}</strong>
-                  {normalCents > fixedCents ? <s className="compare-at"><span className="sr-only">Antes</span> {formatArs(normalCents)}</s> : null}
+                  {normalCents > fixedCents ? <CompareAt cents={normalCents} /> : null}
                 </span>
               </div>
               {combo.badgeText ? <span className="promo-badge combo-badge">{combo.badgeText}</span> : null}

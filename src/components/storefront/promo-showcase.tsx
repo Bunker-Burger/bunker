@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import { explainPromotion, isPromotionInEffect } from "@/domain/promotions";
 import type { Product, PromotionRule } from "@/domain/types";
 import { formatArs } from "@/lib/money";
+import { CompareAt } from "./shared/compare-at";
 import { focalStyle } from "./focal-style";
 
 /*
@@ -114,7 +115,7 @@ export function ComboSection({ combos, products, onAdd }: { combos: readonly Pro
                   <h3>{combo.name}</h3>
                   <span className="product-price">
                     <strong>{formatArs(priceCents)}</strong>
-                    {contents.normalCents > priceCents ? <>{" "}<s className="compare-at"><span className="sr-only">Antes</span> {formatArs(contents.normalCents)}</s></> : null}
+                    {contents.normalCents > priceCents ? <>{" "}<CompareAt cents={contents.normalCents} /></> : null}
                   </span>
                 </div>
                 <p>{combo.description || contents.names}</p>
