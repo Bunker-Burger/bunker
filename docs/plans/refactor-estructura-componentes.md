@@ -17,7 +17,8 @@
 5. **Usar `git mv`** para mover archivos (conserva historia). Para partir un archivo grande: crear el archivo nuevo con el código cortado tal cual y borrar ese bloque del original.
 6. `tsconfig` tiene `exactOptionalPropertyTypes`: al extraer componentes, **no pases `prop={undefined}`** a props opcionales; usá spread condicional `{...(x ? { prop: x } : {})}` o declará el tipo como `prop?: T | undefined` (el repo ya usa las dos formas).
 7. Todos los archivos de UI llevan `"use client";` en la primera línea si usan hooks/estado/eventos. Al partir `storefront.tsx` (que es `"use client"`), **cada archivo nuevo con JSX interactivo lleva `"use client";`**. Los `.ts` puros (helpers sin React) **no** lo llevan.
-8. Imports: dentro de `src/components/storefront/**` se usan rutas relativas (`./`, `../`); entre áreas, el alias `@/` (único alias: `@/*` → `src/*`).
+8. **Usá codegraph** (MCP `mcp__codegraph__*`; el índice está en `.codegraph/`, ignorado por git). Antes de arrancar cada fase corré `codegraph sync` (o `codegraph index` si dice que no hay nodos). Para cada símbolo que muevas: `codegraph_callers` / `codegraph_impact` para saber exactamente quién lo importa (reemplaza los `grep` de este plan; si el MCP dice "not initialized", pasale `projectPath` con la ruta absoluta del repo). Después de mover, `codegraph sync` y volvé a chequear que no queden callers apuntando a la ruta vieja.
+9. Imports: dentro de `src/components/storefront/**` se usan rutas relativas (`./`, `../`); entre áreas, el alias `@/` (único alias: `@/*` → `src/*`).
 
 ## 1. Estado actual (relevado el 2026-10-16)
 
