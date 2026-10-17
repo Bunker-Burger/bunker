@@ -2,10 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { purgeSessionCaches } from "@/lib/session-caches";
-import { logout } from "../actions";
+import { logout } from "@/app/bunker/actions";
 import { LogoutForm } from "./logout-form";
 
-vi.mock("../actions", () => ({ logout: vi.fn(async () => undefined) }));
+vi.mock("@/app/bunker/actions", () => ({ logout: vi.fn(async () => undefined) }));
 vi.mock("@/lib/session-caches", () => ({ purgeSessionCaches: vi.fn(async () => undefined) }));
 
 beforeEach(() => vi.clearAllMocks());

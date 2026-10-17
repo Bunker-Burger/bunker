@@ -2,7 +2,7 @@ import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalo
 import { getStoreAdminView } from "@/server/store-admin";
 import styles from "../../../admin.module.css";
 import { ADMIN_PANEL_PATH } from "../../paths";
-import { AdminPageBar } from "../../page-bar";
+import { AdminPageBar } from "@/components/admin/shared/page-bar";
 import { PromotionForm } from "../promotion-form";
 import { formProducts, newPromotionValues } from "../promotion-props";
 

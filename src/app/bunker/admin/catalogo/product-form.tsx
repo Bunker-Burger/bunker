@@ -7,7 +7,7 @@ import styles from "../../admin.module.css";
 import { saveProductAction } from "./actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
 import { ProductPreview, type PhotoView } from "./product-preview";
-import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "../admin-form";
+import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
 import { PriceField } from "@/components/admin/dashboard/quick-form";
 import { reorderOptionsAction } from "./actions";
 import { IDLE_FORM_STATE } from "./form-state";

@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useActionState, useContext, useId, type ComponentProps, type ReactNode } from "react";
-import styles from "../admin.module.css";
-import { IDLE_FORM_STATE, type AdminFormState } from "./form-state";
+import styles from "@/app/bunker/admin.module.css";
+import { IDLE_FORM_STATE, type AdminFormState } from "@/app/bunker/admin/form-state";
 
 type FormAction = (state: AdminFormState, form: FormData) => Promise<AdminFormState>;
 

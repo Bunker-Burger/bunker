@@ -2,11 +2,11 @@ import { notFound } from "next/navigation";
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
 import { deleteProductAction } from "../../actions";
-import { AdminForm } from "../../../admin-form";
+import { AdminForm } from "@/components/admin/shared/admin-form";
 import { ADMIN_PANEL_PATH } from "../../../paths";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups, formValues } from "../../product-props";
-import { AdminPageBar } from "../../../page-bar";
+import { AdminPageBar } from "@/components/admin/shared/page-bar";
 
 type Params = Promise<{ productId: string }>;
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;

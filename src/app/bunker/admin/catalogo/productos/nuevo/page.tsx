@@ -3,7 +3,7 @@ import styles from "../../../../admin.module.css";
 import { ADMIN_PANEL_PATH } from "../../../paths";
 import { ProductForm } from "../../product-form";
 import { formCategories, formOptionGroups } from "../../product-props";
-import { AdminPageBar } from "../../../page-bar";
+import { AdminPageBar } from "@/components/admin/shared/page-bar";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 

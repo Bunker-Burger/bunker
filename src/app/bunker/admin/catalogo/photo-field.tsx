@@ -3,7 +3,7 @@
 import { Camera, Move } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import styles from "../../admin.module.css";
-import { FieldError } from "../admin-form";
+import { FieldError } from "@/components/admin/shared/admin-form";
 import { PhotoDropzoneContent } from "./photo-dropzone";
 
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/avif";

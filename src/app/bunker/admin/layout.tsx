@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { ADMIN_LOGIN_PATH } from "../paths";
-import { AdminBottomNav } from "./admin-bottom-nav";
-import { LogoutForm } from "./logout-form";
+import { AdminBottomNav } from "@/components/admin/shared/admin-bottom-nav";
+import { LogoutForm } from "@/components/admin/shared/logout-form";
 import styles from "../admin.module.css";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import styles from "../admin.module.css";
+import styles from "@/app/bunker/admin.module.css";
 
 /**
  * Top bar of the admin screens in the canonical captures (issue #54): round back arrow, the screen
