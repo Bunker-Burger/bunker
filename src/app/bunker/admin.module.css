@@ -193,19 +193,6 @@
   letter-spacing: var(--tracking-eyebrow);
 }
 
-.primaryLink {
-  display: inline-flex;
-  min-height: var(--spacing-tap);
-  align-items: center;
-  margin-top: 1rem;
-  padding: 0 1rem;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-weight: 800;
-  text-decoration: none;
-}
-
 @media (max-width: 35rem) {
   .adminHeader {
     align-items: flex-start;
@@ -266,7 +253,6 @@
 /* Grid tracks may shrink below an item's min-content (long file names, URLs) at phone width. */
 .adminForm,
 .tabPanel,
-.imageEditor,
 .field {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -433,46 +419,6 @@
   color: var(--color-muted);
 }
 
-.categoryCard {
-  display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
-}
-
-.cardHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.cardHeader .secondaryLink {
-  margin-left: auto;
-}
-
-.secondaryLink,
-.backLink {
-  display: inline-flex;
-  min-height: var(--spacing-tap);
-  align-items: center;
-  padding: 0 0.9rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  color: var(--color-foreground);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.backLink {
-  margin-bottom: 1rem;
-  border: 0;
-  padding: 0;
-  color: var(--color-primary);
-}
-
 .badge,
 .badgeMuted,
 .badgeWarning {
@@ -514,17 +460,7 @@
   margin-left: 0;
 }
 
-.productList,
-.orderList {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.productRow,
-.orderList > li {
+.productRow {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -532,10 +468,6 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-}
-
-.orderList > li > span {
-  flex: 1;
 }
 
 .thumb {
@@ -555,26 +487,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.productInfo {
-  display: grid;
-  flex: 1;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.productInfo > a {
-  overflow: hidden;
-  color: var(--color-foreground);
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.moveButtons {
-  display: flex;
-  gap: 0.35rem;
 }
 
 .inlineForm {
@@ -608,64 +520,9 @@
   margin-bottom: 0.75rem;
 }
 
-.imageEditor {
-  display: grid;
-  gap: 1rem;
-}
-
-.focalPreviewWrap {
-  max-width: 28rem;
-}
-
-.focalPreview {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  cursor: crosshair;
-}
-
-.focalPreview:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.focalPreview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.focalMarker {
-  position: absolute;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 3px solid var(--color-on-primary);
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  box-shadow: var(--shadow-glow);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.focalInputs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.75rem;
-}
-
 @media (max-width: 35rem) {
   .productRow {
     flex-wrap: wrap;
-  }
-
-  .productInfo {
-    flex-basis: calc(100% - 5rem);
-  }
-
-  .moveButtons {
-    margin-left: auto;
   }
 
   .defaults {
@@ -674,56 +531,6 @@
 }
 
 /* BB-13 — store, hours, payments and promotions */
-
-.adminNav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.sectionLinks {
-  display: grid;
-  gap: 0.75rem;
-  margin: 1.5rem 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sectionLinks > li {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: start;
-}
-
-.sectionLinks .primaryLink {
-  margin-top: 0;
-}
-
-.statusLine {
-  margin: 0;
-}
-
-.publicView {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 0.5rem 1rem;
-  margin: 0;
-}
-
-.publicView dt {
-  color: var(--color-muted);
-  font-weight: 700;
-}
-
-.publicView dd {
-  margin: 0;
-}
-
-.publicView ul {
-  margin: 0;
-  padding-left: 1.1rem;
-}
 
 .promotionRow {
   display: grid;
@@ -778,10 +585,6 @@
   }
 
   .rowFields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .publicView {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -843,7 +646,6 @@
 }
 
 /* Section tabs: the segmented pill bar of the price capture ("Productos · Promociones"). */
-.adminNav,
 .tabs {
   flex-wrap: nowrap;
   gap: 0.35rem;
@@ -880,12 +682,6 @@
   font-size: var(--text-headline-lg);
   line-height: var(--text-headline-lg--line-height);
   letter-spacing: var(--tracking-display);
-}
-
-.backLink {
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-  color: var(--color-foreground);
 }
 
 /* Each section and each group of fields is a card with an uppercase title row. */
@@ -966,8 +762,7 @@
 }
 
 /* Main call to action: the wide amber pill at the end of each capture. */
-.primaryAction,
-.primaryLink {
+.primaryAction {
   min-height: 3.25rem;
   padding: 0 1.5rem;
   border-radius: var(--radius-full);
@@ -1067,18 +862,8 @@
 }
 
 /* Product and promotion rows: the cards of the price capture (photo, name, badges, price). */
-.categoryCard {
-  background: var(--color-surface);
-}
-
-.categoryCard h3 {
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  text-transform: uppercase;
-}
 
 .productRow,
-.orderList > li,
 .promotionRow {
   padding: 0.75rem;
   border-radius: var(--radius-lg);
@@ -1092,28 +877,9 @@
   border-radius: var(--radius-md);
 }
 
-.productInfo > a {
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.productInfo > span:nth-of-type(1) {
-  color: var(--color-primary);
-  font-family: var(--font-display);
-  font-size: var(--text-price);
-  font-weight: 700;
-}
-
 .disclosure {
   border-radius: var(--radius-lg);
   background: var(--color-surface-raised);
-}
-
-.sectionLinks .primaryLink {
-  justify-content: center;
-  width: 100%;
 }
 
 /* Header on one row at phone width: role and sign out stay beside the brand. */
@@ -1148,26 +914,11 @@
 }
 
 /* A category's products are the cards; the category itself is a plain group inside its section. */
-.tabPanel .categoryCard {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
 
 /* Product rows keep the photo beside the name at every width, as in the price capture. */
 .productRow {
   flex-wrap: nowrap;
   align-items: center;
-}
-
-.productRow .productInfo {
-  flex: 1 1 auto;
-  flex-basis: auto;
-}
-
-.productRow .moveButtons {
-  flex-direction: column;
-  margin-left: 0;
 }
 
 .checkGroup.fieldset > legend {
@@ -1297,8 +1048,7 @@
   font-weight: 600;
 }
 
-.statusForm,
-.deliveryForm {
+.statusForm {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1664,15 +1414,6 @@
 .quickToggle input:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
-}
-
-.deliveryForm label {
-  flex-basis: 100%;
-  color: var(--color-muted);
-  font-size: var(--text-badge);
-  font-weight: 700;
-  letter-spacing: var(--tracking-badge);
-  text-transform: uppercase;
 }
 
 @media (min-width: 40rem) {
@@ -2059,28 +1800,6 @@
   background: var(--color-surface-high);
 }
 
-.moreSettings {
-  display: grid;
-  gap: 0.5rem;
-  color: var(--color-muted);
-  font-size: var(--text-body-sm);
-}
-
-.moreSettings p {
-  margin: 0;
-}
-
-.moreSettings .adminNav {
-  margin: 0;
-}
-
-@media (min-width: 64rem) {
-  .moreSettings {
-    grid-column: 2;
-    grid-row: 3;
-  }
-}
-
 /* The capture separates name and price row by space only, and the switch by distance. */
 .quickControls {
   padding-top: 0;
@@ -2285,15 +2004,6 @@
 
 .defaults .checkField span {
   font-weight: 700;
-  text-transform: uppercase;
-}
-
-.selectionTag {
-  grid-column: 2;
-  color: var(--color-muted);
-  font-size: var(--text-badge);
-  font-weight: 700;
-  letter-spacing: var(--tracking-badge);
   text-transform: uppercase;
 }
 
@@ -2522,41 +2232,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   gap: 1rem;
 }
 
-.optionGroupCard {
-  display: grid;
-  gap: 0.6rem;
-  padding: 1rem;
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(var(--color-accent-soft), var(--color-accent-soft)), var(--color-surface);
-  scroll-margin-top: 5rem;
-}
-
-.optionGroupCard header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.optionGroupCard h3 {
-  margin: 0;
-  color: var(--color-primary);
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  text-transform: uppercase;
-}
-
-.optionRows {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.optionRow,
 .newOption {
   display: flex;
   flex-wrap: wrap;
@@ -2591,34 +2266,8 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   outline-offset: 0;
 }
 
-.addOptionAction {
-  display: inline-flex;
-  min-height: var(--spacing-tap);
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0 0.9rem;
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-primary);
-  font-size: var(--text-badge);
-  font-weight: 800;
-  letter-spacing: var(--tracking-badge);
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.optionRow .quickToggle,
 .newOption .quickToggle {
   margin-left: 0;
-}
-
-.editPricesLink {
-  grid-column: 2;
-  justify-self: start;
-  color: var(--color-primary);
-  font-size: var(--text-body-sm);
-  font-weight: 700;
 }
 
 /* Variants of a group in the product form, as the capture: choice, price, save; then "Añadir". */
@@ -2655,14 +2304,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 }
 
 /* The detached forms only show their messages. */
-.optionForms {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.optionForms form {
-  display: contents;
-}
 
 @media (max-width: 26rem) {
   .variantRow {
@@ -3321,9 +2962,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 }
 
 /* On a phone the save button is its check icon (its name stays in aria-label). */
-.variantSaveText {
-  display: none;
-}
 
 @media (max-width: 39.99rem) {
   .defaults {
@@ -3347,10 +2985,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 }
 
 @media (min-width: 40rem) {
-  .variantSaveText {
-    display: inline;
-  }
-
   .variantRow {
     grid-template-areas: "handle choice name price actions";
     grid-template-columns: auto auto minmax(0, 1fr) auto auto;
@@ -3548,7 +3182,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   min-width: 0;
 }
 
-.shiftList,
 .methodList {
   display: grid;
   gap: 0.4rem;
@@ -3557,7 +3190,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
   list-style: none;
 }
 
-.shiftList li,
 .methodList li {
   display: flex;
   align-items: center;
@@ -3599,22 +3231,6 @@ label.dropzone > span:not(.dropzoneIcon, .dropzoneTip) {
 .shiftForm .smallAction {
   grid-column: 1 / -1;
   justify-self: start;
-}
-
-.iconSmall {
-  display: grid;
-  width: var(--spacing-tap);
-  height: var(--spacing-tap);
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-
-.iconSmall:hover {
-  color: var(--color-danger-text);
 }
 
 /* Inside the settings column the cards stack; the old single delivery card's placement does not apply. */
