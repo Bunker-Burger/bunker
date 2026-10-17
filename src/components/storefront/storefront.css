@@ -310,8 +310,8 @@ body.drawer-open { overflow: hidden; }
 .store-legal a { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); font-weight: 700; text-underline-offset: 3px; }
 .store-legal a:focus-visible { outline: 2px solid var(--color-primary-hover); outline-offset: 3px; }
 .store-legal .store-copyright, .store-legal .store-credit { font-size: var(--text-badge); }
-/* "Creado por": the name is set in the brand's display face, small. */
-.store-legal .store-credit a { min-height: 0; font-family: var(--font-display); font-size: var(--text-body-sm); font-weight: 700; letter-spacing: var(--tracking-display); text-decoration: none; text-transform: uppercase; }
+/* "Creado por": the name is set in the brand's display face, small; the link keeps the 44px touch height of the other legal links. */
+.store-legal .store-credit a { font-family: var(--font-display); font-size: var(--text-body-sm); font-weight: 700; letter-spacing: var(--tracking-display); text-decoration: none; text-transform: uppercase; }
 .store-legal .store-credit a:hover { text-decoration: underline; }
 
 /* Promotions with a photo at the top of the menu (issue #54): banner (default) or section. */
