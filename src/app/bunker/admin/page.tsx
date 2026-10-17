@@ -5,9 +5,9 @@ import type { PromotionMechanic } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { getCatalogAdminView } from "@/server/catalog-admin";
 import { getStoreAdminView, PAYMENT_METHODS } from "@/server/store-admin";
-import styles from "../admin.module.css";
+import shared from "@/components/admin/shared/admin-shared.module.css";
 import { formValues, pesos } from "./catalogo/product-props";
-import { AdminDashboard } from "./dashboard";
+import { AdminDashboard } from "@/components/admin/dashboard/dashboard";
 import { PHASE, promotionPhase } from "./promociones/promotion-props";
 import { STATE_LABEL, statusReason } from "./tienda/status-labels";
 
@@ -37,9 +37,9 @@ export default async function AdminHomePage() {
 
   if (!catalogView.ok || !storeView.ok) {
     return (
-      <section className={styles.adminPanel} aria-labelledby="admin-title">
+      <section className={shared.adminPanel} aria-labelledby="admin-title">
         <h1 id="admin-title">Panel administrativo</h1>
-        <p className={styles.error} role="alert">
+        <p className={shared.error} role="alert">
           No pudimos cargar el panel. Recargá la página en unos segundos.
         </p>
       </section>
@@ -55,7 +55,7 @@ export default async function AdminHomePage() {
   const promotions = [...storeCatalog.promotions].sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
 
   return (
-    <section className={styles.adminPanel} aria-labelledby="admin-title">
+    <section className={shared.adminPanel} aria-labelledby="admin-title">
       <h1 className="sr-only" id="admin-title">Panel administrativo</h1>
       <AdminDashboard
         categories={[...catalog.categories]

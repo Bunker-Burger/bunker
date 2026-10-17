@@ -1,0 +1,241 @@
+.rowFields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.preview {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-sm);
+}
+
+.preview th,
+.preview td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.preview td {
+  white-space: nowrap;
+}
+
+@media (max-width: 35rem) {
+  .rowFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.badgeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: -0.4rem;
+}
+
+.badgeChips button {
+  min-height: var(--spacing-tap);
+  padding: 0 0.85rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-high);
+  color: var(--color-foreground);
+  font-size: var(--text-badge);
+  font-weight: 800;
+  letter-spacing: var(--tracking-badge);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.badgeChips button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.badgePicker,
+.dayPicker {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pickerLabel {
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.badgeChips {
+  margin-top: 0;
+}
+
+.badgeChips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.valueBox {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+.valuePair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.valueLabel {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.valueNormal {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.savingBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-foreground);
+  font-size: var(--text-body-sm);
+}
+
+.savingBox strong {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-headline-md);
+}
+
+.comboPrice {
+  grid-column: 1 / -1;
+  color: var(--color-muted);
+  font-size: var(--text-body-sm);
+}
+
+.trashAction {
+  display: grid;
+  width: var(--spacing-tap);
+  height: var(--spacing-tap);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.trashAction:hover {
+  color: var(--color-danger-text);
+}
+
+.addDashed {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.dayChips {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dayChips button {
+  min-height: var(--spacing-tap);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-high);
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dayChips button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.linkAction {
+  justify-self: start;
+  min-height: var(--spacing-tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 26rem) {
+  .valuePair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 26rem) {
+  .valuePair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 21rem) {
+  .valuePair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Fields side by side line up by their top (labels and boxes level), whatever is under each. */
+.valuePair {
+  align-items: start;
+}

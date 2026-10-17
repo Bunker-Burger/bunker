@@ -5,6 +5,7 @@ import { Fragment, useId, useMemo, type ReactNode } from "react";
 import type { Category, Product, ProductType } from "@/domain/types";
 import type { PromotionalPrice } from "@/domain/promotions";
 import { formatArs } from "@/lib/money";
+import { CompareAt } from "./shared/compare-at";
 import { focalStyle } from "./focal-style";
 import { buildMenuSections, FEATURED_SECTION_ID, menuCategories, type MenuSectionView } from "./menu-sections";
 
@@ -170,7 +171,7 @@ export function ProductCard({ product, promotion, layout, categoryName, onOpen, 
             {/* Read as "$X Antes $Y"; shown (column-reverse) with the struck price on top. */}
             <span className="product-price" id={`${id}-price`}>
               <strong>{formatArs(priceCents)}</strong>
-              {promotion ? <>{" "}<s className="compare-at"><span className="sr-only">Antes</span> {formatArs(promotion.compareAtPriceCents)}</s></> : null}
+              {promotion ? <>{" "}<CompareAt cents={promotion.compareAtPriceCents} /></> : null}
             </span>
           </div>
           {promotion ? <span className="promo-note">{promotion.promotionName}: {promotion.explanation}</span> : null}
