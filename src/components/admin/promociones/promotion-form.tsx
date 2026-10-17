@@ -40,7 +40,6 @@ export interface PromotionFormValues {
   schedule: Array<{ dayOfWeek: string; startsAt: string; endsAt: string }>;
 }
 
-
 interface PromotionFormProps {
   products: PromotionFormProduct[];
   deliveryFeeCents: string | null;
@@ -51,14 +50,12 @@ interface PromotionFormProps {
   photo?: PhotoValue;
 }
 
-
 const MECHANIC_ICON: Record<PromotionMechanic["type"], LucideIcon> = {
   fixed_price: Package,
   percent_off: Percent,
   buy_x_get_y: Copy,
   free_delivery: Bike
 };
-
 
 export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, action = savePromotionAction, photo }: PromotionFormProps) {
   const [type, setType] = useState(defaults.type);
@@ -282,7 +279,6 @@ export function PromotionForm({ products, deliveryFeeCents, timezone, defaults, 
           <p className={styles.hint}>Precios de ejemplo con esta promo, sin tener en cuenta fechas ni horarios.</p>
         </section>
       </fieldset>
-
 
       <fieldset className={`${styles.formCard} ${styles.promoCard}`}>
         <legend>

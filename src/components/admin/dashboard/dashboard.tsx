@@ -54,7 +54,6 @@ export interface DashboardStore {
   whatsapp: string;
 }
 
-
 /**
  * The owner's control panel, after the canonical capture admin_configuraci_n_precios (issue #54):
  * store status, search and shortcuts, then prices and stock of products and promotions, and the
