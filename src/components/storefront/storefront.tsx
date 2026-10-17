@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, 
+import {
+  MapPin,
   ArrowLeft,
   ArrowRight,
   Banknote,
@@ -19,7 +20,14 @@ import { MapPin,
   Wallet,
   X
 } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import {
   addCartLine,
   clearCart,
@@ -37,10 +45,18 @@ import {
 } from "@/domain/catalog";
 import { comboCount, removeOneCombo } from "@/domain/combos";
 import { quoteCart } from "@/domain/pricing";
-import { promotionalPrice, type PromotionalPrice, type PromotionLine } from "@/domain/promotions";
+import { promotionalPrice, type PromotionalPrice } from "@/domain/promotions";
 import { toPromotionRule, type PublicPromotion } from "@/domain/public-promotions";
 import { PUBLIC_PAYMENT_NOTE } from "@/domain/public-payment-options";
-import type { CartLine, FulfilmentMethod, PaymentMethodKind, Product, PromotionRule, PublicCatalogSnapshot, SelectedOptions } from "@/domain/types";
+import type {
+  CartLine,
+  FulfilmentMethod,
+  PaymentMethodKind,
+  Product,
+  PromotionRule,
+  PublicCatalogSnapshot,
+  SelectedOptions
+} from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { useCart, useRevalidationNotice, useStorageDegraded } from "@/lib/cart-store";
@@ -50,14 +66,16 @@ import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
 import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
-import {
-  changeLineQuantity,
-  clearOptionGroup,
-  toggleOption,
-  type PaymentMethod
-} from "./storefront-state";
+import { changeLineQuantity, clearOptionGroup, toggleOption, type PaymentMethod } from "./storefront-state";
 import { focalStyle } from "./focal-style";
-import { ComboSection, comboContents, comboPromotions, PromoShowcase, showcasePromotions, usePromoLayout } from "./promo-showcase";
+import {
+  ComboSection,
+  comboContents,
+  comboPromotions,
+  PromoShowcase,
+  showcasePromotions,
+  usePromoLayout
+} from "./promo-showcase";
 import { useNow } from "./use-now";
 import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
@@ -67,6 +85,7 @@ import { Menu } from "./menu";
 import { OrderReturnModal } from "./order-return-modal";
 import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
 import { useStoreView, type StoreView } from "./use-store-view";
+import { makeCartLine, toPromotionLines } from "./cart-lines";
 import "./storefront.css";
 
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
@@ -133,20 +152,6 @@ function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
     event.preventDefault();
     first.focus();
   }
-}
-
-function makeCartLine(product: Product, selectedOptions: SelectedOptions, quantity: number, notes: string, comboId?: string): CartLine {
-  return {
-    ...(comboId ? { comboId } : {}),
-    id: product.id,
-    productId: product.id,
-    productSlug: product.slug,
-    productName: product.name,
-    unitPriceCents: calculateConfiguredUnitPrice(product, selectedOptions),
-    quantity,
-    notes,
-    selectedOptions
-  };
 }
 
 export function Storefront({
@@ -1335,20 +1340,6 @@ function CartSection({
       )}
     </section>
   );
-}
-
-/** Cart lines as the promotion engine reads them; base prices come from the catalog, not the cart. */
-function toPromotionLines(cart: CartLine[], catalogProducts: readonly Product[]): PromotionLine[] {
-  return cart.map((line) => {
-    const basePriceCents = catalogProducts.find((product) => product.id === line.productId)?.priceCents ?? line.unitPriceCents;
-    return {
-      productId: line.productId,
-      quantity: line.quantity,
-      unitPriceCents: line.unitPriceCents,
-      basePriceCents: basePriceCents > line.unitPriceCents ? line.unitPriceCents : basePriceCents,
-      ...(line.comboId ? { comboId: line.comboId } : {})
-    };
-  });
 }
 
 /** Same choices, same JSON: empty groups dropped and groups in a stable order. */
