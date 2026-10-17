@@ -7,7 +7,7 @@ import { getCatalogAdminView } from "@/server/catalog-admin";
 import { getStoreAdminView, PAYMENT_METHODS } from "@/server/store-admin";
 import styles from "../admin.module.css";
 import { formValues, pesos } from "./catalogo/product-props";
-import { AdminDashboard } from "./dashboard";
+import { AdminDashboard } from "@/components/admin/dashboard/dashboard";
 import { PHASE, promotionPhase } from "./promociones/promotion-props";
 import { STATE_LABEL, statusReason } from "./tienda/status-labels";
 

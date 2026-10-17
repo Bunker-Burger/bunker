@@ -4,10 +4,10 @@ import { CalendarClock, ChevronDown, CirclePlus, CreditCard, GripVertical, Truck
 import type { ReactNode } from "react";
 import { ARS_DECIMAL } from "@/lib/money";
 import styles from "../admin.module.css";
-import { useOrderSaver } from "./category-tools";
-import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";
+import { useOrderSaver } from "@/components/admin/dashboard/category-tools";
+import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "@/components/admin/dashboard/quick-form";
 import { addShiftAction, deleteShiftAction, reorderPaymentMethodsAction, saveStoreContactAction, savePaymentMethodAction } from "./tienda/actions";
-import { useDragOrder } from "./use-drag-order";
+import { useDragOrder } from "@/components/admin/dashboard/use-drag-order";
 
 export const WEEKDAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
