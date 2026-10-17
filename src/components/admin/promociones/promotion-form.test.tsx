@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { quoteCart } from "@/domain/pricing";
 import type { PromotionRule } from "@/domain/types";
 import type { AdminFormState } from "@/app/bunker/admin/form-state";
-import { PromotionForm, previewRows, type PromotionFormProduct, type PromotionFormValues } from "./promotion-form";
+import { PromotionForm, type PromotionFormProduct, type PromotionFormValues } from "./promotion-form";
+import { previewRows } from "./promotion-form-model";
 
 vi.mock("@/app/bunker/admin/promociones/actions", () => ({ savePromotionAction: vi.fn() }));
 
