@@ -3,10 +3,8 @@
 import {
   MapPin,
   ArrowRight,
-  Banknote,
   Check,
   Hamburger,
-  Landmark,
   ReceiptText,
   ScrollText,
   Search,
@@ -72,6 +70,7 @@ import { ViewBar } from "./shared/view-bar";
 import { ProductDrawer } from "./drawers/product-drawer";
 import { ComboDrawer, comboDrawerState } from "./drawers/combo-drawer";
 import { CartSection } from "./cart/cart-section";
+import { PaymentChoice } from "./checkout/payment-choice";
 import "./storefront.css";
 
 const INVALID_PRODUCT_NOTICE = "Ese producto ya no está disponible.";
@@ -1021,18 +1020,5 @@ function CheckoutSection({
         </div>
       </div>
     </section>
-  );
-}
-
-const PAYMENT_ICONS: Record<PaymentMethod, typeof Banknote> = { "mercado-pago": Wallet, transfer: Landmark, cash: Banknote };
-
-function PaymentChoice({ checked, label, note, onChange, value }: { checked: boolean; label: string; note: string; onChange: () => void; value: PaymentMethod }) {
-  const Icon = PAYMENT_ICONS[value];
-  return (
-    <label className={checked ? "payment-choice active" : "payment-choice"}>
-      <input checked={checked} name="payment" onChange={onChange} type="radio" value={value} />
-      <span><strong>{label}</strong><small>{note}</small></span>
-      <Icon aria-hidden="true" />
-    </label>
   );
 }
