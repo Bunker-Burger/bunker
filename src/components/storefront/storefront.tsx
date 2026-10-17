@@ -38,14 +38,8 @@ import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { AppShell, SiteHeader } from "@/components/shell/app-shell";
 import { BottomNav, type BottomNavItem } from "@/components/shell/bottom-nav";
 import { useVirtualKeyboardOpen } from "@/components/shell/use-virtual-keyboard";
-import {
-  ComboSection,
-  comboContents,
-  comboPromotions,
-  PromoShowcase,
-  showcasePromotions,
-  usePromoLayout
-} from "./promo/promo-showcase";
+import { ComboSection, comboContents, comboPromotions } from "./promo/combo-section";
+import { PromoShowcase, showcasePromotions, usePromoLayout } from "./promo/promo-showcase";
 import { useNow } from "./use-now";
 import { usePublicCatalog } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";

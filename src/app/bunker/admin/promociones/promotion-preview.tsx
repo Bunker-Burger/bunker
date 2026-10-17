@@ -3,7 +3,8 @@
 import { Eye } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import "@/components/storefront/storefront.css";
-import { ComboSection, isCombo, PromoBanner, PromoSection } from "@/components/storefront/promo/promo-showcase";
+import { ComboSection, isCombo } from "@/components/storefront/promo/combo-section";
+import { PromoBanner, PromoSection } from "@/components/storefront/promo/promo-cards";
 import type { PromotionMechanic, PromotionRule } from "@/domain/types";
 import styles from "../../admin.module.css";
 
