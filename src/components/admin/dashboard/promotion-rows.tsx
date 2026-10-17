@@ -5,7 +5,7 @@ import Link from "next/link";
 import { reorderPromotionsAction, setPromotionActiveAction } from "@/app/bunker/admin/promociones/actions";
 import { promotionEditPath } from "@/app/bunker/admin/paths";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 import { useOrderSaver } from "./category-tools";
 import type { DashboardPromotion } from "./dashboard";
 import { QuickRowInfo } from "./product-rows";

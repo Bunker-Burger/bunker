@@ -5,7 +5,7 @@ import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { ARS_DECIMAL } from "@/lib/money";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 import { IDLE_FORM_STATE, type AdminFormState } from "@/app/bunker/admin/form-state";
 
 type FormAction = (state: AdminFormState, form: FormData) => Promise<AdminFormState>;

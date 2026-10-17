@@ -4,7 +4,7 @@ import { Check, CirclePlus, GripVertical, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 import { createCategoryAction, deleteCategoryAction, reorderCategoriesAction, updateCategoryAction } from "@/app/bunker/admin/catalogo/actions";
 import { IDLE_FORM_STATE, type AdminFormState } from "@/app/bunker/admin/form-state";
 import { QuickForm, QuickSubmit } from "./quick-form";

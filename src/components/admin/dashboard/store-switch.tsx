@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 
 /**
  * Open or close the store, as the capture's switch: on sets "Abierto", off sets "Cerrado". Pausing

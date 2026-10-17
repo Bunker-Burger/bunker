@@ -8,7 +8,7 @@ import { productEditPath } from "@/app/bunker/admin/catalogo/form-state";
 import { reorderProductsAction, saveProductAction } from "@/app/bunker/admin/catalogo/actions";
 import type { ProductFormValues } from "@/components/admin/catalogo/product-form";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 import { useOrderSaver } from "./category-tools";
 import type { DashboardProduct } from "./dashboard";
 import { PriceField, QuickForm, QuickSubmit, QuickToggle } from "./quick-form";

@@ -10,7 +10,7 @@ import { ADMIN_PROMOTIONS_PATH } from "@/app/bunker/admin/paths";
 import { setStoreStatusAction } from "@/app/bunker/admin/tienda/actions";
 import { OVERRIDE_OPTIONS } from "@/app/bunker/admin/tienda/status-labels";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./dashboard.module.css";
 import type { ProductFormValues } from "@/components/admin/catalogo/product-form";
 import { StoreSettings, type StoreSettingsProps } from "@/components/admin/tienda/store-settings";
 import { CategoryTools, type DashboardCategory } from "./category-tools";
