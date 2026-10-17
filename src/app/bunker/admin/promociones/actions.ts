@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { catalogAdminDependencies, deletePromotionImage, savePromotionImage } from "@/server/catalog-admin";
-import { deletePromotion, movePromotion, reorderPromotions, savePromotion, setPromotionActive, storeAdminDependencies } from "@/server/store-admin";
+import { deletePromotion, reorderPromotions, savePromotion, setPromotionActive, storeAdminDependencies } from "@/server/store-admin";
 import { performAdminAction } from "../admin-action";
 import type { AdminFormState } from "../form-state";
 import { ADMIN_PANEL_PATH, promotionEditPath } from "../paths";
@@ -41,10 +41,6 @@ async function savePhoto(promotionId: string, form: FormData): Promise<AdminForm
 
 export async function setPromotionActiveAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   return (await performAdminAction(storeAdminDependencies, setPromotionActive, form, ADMIN_PANEL_PATH)).state;
-}
-
-export async function movePromotionAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await performAdminAction(storeAdminDependencies, movePromotion, form, ADMIN_PANEL_PATH)).state;
 }
 
 /** Drag and drop in the panel: the first one is tried first (issue #54). */

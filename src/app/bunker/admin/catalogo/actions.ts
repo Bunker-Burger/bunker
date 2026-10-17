@@ -9,8 +9,6 @@ import {
   deleteCategory,
   deleteProduct,
   deleteProductImage,
-  moveCategory,
-  moveProduct,
   saveProduct,
   reorderCategories,
   reorderOptions,
@@ -61,14 +59,6 @@ export async function updateCategoryAction(_previous: AdminFormState, form: Form
 
 export async function deleteCategoryAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
   return (await perform(deleteCategory, form)).state;
-}
-
-export async function moveCategoryAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await perform(moveCategory, form)).state;
-}
-
-export async function moveProductAction(_previous: AdminFormState, form: FormData): Promise<AdminFormState> {
-  return (await perform(moveProduct, form)).state;
 }
 
 /**
