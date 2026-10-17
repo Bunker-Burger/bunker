@@ -3,7 +3,7 @@
 import { Camera, Move } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./catalogo.module.css";
 import { FieldError } from "@/components/admin/shared/admin-form";
 import { PhotoDropzoneContent } from "./photo-dropzone";
 

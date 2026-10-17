@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "../../../../admin.module.css";
+import styles from "@/components/admin/catalogo/catalogo.module.css";
 import { deleteProductAction } from "../../actions";
 import { AdminForm } from "@/components/admin/shared/admin-form";
 import { ADMIN_PANEL_PATH } from "../../../paths";

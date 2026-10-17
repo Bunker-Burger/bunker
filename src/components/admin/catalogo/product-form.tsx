@@ -4,7 +4,7 @@ import { CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, t
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "@/app/bunker/admin.module.css";
+import styles from "./catalogo.module.css";
 import { saveProductAction } from "@/app/bunker/admin/catalogo/actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
 import { ProductPreview, type PhotoView } from "./product-preview";
