@@ -409,12 +409,12 @@ src/
 
 ## 9. Checklist final del PR de implementación
 
-- [ ] El árbol final coincide con la sección 7.5. Si no coincide, explicá la diferencia en el PR.
-- [ ] Fases 1 a 6 hechas, con un commit por paso.
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` y `pnpm build` en verde. Pegá la línea de resumen de vitest (archivos y tests).
-- [ ] `storefront.tsx` ≤ ~550 líneas; ningún archivo de `src/components/storefront/**` > 450.
-- [ ] `src/app/bunker/admin/**` sin componentes de UI (solo rutas, actions y helpers de datos).
-- [ ] `admin.module.css` borrado; `grep -rn "admin.module.css" src` da 0 resultados.
-- [ ] Capturas del admin y del storefront (mobile y desktop) sin cambios visuales.
-- [ ] La lista de "no borrado por duda" (fase 1) está en la descripción del PR.
-- [ ] No se tocaron migraciones, `database.types.ts`, `.gitignore`, `next-env.d.ts` ni E2E.
+- [~] El árbol final coincide con la sección 7.5. Si no coincide, explicá la diferencia en el PR. (con desvíos menores: ver "Fases 5-6" en el PR)
+- [x] Fases 1 a 6 hechas, con un commit por paso.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` y `pnpm build` en verde. Pegá la línea de resumen de vitest (archivos y tests).
+- [ ] `storefront.tsx` ≤ ~550 líneas; ningún archivo de `src/components/storefront/**` > 450. (pendiente: `storefront.tsx` tiene 601 líneas; el resto de `storefront/**` cumple)
+- [x] `src/app/bunker/admin/**` sin componentes de UI (solo rutas, actions y helpers de datos).
+- [x] `admin.module.css` borrado; `grep -rn "admin.module.css" src` da 0 resultados.
+- [ ] Capturas del admin y del storefront (mobile y desktop) sin cambios visuales. (pendiente: falta la verificación visual del admin con sesión)
+- [x] La lista de "no borrado por duda" (fase 1) está en la descripción del PR.
+- [x] No se tocaron migraciones, `database.types.ts`, `.gitignore`, `next-env.d.ts` ni E2E.
