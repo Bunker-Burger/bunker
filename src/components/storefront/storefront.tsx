@@ -92,7 +92,7 @@ function removeProductParam() {
 /** Credit in the footer: opens the developer's WhatsApp with a message asking about their services. */
 const CREDIT_WHATSAPP_URL = `https://wa.me/543865575688?text=${encodeURIComponent("Hola Lautaro! Vi la carta online de Búnker Burguer y me gustaría consultarte por tus servicios.")}`;
 
-export interface StorefrontProps {
+interface StorefrontProps {
   initialProductSlug: string | null;
   mercadoPagoEnabled: boolean;
   /** Methods the store has enabled (`store_payment_methods`); the server enforces them again. */

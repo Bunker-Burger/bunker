@@ -17,7 +17,7 @@ import { focalStyle } from "./focal-style";
  * cards of the menu, opened with `?promos=seccion`; `?promos=ambas` shows both, to compare.
  */
 
-export type PromoLayout = "banner" | "section" | "both";
+type PromoLayout = "banner" | "section" | "both";
 
 const subscribe = () => () => {};
 const LAYOUTS: Record<string, PromoLayout> = { seccion: "section", ambas: "both" };
