@@ -4,7 +4,7 @@ import styles from "../../../../admin.module.css";
 import { deleteProductAction } from "../../actions";
 import { AdminForm } from "@/components/admin/shared/admin-form";
 import { ADMIN_PANEL_PATH } from "../../../paths";
-import { ProductForm } from "../../product-form";
+import { ProductForm } from "@/components/admin/catalogo/product-form";
 import { formCategories, formOptionGroups, formValues } from "../../product-props";
 import { AdminPageBar } from "@/components/admin/shared/page-bar";
 

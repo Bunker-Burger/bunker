@@ -1,5 +1,5 @@
 import { CloudUpload, Zap } from "lucide-react";
-import styles from "../../admin.module.css";
+import styles from "@/app/bunker/admin.module.css";
 
 /** Inside of the photo box of the new-product capture: icon, title, formats and the backdrop tip. */
 export function PhotoDropzoneContent({ title, detail }: { title: string; detail: string }) {

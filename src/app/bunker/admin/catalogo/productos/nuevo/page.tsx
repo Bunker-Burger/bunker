@@ -1,7 +1,7 @@
 import { getCatalogAdminView, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import styles from "../../../../admin.module.css";
 import { ADMIN_PANEL_PATH } from "../../../paths";
-import { ProductForm } from "../../product-form";
+import { ProductForm } from "@/components/admin/catalogo/product-form";
 import { formCategories, formOptionGroups } from "../../product-props";
 import { AdminPageBar } from "@/components/admin/shared/page-bar";
 

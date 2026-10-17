@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import "@/components/storefront/storefront.css";
 import { layoutFor, ProductCard } from "@/components/storefront/menu";
 import type { Product, ProductType } from "@/domain/types";
-import styles from "../../admin.module.css";
+import styles from "@/app/bunker/admin.module.css";
 import type { ProductFormCategory } from "./product-form";
 
 export interface PhotoView {

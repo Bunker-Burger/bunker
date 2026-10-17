@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { reorderOptionsAction, saveOptionAction, saveProductAction } from "./actions";
-import type { AdminFormState } from "./form-state";
+import { reorderOptionsAction, saveOptionAction, saveProductAction } from "@/app/bunker/admin/catalogo/actions";
+import type { AdminFormState } from "@/app/bunker/admin/catalogo/form-state";
 import { ProductForm, type ProductFormCategory, type ProductFormOptionGroup } from "./product-form";
 
-vi.mock("./actions", () => ({ saveProductAction: vi.fn(), saveOptionAction: vi.fn(), reorderOptionsAction: vi.fn() }));
+vi.mock("@/app/bunker/admin/catalogo/actions", () => ({ saveProductAction: vi.fn(), saveOptionAction: vi.fn(), reorderOptionsAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const categories: ProductFormCategory[] = [

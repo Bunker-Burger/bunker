@@ -8,7 +8,7 @@ import type { ProductType } from "@/domain/types";
 import styles from "@/app/bunker/admin.module.css";
 import { CategoryTools, useOrderSaver, type DashboardCategory } from "./category-tools";
 import { reorderProductsAction, saveProductAction } from "@/app/bunker/admin/catalogo/actions";
-import type { ProductFormValues } from "@/app/bunker/admin/catalogo/product-form";
+import type { ProductFormValues } from "@/components/admin/catalogo/product-form";
 import { ADMIN_CATALOG_PATH, productEditPath } from "@/app/bunker/admin/catalogo/form-state";
 import { ADMIN_PROMOTIONS_PATH, promotionEditPath } from "@/app/bunker/admin/paths";
 import { reorderPromotionsAction, setPromotionActiveAction } from "@/app/bunker/admin/promociones/actions";

@@ -3,14 +3,14 @@
 import { CupSoda, GripVertical, Hamburger, Popcorn, Sandwich, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import styles from "../../admin.module.css";
-import { saveProductAction } from "./actions";
+import styles from "@/app/bunker/admin.module.css";
+import { saveProductAction } from "@/app/bunker/admin/catalogo/actions";
 import { PhotoField, type PhotoValue } from "./photo-field";
 import { ProductPreview, type PhotoView } from "./product-preview";
 import { AdminForm, CheckboxField, FieldError, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
 import { PriceField } from "@/components/admin/dashboard/quick-form";
-import { reorderOptionsAction } from "./actions";
-import { IDLE_FORM_STATE } from "./form-state";
+import { reorderOptionsAction } from "@/app/bunker/admin/catalogo/actions";
+import { IDLE_FORM_STATE } from "@/app/bunker/admin/catalogo/form-state";
 
 export interface ProductFormCategory {
   id: string;

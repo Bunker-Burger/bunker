@@ -7,7 +7,7 @@ import type { FulfilmentMethod, PromotionMechanic, PromotionRule } from "@/domai
 import { formatArs } from "@/lib/money";
 import styles from "../../admin.module.css";
 import { AdminForm, CheckboxField, FieldError, SelectField, TextAreaField, TextField } from "@/components/admin/shared/admin-form";
-import { PhotoField, type PhotoValue } from "../catalogo/photo-field";
+import { PhotoField, type PhotoValue } from "@/components/admin/catalogo/photo-field";
 import { PromotionPreview } from "./promotion-preview";
 import { savePromotionAction } from "./actions";
 
