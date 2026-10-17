@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { login, type LoginActionState } from "./actions";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "./admin.module.css";
+import styles from "./login.module.css";
 
 const initialState: LoginActionState = { message: null };
 

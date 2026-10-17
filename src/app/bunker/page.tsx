@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { getCurrentStoreAdmin } from "@/server/auth/admin-session";
 import { ADMIN_HOME_PATH } from "./paths";
 import shared from "@/components/admin/shared/admin-shared.module.css";
-import styles from "./admin.module.css";
+import styles from "./login.module.css";
 import { LoginForm } from "./login-form";
 
 export default async function BunkerLoginPage() {
