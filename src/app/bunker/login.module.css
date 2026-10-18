@@ -1,0 +1,49 @@
+.viewport {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at top, var(--color-accent-soft), transparent 35rem),
+    var(--color-canvas);
+}
+
+.card {
+  width: min(100%, 28rem);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+}
+
+.heading {
+  margin: 2rem 0;
+}
+
+.heading p {
+  margin: 0 0 0.5rem;
+  color: var(--color-primary);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-eyebrow);
+}
+
+.heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+}
+
+.heading > span {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--color-muted);
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+}

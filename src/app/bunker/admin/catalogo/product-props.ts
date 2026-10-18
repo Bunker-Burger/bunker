@@ -2,7 +2,7 @@ import type { Category, Product } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import type { AdminOptionGroup } from "@/server/catalog-admin";
 import { tabForType } from "./form-state";
-import type { ProductFormCategory, ProductFormOptionGroup, ProductFormValues } from "./product-form";
+import type { ProductFormCategory, ProductFormOptionGroup, ProductFormValues } from "@/components/admin/catalogo/product-form";
 
 /* Plain, serializable props for the client editor (no bigint, no domain classes). */
 
