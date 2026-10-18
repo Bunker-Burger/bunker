@@ -63,7 +63,8 @@ export function CheckoutSection({
   storeStatus,
   deliveryFeeCents,
   timezone,
-  onCheckoutRedirect
+  onCheckoutRedirect,
+  onOrderSent
 }: {
   active: boolean;
   cart: CartLine[];
@@ -81,6 +82,8 @@ export function CheckoutSection({
   deliveryFeeCents: bigint | null;
   timezone: string;
   onCheckoutRedirect?: ((url: string) => void) | undefined;
+  /** The customer opened WhatsApp with the order. */
+  onOrderSent: () => void;
 }) {
   const offered: PaymentMethod[] = [
     ...(mercadoPagoEnabled && paymentMethods.includes("mercado_pago") ? ["mercado-pago" as const] : []),
@@ -415,7 +418,7 @@ export function CheckoutSection({
               {mpButtonLabel}
             </button>
           ) : confirmed && online ? (
-            <a className="whatsapp-button" href={confirmed.url} rel="noopener noreferrer" target="_blank">
+            <a className="whatsapp-button" href={confirmed.url} onClick={onOrderSent} rel="noopener noreferrer" target="_blank">
               Enviar pedido por WhatsApp
             </a>
           ) : (
@@ -427,7 +430,7 @@ export function CheckoutSection({
             {payment === "mercado-pago"
               ? "Serás redirigido al sitio seguro de Mercado Pago. Al finalizar el pago volverás a esta página para coordinar la entrega por WhatsApp."
               : confirmed
-                ? "Se abre WhatsApp con tu pedido para que el local lo confirme. El carrito queda guardado en este dispositivo."
+                ? "Se abre WhatsApp con tu pedido para que el local lo confirme. Cuando vuelvas, te preguntamos si lo enviaste para vaciar el carrito."
                 : "Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo."}
           </small>
         </div>

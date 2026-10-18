@@ -44,6 +44,8 @@ import { useNow } from "./use-now";
 import { usePublicCatalog } from "./use-public-catalog";
 import { usePublicPromotions } from "./use-public-promotions";
 import { useStoreStatus } from "./use-store-status";
+import { forgetOrderSent, markOrderSent, shouldAskOrderSent } from "./order-sent";
+import { OrderSentPrompt } from "./order-sent-prompt";
 import { Menu } from "./menu";
 import { OrderReturnModal } from "./order-return-modal";
 import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
@@ -149,6 +151,34 @@ export function Storefront({
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
+  // Back from WhatsApp (the page was hidden, or it is opened again later): ask whether the order
+  // went out before emptying the cart. See order-sent.ts.
+  const [askOrderSent, setAskOrderSent] = useState(false);
+  const leftPageRef = useRef(false);
+  const checkedOnLoadRef = useRef(false);
+  useEffect(() => {
+    const ask = () => {
+      if (shouldAskOrderSent(cart, Date.now())) setAskOrderSent(true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        leftPageRef.current = true;
+      } else if (leftPageRef.current) {
+        leftPageRef.current = false;
+        ask();
+      }
+    };
+    let timer = 0;
+    if (!checkedOnLoadRef.current && cart.length > 0) {
+      checkedOnLoadRef.current = true;
+      timer = window.setTimeout(ask, 0);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [cart]);
   const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog, fallback: catalogFallback });
   const storageDegraded = useStorageDegraded();
 
@@ -492,7 +522,25 @@ export function Storefront({
         timezone={timezone}
         verificationStatus={verificationStatus}
         onCheckoutRedirect={onCheckoutRedirect}
+        onOrderSent={() => markOrderSent(cart, Date.now())}
       />
+
+      {askOrderSent ? (
+        <OrderSentPrompt
+          onKeep={() => {
+            forgetOrderSent();
+            setAskOrderSent(false);
+          }}
+          onSent={() => {
+            forgetOrderSent();
+            setAskOrderSent(false);
+            setCart([]);
+            clearCart();
+            setNotice("Listo, vaciamos el carrito. El local te confirma el pedido por WhatsApp.");
+            window.location.hash = "menu";
+          }}
+        />
+      ) : null}
 
       {itemCount > 0 && !keyboardOpen && view === "menu" ? (
         <a className="cart-tray" href="#carrito">
