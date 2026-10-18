@@ -233,6 +233,67 @@ describe("WhatsApp checkout (BB-10)", () => {
     expect(JSON.stringify(sent?.body)).not.toMatch(/price|total|cents|promotion|customer/i);
   });
 
+  describe("back from WhatsApp", () => {
+    // jsdom does not navigate: the click is what opens WhatsApp, and the page going hidden and
+    // visible again is the customer coming back.
+    let visibility: DocumentVisibilityState = "visible";
+    beforeEach(() => {
+      visibility = "visible";
+      vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visibility);
+    });
+    const leaveAndComeBack = () => {
+      for (const state of ["hidden", "visible"] as const) {
+        visibility = state;
+        act(() => {
+          document.dispatchEvent(new Event("visibilitychange"));
+        });
+      }
+    };
+    const sendOrder = async (user: ReturnType<typeof userEvent.setup>) => {
+      const checkout = await fillCompleteOrder(user);
+      const link = await within(checkout).findByRole("link", { name: "Enviar pedido por WhatsApp" });
+      expect(within(checkout).getByText(/te preguntamos si lo enviaste/)).toBeInTheDocument();
+      link.addEventListener("click", (event) => event.preventDefault());
+      await user.click(link);
+    };
+
+    it("does not empty the cart on the click; on coming back, 'Sí' empties it", async () => {
+      serveOpenStore();
+      const user = userEvent.setup();
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+      await sendOrder(user);
+
+      // Still there right after the click, and nothing is asked while the page never left.
+      expect(localStorage.getItem("bunker-cart")).toContain("smash-doble");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+
+      leaveAndComeBack();
+      const prompt = await screen.findByRole("alertdialog", { name: "¿Enviaste tu pedido?" });
+      await user.click(within(prompt).getByRole("button", { name: "Sí, vaciar carrito" }));
+
+      await waitFor(() => expect(localStorage.getItem("bunker-cart") ?? "").not.toContain("smash-doble"));
+      expect(window.location.hash).toBe("#menu");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(localStorage.getItem("bunker-order-sent")).toBeNull();
+    });
+
+    it("'No, seguir con mi pedido' keeps the cart and does not ask again", async () => {
+      serveOpenStore();
+      const user = userEvent.setup();
+      render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+      await sendOrder(user);
+
+      leaveAndComeBack();
+      const prompt = await screen.findByRole("alertdialog", { name: "¿Enviaste tu pedido?" });
+      await user.click(within(prompt).getByRole("button", { name: "No, seguir con mi pedido" }));
+
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(localStorage.getItem("bunker-cart")).toContain("smash-doble");
+      leaveAndComeBack();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+  });
+
   it("recomputes with the server when the payment method changes", async () => {
     serveOpenStore();
     const user = userEvent.setup();

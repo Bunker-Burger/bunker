@@ -305,6 +305,10 @@ body.drawer-open { overflow: hidden; }
 .return-modal-instruction strong { display: block; margin-bottom: .25rem; }
 .return-modal-instruction span { color: var(--color-muted); }
 .return-modal-actions { display: flex; gap: .75rem; }
+.order-sent-actions { flex-direction: column; }
+.secondary-action { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: .75rem 1.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-full); background: transparent; color: var(--color-foreground); font-size: var(--text-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; cursor: pointer; }
+.secondary-action:hover { border-color: var(--color-accent-border); }
+.secondary-action.wide { width: 100%; }
 
 
 /* BB-18: allergen notice and legal links, at the end of the page above the bottom nav. */

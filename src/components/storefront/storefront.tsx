@@ -63,6 +63,8 @@ import { usePublicCatalog, type CatalogVerificationStatus } from "./use-public-c
 import { usePublicPromotions } from "./use-public-promotions";
 import { acceptsOrdersNow, describeStoreStatus, useStoreStatus, type StoreStatusView } from "./use-store-status";
 import { useWhatsAppCheckout, type WhatsAppCheckoutRequest } from "./use-whatsapp-checkout";
+import { forgetOrderSent, markOrderSent, shouldAskOrderSent } from "./order-sent";
+import { OrderSentPrompt } from "./order-sent-prompt";
 import { Menu } from "./menu";
 import { OrderReturnModal } from "./order-return-modal";
 import { LONG_TOAST_DURATION_MS, StoreToast, TOAST_DURATION_MS, type ToastMessage } from "./store-toast";
@@ -196,6 +198,34 @@ export function Storefront({
   const storeStatus = useStoreStatus();
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>("pickup");
   const [cart, setCart] = useCart();
+  // Back from WhatsApp (the page was hidden, or it is opened again later): ask whether the order
+  // went out before emptying the cart. See order-sent.ts.
+  const [askOrderSent, setAskOrderSent] = useState(false);
+  const leftPageRef = useRef(false);
+  const checkedOnLoadRef = useRef(false);
+  useEffect(() => {
+    const ask = () => {
+      if (shouldAskOrderSent(cart, Date.now())) setAskOrderSent(true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        leftPageRef.current = true;
+      } else if (leftPageRef.current) {
+        leftPageRef.current = false;
+        ask();
+      }
+    };
+    let timer = 0;
+    if (!checkedOnLoadRef.current && cart.length > 0) {
+      checkedOnLoadRef.current = true;
+      timer = window.setTimeout(ask, 0);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [cart]);
   const { products, categories, verificationStatus, verifiedGeneration, recheckProducts } = usePublicCatalog({ initialCatalog, fallback: catalogFallback });
   const storageDegraded = useStorageDegraded();
 
@@ -539,7 +569,25 @@ export function Storefront({
         timezone={timezone}
         verificationStatus={verificationStatus}
         onCheckoutRedirect={onCheckoutRedirect}
+        onOrderSent={() => markOrderSent(cart, Date.now())}
       />
+
+      {askOrderSent ? (
+        <OrderSentPrompt
+          onKeep={() => {
+            forgetOrderSent();
+            setAskOrderSent(false);
+          }}
+          onSent={() => {
+            forgetOrderSent();
+            setAskOrderSent(false);
+            setCart([]);
+            clearCart();
+            setNotice("Listo, vaciamos el carrito. El local te confirma el pedido por WhatsApp.");
+            window.location.hash = "menu";
+          }}
+        />
+      ) : null}
 
       {itemCount > 0 && !keyboardOpen && view === "menu" ? (
         <a className="cart-tray" href="#carrito">
@@ -1384,7 +1432,8 @@ function CheckoutSection({
   storeStatus,
   deliveryFeeCents,
   timezone,
-  onCheckoutRedirect
+  onCheckoutRedirect,
+  onOrderSent
 }: {
   active: boolean;
   cart: CartLine[];
@@ -1402,6 +1451,8 @@ function CheckoutSection({
   deliveryFeeCents: bigint | null;
   timezone: string;
   onCheckoutRedirect?: ((url: string) => void) | undefined;
+  /** The customer opened WhatsApp with the order. */
+  onOrderSent: () => void;
 }) {
   const offered: PaymentMethod[] = [
     ...(mercadoPagoEnabled && paymentMethods.includes("mercado_pago") ? ["mercado-pago" as const] : []),
@@ -1736,7 +1787,7 @@ function CheckoutSection({
               {mpButtonLabel}
             </button>
           ) : confirmed && online ? (
-            <a className="whatsapp-button" href={confirmed.url} rel="noopener noreferrer" target="_blank">
+            <a className="whatsapp-button" href={confirmed.url} onClick={onOrderSent} rel="noopener noreferrer" target="_blank">
               Enviar pedido por WhatsApp
             </a>
           ) : (
@@ -1748,7 +1799,7 @@ function CheckoutSection({
             {payment === "mercado-pago"
               ? "Serás redirigido al sitio seguro de Mercado Pago. Al finalizar el pago volverás a esta página para coordinar la entrega por WhatsApp."
               : confirmed
-                ? "Se abre WhatsApp con tu pedido para que el local lo confirme. El carrito queda guardado en este dispositivo."
+                ? "Se abre WhatsApp con tu pedido para que el local lo confirme. Cuando vuelvas, te preguntamos si lo enviaste para vaciar el carrito."
                 : "Podés seguir armando tu pedido: el carrito queda guardado en este dispositivo."}
           </small>
         </div>
