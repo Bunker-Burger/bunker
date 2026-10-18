@@ -66,13 +66,17 @@
 .product-card.hero .product-image-wrap::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--color-surface), transparent 55%, var(--color-scrim)); pointer-events: none; }
 /* Row card (burgers, sandwiches): photo on the left. */
 .product-card.row .product-main { grid-template-columns: 8rem minmax(0, 1fr); min-height: 11rem; }
-/* The photo (or the icon tile) fills the whole left cell. Absolute, because iOS Safari does not resolve height: 100% inside a stretched grid cell and the tile collapsed to a short band. */
+/* The photo (or the icon tile) fills the whole left column. The column is pinned absolutely to the card's height: iOS Safari does not stretch grid items inside a <button>, so a stretched cell collapsed to 0px and the photo disappeared. */
+.product-card.row .product-main { position: relative; }
+.product-card.row .product-image-wrap { position: absolute; top: 0; bottom: 0; left: 0; width: 8rem; }
+.product-card.row .product-copy { grid-column: 2; }
 .product-card.row .product-image-wrap > .product-image, .product-card.row .product-image-wrap > .product-placeholder { position: absolute; inset: 0; }
 .product-card.row .product-title-row { flex-wrap: nowrap; }
 .product-card.row .product-title-row h3 { min-width: 0; }
 /* Narrow phones: the price drops under the title instead of being clipped. */
 @media (max-width: 24rem) {
   .product-card.row .product-main { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .product-card.row .product-image-wrap { width: 6.5rem; }
   .product-card.row .product-title-row { flex-wrap: wrap; }
 }
 .product-card.row .product-copy { padding: .9rem .9rem 1rem; }
