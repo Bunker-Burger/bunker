@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MIN_IMAGE_SIDE } from "@/server/catalog-admin";
 import { getStoreAdminView } from "@/server/store-admin";
-import styles from "../../../admin.module.css";
-import { AdminForm } from "../../admin-form";
-import { AdminPageBar } from "../../page-bar";
+import shared from "@/components/admin/shared/admin-shared.module.css";
+import { AdminForm } from "@/components/admin/shared/admin-form";
+import { AdminPageBar } from "@/components/admin/shared/page-bar";
 import { ADMIN_PANEL_PATH } from "../../paths";
 import { deletePromotionAction } from "../actions";
-import { PromotionForm } from "../promotion-form";
+import { PromotionForm } from "@/components/admin/promociones/promotion-form";
 import { formProducts, promotionValues } from "../promotion-props";
 
 type Params = Promise<{ promotionId: string }>;
@@ -17,9 +17,9 @@ export default async function EditPromotionPage({ params, searchParams }: { para
   const view = await getStoreAdminView();
   if (!view.ok) {
     return (
-      <section className={styles.adminPanel} aria-labelledby="promotion-title">
+      <section className={shared.adminPanel} aria-labelledby="promotion-title">
         <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title="Promoción" titleId="promotion-title" />
-        <p className={styles.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
+        <p className={shared.error} role="alert">No pudimos cargar los datos. Recargá la página en unos segundos.</p>
       </section>
     );
   }
@@ -28,14 +28,14 @@ export default async function EditPromotionPage({ params, searchParams }: { para
   if (!rule) notFound();
 
   return (
-    <section className={styles.adminPanel} aria-labelledby="promotion-title">
+    <section className={shared.adminPanel} aria-labelledby="promotion-title">
       <AdminPageBar backHref={ADMIN_PANEL_PATH} backLabel="Volver al panel" title={rule.name} titleId="promotion-title" />
       {creada === "1" && foto === "0" ? (
-        <p className={styles.error} role="alert">
+        <p className={shared.error} role="alert">
           Promoción creada, pero la foto no se pudo subir. Probá de nuevo desde “Foto de la promo”.
         </p>
       ) : creada === "1" ? (
-        <p className={styles.success} role="status">
+        <p className={shared.success} role="status">
           Promoción creada.
         </p>
       ) : null}
@@ -54,11 +54,11 @@ export default async function EditPromotionPage({ params, searchParams }: { para
         products={formProducts(catalog)}
         timezone={catalog.store.timezone}
       />
-      <section aria-labelledby="danger-title" className={styles.tabPanel}>
+      <section aria-labelledby="danger-title" className={shared.tabPanel}>
         <h2 id="danger-title">Eliminar</h2>
-        <details className={styles.disclosure}>
+        <details className={shared.disclosure}>
           <summary>Eliminar promoción</summary>
-          <p className={styles.hint}>Se borra con sus productos y franjas. No se puede deshacer; podés pausarla en su lugar.</p>
+          <p className={shared.hint}>Se borra con sus productos y franjas. No se puede deshacer; podés pausarla en su lugar.</p>
           <AdminForm action={deletePromotionAction} pendingLabel="Eliminando…" submitLabel={`Eliminar ${rule.name}`} submitVariant="danger">
             <input name="promotionId" type="hidden" value={rule.id} />
             <input name="from" type="hidden" value="edit" />

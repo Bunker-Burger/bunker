@@ -1,7 +1,7 @@
 import { localInputFromInstant } from "@/domain/store-admin";
 import type { Catalog, PromotionRule } from "@/domain/types";
 import { pesos } from "../catalogo/product-props";
-import type { PromotionFormProduct, PromotionFormValues } from "./promotion-form";
+import type { PromotionFormProduct, PromotionFormValues } from "@/components/admin/promociones/promotion-form";
 
 /* Serializable props for the client promotion editor (no bigint, dates as local inputs). */
 

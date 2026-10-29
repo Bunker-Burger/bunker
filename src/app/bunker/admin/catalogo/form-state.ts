@@ -17,7 +17,3 @@ export type CatalogTab = (typeof CATALOG_TABS)[number];
 export function tabForType(type: string): CatalogTab | undefined {
   return CATALOG_TABS.find((tab) => tab.type === type);
 }
-
-export function tabFor(slug: string | undefined): CatalogTab {
-  return CATALOG_TABS.find((tab) => tab.slug === slug) ?? CATALOG_TABS[0];
-}

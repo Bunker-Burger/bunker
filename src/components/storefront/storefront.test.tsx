@@ -6,7 +6,9 @@ import { revalidateCart, serializeCart } from "@/domain/cart";
 import type { CartLine, Product } from "@/domain/types";
 import { getCartSnapshot, resetCartStoreForTesting } from "@/lib/cart-store";
 import { serializePublicCatalog, serializePublicCategories, serializePublicProducts } from "@/server/catalog/public-products";
-import { comboDrawerState, ProductDrawer, Storefront } from "./storefront";
+import { comboDrawerState } from "./drawers/combo-drawer";
+import { ProductDrawer } from "./drawers/product-drawer";
+import { Storefront } from "./storefront";
 
 describe("Storefront", () => {
   beforeEach(() => {
