@@ -700,7 +700,7 @@ export function Storefront({
 /** What the combo's detail starts from when a combo already in the cart is edited. */
 export interface ComboDrawerState {
   selections: SelectedOptions[];
-  extraUnits: ExtraLevels[];
+  extraUnits: ExtraCounts[];
   notes: string;
 }
 
@@ -717,21 +717,16 @@ export function comboDrawerState(combo: PromotionRule, lines: readonly CartLine[
   const perProduct = entries.map((product) => {
     const mine = own.filter((line) => line.productId === product.id);
     const selected: SelectedOptions = {};
-    const units: ExtraLevels = {};
+    const units: ExtraCounts = {};
     for (const group of getApplicableOptionGroups(product)) {
       if (group.selectionMode === "multiple") {
         const ids = new Set(mine.flatMap((line) => line.selectedOptions[group.id] ?? []));
         selected[group.id] = [...ids];
-        const total = mine.reduce((sum, line) => sum + line.quantity, 0);
         for (const id of ids) {
           const timesIn = (line: CartLine) => (line.selectedOptions[group.id] ?? []).filter((optionId) => optionId === id).length;
-          const most = Math.max(...mine.map(timesIn));
-          // Level k: the units with more than k of this extra. On every unit: Infinity, so it follows the number of combos.
-          const levels = Array.from({ length: most }, (_, k) => {
-            const carrying = mine.filter((line) => timesIn(line) > k).reduce((sum, line) => sum + line.quantity, 0);
-            return carrying < total ? carrying : Infinity;
-          });
-          if (levels.length > 1 || levels[0] !== Infinity) units[id] = levels;
+          // What each unit carries, line by line; the same on all is one count, so it follows the number of combos.
+          const counts = mine.flatMap((line) => Array.from({ length: line.quantity }, () => timesIn(line)));
+          if (counts.some((count) => count !== 1)) units[id] = counts.every((count) => count === counts[0]) ? [counts[0]!] : counts;
         }
       } else {
         const biggest = [...mine].sort((a, b) => b.quantity - a.quantity)[0];
@@ -765,7 +760,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
   });
   const editing = initial !== undefined;
   const [selections, setSelections] = useState<SelectedOptions[]>(() => initial?.selections ?? items.map((item) => getDefaultSelection(item.product)));
-  const [extraUnits, setExtraUnits] = useState<ExtraLevels[]>(() => initial?.extraUnits ?? items.map(() => ({})));
+  const [extraUnits, setExtraUnits] = useState<ExtraCounts[]>(() => initial?.extraUnits ?? items.map(() => ({})));
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -893,22 +888,23 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
 }
 
 /**
- * Per extra, how many units carry at least 1, 2, 3… of it (2 patties on one burger, 1 on the rest).
- * Infinity is "all of them", so it follows the quantity; not set is one on every unit.
+ * Per extra, how many of it each unit carries, in order (2 patties on the first burger, 1 on the
+ * rest). A unit past the end takes the last count, so one count is "the same on all"; not set is one each.
  */
-export type ExtraLevels = Record<string, number[]>;
-const levelsOf = (extraUnits: ExtraLevels, optionId: string, quantity: number) => (extraUnits[optionId] ?? [Infinity]).map((units) => Math.min(units, quantity));
+export type ExtraCounts = Record<string, number[]>;
+const countsOf = (extraUnits: ExtraCounts, optionId: string, quantity: number) =>
+  Array.from({ length: quantity }, (_, unit) => extraUnits[optionId]?.[unit] ?? extraUnits[optionId]?.at(-1) ?? 1);
 
 /** A saved selection, where repeating an extra means several of it, as the detail's state: each extra once, plus how many. */
-function splitRepeats(options: SelectedOptions): { selected: SelectedOptions; extraUnits: ExtraLevels } {
+function splitRepeats(options: SelectedOptions): { selected: SelectedOptions; extraUnits: ExtraCounts } {
   const selected: SelectedOptions = {};
-  const extraUnits: ExtraLevels = {};
+  const extraUnits: ExtraCounts = {};
   for (const [groupId, ids] of Object.entries(options)) {
     const unique = [...new Set(ids)];
     selected[groupId] = unique;
     for (const id of unique) {
       const times = ids.filter((optionId) => optionId === id).length;
-      if (times > 1) extraUnits[id] = Array.from({ length: times }, () => Infinity);
+      if (times > 1) extraUnits[id] = [times];
     }
   }
   return { selected, extraUnits };
@@ -924,15 +920,15 @@ function paidExtraNames(product: Product, options: SelectedOptions): string[] {
   );
 }
 
-/** The units of a line grouped by what each carries: the first units take the extras, as many of each as its levels say. */
-export function unitGroupsOf(product: Product, selected: SelectedOptions, quantity: number, extraUnits: ExtraLevels) {
+/** The units of a line grouped by what each carries: the first units take the extras, as many of each as its counts say. */
+export function unitGroupsOf(product: Product, selected: SelectedOptions, quantity: number, extraUnits: ExtraCounts) {
   const applicable = getApplicableOptionGroups(product);
   const groups = new Map<string, { selected: SelectedOptions; quantity: number }>();
   for (let unit = 0; unit < quantity; unit += 1) {
     const options: SelectedOptions = {};
     for (const [groupId, ids] of Object.entries(selected)) {
       const multiple = applicable.find((group) => group.id === groupId)?.selectionMode === "multiple";
-      options[groupId] = multiple ? ids.flatMap((id) => Array.from({ length: levelsOf(extraUnits, id, quantity).filter((units) => unit < units).length }, () => id)) : ids;
+      options[groupId] = multiple ? ids.flatMap((id) => Array.from({ length: countsOf(extraUnits, id, quantity)[unit]! }, () => id)) : ids;
     }
     const key = JSON.stringify(options);
     const found = groups.get(key);
@@ -943,73 +939,69 @@ export function unitGroupsOf(product: Product, selected: SelectedOptions, quanti
 }
 
 /**
- * How many of a chosen extra (2 eggs) and, with several units, on how many of them: one row per
- * level, so 3 burgers can carry one extra patty each and one of them a second one.
+ * How many of a chosen extra (2 eggs). With several units: one count for all of them and one per
+ * unit, so one burger of three can take a second patty, or none.
  */
 function ExtraAmount({ option, quantity, extraUnits, setExtraUnits }: {
   option: { id: string; name: string; priceDeltaCents: bigint };
   quantity: number;
-  extraUnits: ExtraLevels;
-  setExtraUnits: (update: (current: ExtraLevels) => ExtraLevels) => void;
+  extraUnits: ExtraCounts;
+  setExtraUnits: (update: (current: ExtraCounts) => ExtraCounts) => void;
 }) {
-  const raw = extraUnits[option.id] ?? [Infinity];
-  const levels = levelsOf(extraUnits, option.id, quantity);
-  const setLevels = (next: number[]) =>
+  const counts = countsOf(extraUnits, option.id, quantity);
+  const setCounts = (next: number[]) =>
     setExtraUnits((current) => {
       const copy = { ...current };
-      if (next.length === 1 && next[0] === Infinity) delete copy[option.id];
-      else copy[option.id] = next;
+      // The same on every unit is kept as one count, so it follows the quantity.
+      if (next.every((count) => count === next[0])) {
+        if (next[0] === 1) delete copy[option.id];
+        else copy[option.id] = [next[0]!];
+      } else copy[option.id] = next;
       return copy;
     });
-  const setLevel = (index: number, units: number) => {
-    const ceiling = index === 0 ? quantity : levels[index - 1]!;
-    const next = [...raw];
-    // Reaching the ceiling keeps following it (all units, or all those with one less).
-    next[index] = units >= ceiling ? (index === 0 ? Infinity : raw[index - 1]!) : units;
-    for (let after = index + 1; after < next.length; after += 1) next[after] = Math.min(next[after]!, next[index]!);
-    setLevels(next);
-  };
-  const total = levels.reduce((sum, units) => sum + units, 0);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  const most = Math.max(...counts);
+  const same = counts.every((count) => count === counts[0]);
   return (
     <>
       <div className="option-units">
-        <span className="option-units-label">{quantity > 1 ? "Cantidad por unidad" : "Cantidad"}</span>
+        <span className="option-units-label">{quantity === 1 ? "Cantidad" : "En cada una"}</span>
         <div aria-label={`Cantidad de ${option.name}`} className="option-units-stepper" role="group">
-          <button aria-label={`Una ${option.name} menos`} disabled={levels.length <= 1} onClick={() => setLevels(raw.slice(0, -1))} type="button">
+          <button aria-label={`Una ${option.name} menos`} disabled={most <= 1} onClick={() => setCounts(counts.map((count) => Math.max(0, count - 1)))} type="button">
             <Minus aria-hidden="true" />
           </button>
-          <strong>{levels.length}</strong>
-          <button aria-label={`Una ${option.name} más`} disabled={levels.length >= MAX_SAME_EXTRA} onClick={() => setLevels([...raw, raw.at(-1)!])} type="button">
+          <strong>{same ? counts[0] : "–"}</strong>
+          <button aria-label={`Una ${option.name} más`} disabled={most >= MAX_SAME_EXTRA} onClick={() => setCounts(counts.map((count) => Math.min(MAX_SAME_EXTRA, count + 1)))} type="button">
             <Plus aria-hidden="true" />
           </button>
         </div>
         {option.priceDeltaCents > 0n ? <strong className="option-units-cost">+ {formatArs(option.priceDeltaCents * BigInt(total))}</strong> : null}
       </div>
       {quantity > 1
-        ? levels.map((units, index) => {
-            const nth = levels.length > 1 ? `${index + 1}× ` : "";
-            const ceiling = index === 0 ? quantity : levels[index - 1]!;
-            const name = index === 0 ? option.name : `${option.name} ×${index + 1}`;
-            return (
-              <div className="option-units" key={index}>
-                <span className="option-units-label">{units === quantity ? `${nth}En las ${quantity}` : `${nth}En ${units} de ${quantity}`}</span>
-                <div aria-label={`Unidades con ${name}`} className="option-units-stepper" role="group">
-                  <button aria-label={`Quitar ${name} de una unidad`} disabled={units <= 1} onClick={() => setLevel(index, units - 1)} type="button">
-                    <Minus aria-hidden="true" />
-                  </button>
-                  <strong>{units}</strong>
-                  <button aria-label={`Poner ${name} en una unidad más`} disabled={units >= ceiling} onClick={() => setLevel(index, units + 1)} type="button">
-                    <Plus aria-hidden="true" />
-                  </button>
-                </div>
-                {index === 0 && units < quantity ? (
-                  <button className="option-units-all" onClick={() => setLevel(0, quantity)} type="button">
-                    Todas
-                  </button>
-                ) : null}
+        ? counts.map((count, unit) => (
+            <div className="option-units option-units-unit" key={unit}>
+              <span className="option-units-label">Unidad {unit + 1}</span>
+              <div aria-label={`${option.name} en la unidad ${unit + 1}`} className="option-units-stepper" role="group">
+                <button
+                  aria-label={`Quitar ${option.name} de la unidad ${unit + 1}`}
+                  disabled={count === 0 || total === 1}
+                  onClick={() => setCounts(counts.map((value, other) => (other === unit ? value - 1 : value)))}
+                  type="button"
+                >
+                  <Minus aria-hidden="true" />
+                </button>
+                <strong>{count}</strong>
+                <button
+                  aria-label={`Sumar ${option.name} a la unidad ${unit + 1}`}
+                  disabled={count >= MAX_SAME_EXTRA}
+                  onClick={() => setCounts(counts.map((value, other) => (other === unit ? value + 1 : value)))}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" />
+                </button>
               </div>
-            );
-          })
+            </div>
+          ))
         : null}
     </>
   );
@@ -1023,8 +1015,8 @@ function OptionGroups({ product, selected, setSelected, quantity, extraUnits, se
   selected: SelectedOptions;
   setSelected: (update: (current: SelectedOptions) => SelectedOptions) => void;
   quantity: number;
-  extraUnits: ExtraLevels;
-  setExtraUnits: (update: (current: ExtraLevels) => ExtraLevels) => void;
+  extraUnits: ExtraCounts;
+  setExtraUnits: (update: (current: ExtraCounts) => ExtraCounts) => void;
 }) {
   const applicableGroups = getApplicableOptionGroups(product);
   return (
@@ -1123,7 +1115,7 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
   const [selected, setSelected] = useState<SelectedOptions>(() => splitRepeats(initialLine?.selectedOptions ?? getDefaultSelection(product)).selected);
   const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
   // How many of each extra, and with several units on how many of them (one on every unit, when not set).
-  const [extraUnits, setExtraUnits] = useState<ExtraLevels>(() => splitRepeats(initialLine?.selectedOptions ?? {}).extraUnits);
+  const [extraUnits, setExtraUnits] = useState<ExtraCounts>(() => splitRepeats(initialLine?.selectedOptions ?? {}).extraUnits);
   const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);

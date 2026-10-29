@@ -463,15 +463,17 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
-    expect(within(dialog).queryByText("En las 3")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("En cada una")).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
-    expect(within(dialog).getByText("En las 3")).toBeInTheDocument();
+    expect(within(dialog).getByText("En cada una")).toBeInTheDocument();
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 3" })).toHaveTextContent("1");
     // On all three at first: 3 × $ 900, on top of 3 × $ 7.800.
     expect(within(dialog).getByText("+ $ 2.700")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de una unidad" }));
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de una unidad" }));
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la unidad 2" }));
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la unidad 3" }));
+    expect(within(dialog).getByRole("group", { name: "Cantidad de Extra bacon ahumado" })).toHaveTextContent("–");
     expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 900");
     expect(within(dialog).getByRole("button", { name: /Guardar cambios/ })).toHaveTextContent("$ 24.300");
     await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
@@ -519,13 +521,9 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
 
     await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
-    await user.click(within(dialog).getByRole("button", { name: "Una Extra bacon ahumado más" }));
-    // A second bacon follows the first one: on all three until it is lowered.
-    expect(within(dialog).getByText("2× En las 3")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado ×2 de una unidad" }));
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado ×2 de una unidad" }));
-    expect(within(dialog).getByText("1× En las 3")).toBeInTheDocument();
-    expect(within(dialog).getByText("2× En 1 de 3")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Sumar Extra bacon ahumado a la unidad 1" }));
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 1" })).toHaveTextContent("2");
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 2" })).toHaveTextContent("1");
     // 4 bacons in all: 4 × $ 900 on top of 3 × $ 7.800.
     expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 3.600");
     await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
@@ -551,10 +549,10 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
       comboId: "combo"
     });
     const combo = { id: "combo", items: [{ productId: burger.id, quantity: 3 }] } as unknown as Parameters<typeof comboDrawerState>[0];
-    // 1 burger with 2 bacons, 2 with 1: bacon on all 3, the second one on 1.
+    // 1 burger with 2 bacons, 2 with 1: what each unit carries, in order.
     const state = comboDrawerState(combo, [line(1, ["bacon", "bacon"]), line(2, ["bacon"])], [burger]);
     expect(state.selections[0]?.extras).toEqual(["bacon"]);
-    expect(state.extraUnits[0]).toEqual({ bacon: [Infinity, 1] });
+    expect(state.extraUnits[0]).toEqual({ bacon: [2, 1, 1] });
   });
 
   it("permite eliminar una línea individual y vaciar el carrito completo", async () => {
