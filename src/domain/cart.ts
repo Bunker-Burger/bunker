@@ -11,7 +11,8 @@ export function normalizeNotes(notes: string): string {
 export function normalizeOptions(options: SelectedOptions): SelectedOptions {
   return Object.fromEntries(
     Object.entries(options)
-      .map(([groupId, optionIds]) => [groupId, [...new Set(optionIds)].sort()] as const)
+      // Repeats stay: the same extra twice is two extras (validation rejects repeats where they are not allowed).
+      .map(([groupId, optionIds]) => [groupId, [...optionIds].sort()] as const)
       .filter(([, optionIds]) => optionIds.length > 0)
       .sort(([left], [right]) => left.localeCompare(right))
   );

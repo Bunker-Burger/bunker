@@ -75,6 +75,9 @@ export function getDefaultSelection(product: Product): SelectedOptions {
  * Calculates the unit price in cents derived from the product base price and selected options.
  * Negative option adjustments cannot drop the total price below zero.
  */
+/** How many of the same extra one unit can take (2 extra patties, 3 eggs…); each one is charged. */
+export const MAX_SAME_EXTRA = 10;
+
 export function calculateConfiguredUnitPrice(
   product: Pick<ConfigurableProduct, "priceCents" | "type" | "optionGroups">,
   selected: SelectedOptions
@@ -83,7 +86,8 @@ export function calculateConfiguredUnitPrice(
   let totalDelta = 0n;
 
   for (const group of applicableGroups) {
-    const chosen = new Set(selected[group.id] ?? []);
+    // Extras (multiple) count every repetition; a single choice counts once.
+    const chosen = group.selectionMode === "multiple" ? (selected[group.id] ?? []) : new Set(selected[group.id] ?? []);
     const optionsById = new Map(group.options.map((option) => [option.id, option]));
     for (const id of chosen) {
       const option = optionsById.get(id);
@@ -141,8 +145,11 @@ export function validateOptionSelection(
   for (const group of applicableGroups) {
     const rawChosenIds = selected[group.id] ?? [];
     const uniqueChosenIds = [...new Set(rawChosenIds)];
+    const timesChosen = (optionId: string) => rawChosenIds.filter((id) => id === optionId).length;
 
-    if (uniqueChosenIds.length !== rawChosenIds.length) {
+    // An extra may repeat (twice the bacon); a single choice may not, nor an extra past the cap.
+    const badRepeat = group.selectionMode === "multiple" ? uniqueChosenIds.some((id) => timesChosen(id) > MAX_SAME_EXTRA) : uniqueChosenIds.length !== rawChosenIds.length;
+    if (badRepeat) {
       errors.push({
         groupId: group.id,
         code: "DUPLICATE_SELECTION",
@@ -205,15 +212,17 @@ export function validateOptionSelection(
         continue;
       }
 
-      optionsPriceDelta += option.priceDeltaCents;
-      validGroupSelection.push(option.id);
-      selectedDetails.push({
-        groupId: group.id,
-        groupName: group.name,
-        optionId: option.id,
-        optionName: option.name,
-        priceDeltaCents: option.priceDeltaCents
-      });
+      for (let time = 0; time < (group.selectionMode === "multiple" ? timesChosen(optionId) : 1); time += 1) {
+        optionsPriceDelta += option.priceDeltaCents;
+        validGroupSelection.push(option.id);
+        selectedDetails.push({
+          groupId: group.id,
+          groupName: group.name,
+          optionId: option.id,
+          optionName: option.name,
+          priceDeltaCents: option.priceDeltaCents
+        });
+      }
     }
 
     normalizedSelections[group.id] = validGroupSelection.sort();

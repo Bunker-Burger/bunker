@@ -6,6 +6,7 @@ import {
   getDefaultSelection,
   isGroupApplicableToProduct,
   isPublishable,
+  MAX_SAME_EXTRA,
   toggleOption,
   validateOptionSelection,
   validateProductPublication
@@ -329,13 +330,27 @@ describe("BB-05: Motor de opciones y defaults", () => {
       expect(clearOptionGroup(current, "sauce")).toEqual({ sauce: [], extras: ["bacon"] });
     });
 
-    it("rechaza opciones duplicadas dentro del mismo grupo", () => {
-      const selection: SelectedOptions = { patty: ["double"], extras: ["bacon", "bacon"] };
+    it("un extra repetido cuenta y se cobra cada vez (doble bacon)", () => {
+      const selection: SelectedOptions = { patty: ["double"], extras: ["bacon", "egg", "bacon"] };
       const result = validateOptionSelection(burgerProduct, selection);
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.some((err) => err.code === "DUPLICATE_SELECTION")).toBe(true);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.normalizedSelections.extras).toEqual(["bacon", "bacon", "egg"]);
+        expect(result.value.unitPriceCents).toBe(burgerProduct.priceCents + 2n * 90000n + 60000n);
+        expect(result.value.selectedDetails.filter((detail) => detail.optionId === "bacon")).toHaveLength(2);
+      }
+      expect(calculateConfiguredUnitPrice(burgerProduct, selection)).toBe(burgerProduct.priceCents + 2n * 90000n + 60000n);
+    });
+
+    it("rechaza repetir una opción de selección única o un extra más allá del tope", () => {
+      for (const selection of [
+        { patty: ["double", "double"] },
+        { patty: ["double"], extras: Array.from({ length: MAX_SAME_EXTRA + 1 }, () => "bacon") }
+      ] satisfies SelectedOptions[]) {
+        const result = validateOptionSelection(burgerProduct, selection);
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.some((err) => err.code === "DUPLICATE_SELECTION")).toBe(true);
       }
     });
 
