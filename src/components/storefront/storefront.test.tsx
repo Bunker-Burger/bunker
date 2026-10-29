@@ -463,17 +463,16 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
 
     await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
-    expect(within(dialog).queryByText("En cada una")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Burguer 1")).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
-    expect(within(dialog).getByText("En cada una")).toBeInTheDocument();
-    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 3" })).toHaveTextContent("1");
-    // On all three at first: 3 × $ 900, on top of 3 × $ 7.800.
-    expect(within(dialog).getByText("+ $ 2.700")).toBeInTheDocument();
+    // One row per burger, each with one to begin with.
+    expect(within(dialog).getByText("Burguer 1")).toBeInTheDocument();
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la burguer 3" })).toHaveTextContent("1");
+    expect(dialog.querySelectorAll(".option-units-cost")).toHaveLength(3);
 
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la unidad 2" }));
-    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la unidad 3" }));
-    expect(within(dialog).getByRole("group", { name: "Cantidad de Extra bacon ahumado" })).toHaveTextContent("–");
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la burguer 2" }));
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado de la burguer 3" }));
     expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 900");
     expect(within(dialog).getByRole("button", { name: /Guardar cambios/ })).toHaveTextContent("$ 24.300");
     await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
@@ -521,11 +520,11 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
 
     await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
-    await user.click(within(dialog).getByRole("button", { name: "Sumar Extra bacon ahumado a la unidad 1" }));
-    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 1" })).toHaveTextContent("2");
-    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la unidad 2" })).toHaveTextContent("1");
+    await user.click(within(dialog).getByRole("button", { name: "Sumar Extra bacon ahumado a la burguer 1" }));
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la burguer 1" })).toHaveTextContent("2");
+    expect(within(dialog).getByRole("group", { name: "Extra bacon ahumado en la burguer 2" })).toHaveTextContent("1");
     // 4 bacons in all: 4 × $ 900 on top of 3 × $ 7.800.
-    expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 3.600");
+    expect([...dialog.querySelectorAll(".option-units-cost")].map((cost) => cost.textContent?.replace(/\s/g, " "))).toEqual(["+ $ 1.800", "+ $ 900", "+ $ 900"]);
     await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
 
     expect(getCartSnapshot().map((line) => [line.quantity, line.selectedOptions.extras])).toEqual([

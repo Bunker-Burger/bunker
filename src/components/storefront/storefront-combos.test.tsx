@@ -286,7 +286,7 @@ describe("combos in the menu", () => {
     const burger = within(within(edit).getByRole("region", { name: "Opciones de Oklahoma Onion" }));
     await user.click(burger.getByRole("checkbox", { name: /Extra bacon ahumado/ }));
     // Two burgers: the extra can go on one or both.
-    await user.click(burger.getByRole("button", { name: "Quitar Extra bacon ahumado de la unidad 2" }));
+    await user.click(burger.getByRole("button", { name: "Quitar Extra bacon ahumado de la burguer 2" }));
     await user.click(within(edit).getByRole("button", { name: /Guardar cambios/ }));
 
     expect(getCartSnapshot().map((line) => [line.productId, line.quantity, line.selectedOptions.extras ?? []])).toEqual([

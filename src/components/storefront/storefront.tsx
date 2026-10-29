@@ -939,12 +939,14 @@ export function unitGroupsOf(product: Product, selected: SelectedOptions, quanti
 }
 
 /**
- * How many of a chosen extra (2 eggs). With several units: one count for all of them and one per
- * unit, so one burger of three can take a second patty, or none.
+ * How many of a chosen extra (2 eggs). With several units, one count per unit ("Burguer 1, 2, 3"),
+ * all starting at one, so one burger of three can take a second patty, or none.
  */
-function ExtraAmount({ option, quantity, extraUnits, setExtraUnits }: {
+function ExtraAmount({ option, quantity, unitName, extraUnits, setExtraUnits }: {
   option: { id: string; name: string; priceDeltaCents: bigint };
   quantity: number;
+  /** What one unit is called in the rows: "Burguer", or "Unidad" for other products. */
+  unitName: string;
   extraUnits: ExtraCounts;
   setExtraUnits: (update: (current: ExtraCounts) => ExtraCounts) => void;
 }) {
@@ -960,49 +962,54 @@ function ExtraAmount({ option, quantity, extraUnits, setExtraUnits }: {
       return copy;
     });
   const total = counts.reduce((sum, count) => sum + count, 0);
-  const most = Math.max(...counts);
-  const same = counts.every((count) => count === counts[0]);
-  return (
-    <>
+  const cost = (count: number) => (option.priceDeltaCents > 0n && count > 0 ? <strong className="option-units-cost">+ {formatArs(option.priceDeltaCents * BigInt(count))}</strong> : null);
+  if (quantity === 1) {
+    return (
       <div className="option-units">
-        <span className="option-units-label">{quantity === 1 ? "Cantidad" : "En cada una"}</span>
+        <span className="option-units-label">Cantidad</span>
         <div aria-label={`Cantidad de ${option.name}`} className="option-units-stepper" role="group">
-          <button aria-label={`Una ${option.name} menos`} disabled={most <= 1} onClick={() => setCounts(counts.map((count) => Math.max(0, count - 1)))} type="button">
+          <button aria-label={`Una ${option.name} menos`} disabled={total <= 1} onClick={() => setCounts([total - 1])} type="button">
             <Minus aria-hidden="true" />
           </button>
-          <strong>{same ? counts[0] : "–"}</strong>
-          <button aria-label={`Una ${option.name} más`} disabled={most >= MAX_SAME_EXTRA} onClick={() => setCounts(counts.map((count) => Math.min(MAX_SAME_EXTRA, count + 1)))} type="button">
+          <strong>{total}</strong>
+          <button aria-label={`Una ${option.name} más`} disabled={total >= MAX_SAME_EXTRA} onClick={() => setCounts([total + 1])} type="button">
             <Plus aria-hidden="true" />
           </button>
         </div>
-        {option.priceDeltaCents > 0n ? <strong className="option-units-cost">+ {formatArs(option.priceDeltaCents * BigInt(total))}</strong> : null}
+        {cost(total)}
       </div>
-      {quantity > 1
-        ? counts.map((count, unit) => (
-            <div className="option-units option-units-unit" key={unit}>
-              <span className="option-units-label">Unidad {unit + 1}</span>
-              <div aria-label={`${option.name} en la unidad ${unit + 1}`} className="option-units-stepper" role="group">
-                <button
-                  aria-label={`Quitar ${option.name} de la unidad ${unit + 1}`}
-                  disabled={count === 0 || total === 1}
-                  onClick={() => setCounts(counts.map((value, other) => (other === unit ? value - 1 : value)))}
-                  type="button"
-                >
-                  <Minus aria-hidden="true" />
-                </button>
-                <strong>{count}</strong>
-                <button
-                  aria-label={`Sumar ${option.name} a la unidad ${unit + 1}`}
-                  disabled={count >= MAX_SAME_EXTRA}
-                  onClick={() => setCounts(counts.map((value, other) => (other === unit ? value + 1 : value)))}
-                  type="button"
-                >
-                  <Plus aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          ))
-        : null}
+    );
+  }
+  const unitWord = unitName.toLowerCase();
+  return (
+    <>
+      {counts.map((count, unit) => (
+        <div className="option-units" key={unit}>
+          <span className="option-units-label">
+            {unitName} {unit + 1}
+          </span>
+          <div aria-label={`${option.name} en la ${unitWord} ${unit + 1}`} className="option-units-stepper" role="group">
+            <button
+              aria-label={`Quitar ${option.name} de la ${unitWord} ${unit + 1}`}
+              disabled={count === 0 || total === 1}
+              onClick={() => setCounts(counts.map((value, other) => (other === unit ? value - 1 : value)))}
+              type="button"
+            >
+              <Minus aria-hidden="true" />
+            </button>
+            <strong>{count}</strong>
+            <button
+              aria-label={`Sumar ${option.name} a la ${unitWord} ${unit + 1}`}
+              disabled={count >= MAX_SAME_EXTRA}
+              onClick={() => setCounts(counts.map((value, other) => (other === unit ? value + 1 : value)))}
+              type="button"
+            >
+              <Plus aria-hidden="true" />
+            </button>
+          </div>
+          {cost(count)}
+        </div>
+      ))}
     </>
   );
 }
@@ -1088,7 +1095,7 @@ function OptionGroups({ product, selected, setSelected, quantity, extraUnits, se
                       <Fragment key={option.id}>
                         {row}
                         {checked && group.selectionMode === "multiple" ? (
-                          <ExtraAmount extraUnits={extraUnits} option={option} quantity={quantity} setExtraUnits={setExtraUnits} />
+                          <ExtraAmount extraUnits={extraUnits} option={option} quantity={quantity} setExtraUnits={setExtraUnits} unitName={product.type === "burger" ? "Burguer" : "Unidad"} />
                         ) : null}
                       </Fragment>
                     );
