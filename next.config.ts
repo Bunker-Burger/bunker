@@ -34,6 +34,8 @@ const workerConnectSrc = imageOrigin ? `'self' ${imageOrigin}` : "'self'";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: {
+    // Next.js upgrades on this app are security patches (next upgrade --agent=security).
+    agentUpgrade: "security",
     serverActions: {
       // Product photos go through a Server Action: 5 MB (the image and bucket limit) plus multipart overhead.
       bodySizeLimit: "6mb"
