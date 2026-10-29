@@ -125,6 +125,12 @@ describe("WhatsApp checkout message", () => {
     expect([...new URL(url).searchParams.keys()]).toEqual(["text"]);
   });
 
+  it("groups a repeated extra as 'x2'", () => {
+    const bacon = { groupId: "extras", optionId: "bacon", optionName: "Bacon" };
+    const twice = { ...pricing, lines: [{ ...pricing.lines[0]!, selectedOptions: [{ groupId: "size", optionId: "triple", optionName: "Triple" }, bacon, bacon] }] };
+    expect(text(buildExactCashWhatsAppUrl({ ...order, pricing: twice }))).toContain("   Opciones: Triple, Bacon x2");
+  });
+
   it("formats ARS without decimals and with thousands separators", () => {
     expect(formatWhatsAppArs(0n)).toBe("$0");
     expect(formatWhatsAppArs(99_900n)).toBe("$999");

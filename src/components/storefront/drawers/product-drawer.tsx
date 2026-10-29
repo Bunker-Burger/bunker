@@ -4,7 +4,6 @@ import { ArrowLeft, NotebookPen } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   calculateConfiguredUnitPrice,
-  getApplicableOptionGroups,
   getDefaultSelection,
   validateOptionSelection
 } from "@/domain/catalog";
@@ -15,7 +14,7 @@ import { CompareAt } from "../shared/compare-at";
 import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
-import { OptionGroups, unitGroupsOf } from "./option-groups";
+import { OptionGroups, paidExtraNames, splitRepeats, unitGroupsOf, type ExtraLevels } from "./option-groups";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -48,10 +47,10 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
   /** The line to add or edit and, when extras go to only some of the units, the other lines the quantity splits into. */
   onSubmit: (line: CartLine, otherLines?: CartLine[]) => void;
 }) {
-  const [selected, setSelected] = useState<SelectedOptions>(() => initialLine?.selectedOptions ?? getDefaultSelection(product));
+  const [selected, setSelected] = useState<SelectedOptions>(() => splitRepeats(initialLine?.selectedOptions ?? getDefaultSelection(product)).selected);
   const [quantity, setQuantity] = useState(() => initialLine?.quantity ?? 1);
-  // With several units, each extra can go on only some of them: how many carry it (all, when not set).
-  const [extraUnits, setExtraUnits] = useState<Record<string, number>>({});
+  // How many of each extra, and with several units on how many of them (one on every unit, when not set).
+  const [extraUnits, setExtraUnits] = useState<ExtraLevels>(() => splitRepeats(initialLine?.selectedOptions ?? {}).extraUnits);
   const [notes, setNotes] = useState(() => initialLine?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -89,16 +88,12 @@ export function ProductDrawer({ product, initialLine, cart = [], promotion = nul
     };
   }, [slug]);
 
-  const applicableGroups = getApplicableOptionGroups(product);
   const unitGroups = unitGroupsOf(product, selected, quantity, extraUnits);
   const isValid = unitGroups.every((group) => validateOptionSelection(product, group.selected).ok);
   const lineTotal = unitGroups.reduce((total, group) => total + calculateConfiguredUnitPrice(product, group.selected) * BigInt(group.quantity), 0n);
   // Order summary as in the capture: this product as configured plus what is already in the cart.
   const otherLines = cart.filter((line) => line.id !== initialLine?.id);
-  const extrasOf = (options: SelectedOptions) =>
-    applicableGroups.flatMap((group) =>
-      group.options.filter((option) => (options[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => option.name)
-    );
+  const extrasOf = (options: SelectedOptions) => paidExtraNames(product, options);
   const summaryCount = otherLines.reduce((total, line) => total + line.quantity, 0) + quantity;
   const summaryTotal = otherLines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n) + lineTotal;
 

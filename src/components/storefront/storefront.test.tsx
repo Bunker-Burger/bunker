@@ -6,6 +6,7 @@ import { revalidateCart, serializeCart } from "@/domain/cart";
 import type { CartLine, Product } from "@/domain/types";
 import { getCartSnapshot, resetCartStoreForTesting } from "@/lib/cart-store";
 import { serializePublicCatalog, serializePublicCategories, serializePublicProducts } from "@/server/catalog/public-products";
+import { comboDrawerState } from "./drawers/combo-drawer";
 import { ProductDrawer } from "./drawers/product-drawer";
 import { Storefront } from "./storefront";
 
@@ -484,6 +485,78 @@ describe("Storefront - BB-06 Carrito persistente, multi-pestaña, edición y rev
     ]);
     expect(lines.reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n)).toBe(2430000n);
     expect(screen.getByLabelText("Carrito, 3 productos")).toBeInTheDocument();
+  });
+
+  it("un mismo extra se puede pedir varias veces, se cobra cada una y se vuelve a ver al editar", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    await user.click(screen.getByRole("button", { name: "Agregar Smash Búnker Doble" }));
+    await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
+    let dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+
+    await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    const more = within(dialog).getByRole("button", { name: "Una Extra bacon ahumado más" });
+    await user.click(more);
+    await user.click(more);
+    expect(within(dialog).getByRole("group", { name: "Cantidad de Extra bacon ahumado" })).toHaveTextContent("3");
+    expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 2.700");
+    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
+
+    expect(getCartSnapshot().map((line) => [line.quantity, line.selectedOptions.extras, line.unitPriceCents])).toEqual([[1, ["bacon", "bacon", "bacon"], 1050000n]]);
+    expect(screen.getByText("+ Extra bacon ahumado ×3")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
+    dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+    expect(within(dialog).getByRole("group", { name: "Cantidad de Extra bacon ahumado" })).toHaveTextContent("3");
+  });
+
+  it("con 3 iguales, el extra va en las 3 y una lleva uno más", async () => {
+    const user = userEvent.setup();
+    render(<Storefront initialProductSlug={null} mercadoPagoEnabled={false} />);
+    const add = screen.getByRole("button", { name: "Agregar Smash Búnker Doble" });
+    await user.click(add);
+    await user.click(add);
+    await user.click(add);
+    await user.click(screen.getByRole("button", { name: "Editar Smash Búnker Doble" }));
+    const dialog = screen.getByRole("dialog", { name: "Personalizar Smash Búnker Doble" });
+
+    await user.click(within(dialog).getByRole("checkbox", { name: /Extra bacon ahumado/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Una Extra bacon ahumado más" }));
+    // A second bacon follows the first one: on all three until it is lowered.
+    expect(within(dialog).getByText("2× En las 3")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado ×2 de una unidad" }));
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Extra bacon ahumado ×2 de una unidad" }));
+    expect(within(dialog).getByText("1× En las 3")).toBeInTheDocument();
+    expect(within(dialog).getByText("2× En 1 de 3")).toBeInTheDocument();
+    // 4 bacons in all: 4 × $ 900 on top of 3 × $ 7.800.
+    expect(dialog.querySelector(".option-units-cost")).toHaveTextContent("+ $ 3.600");
+    await user.click(within(dialog).getByRole("button", { name: /Guardar cambios/ }));
+
+    expect(getCartSnapshot().map((line) => [line.quantity, line.selectedOptions.extras])).toEqual([
+      [1, ["bacon", "bacon"]],
+      [2, ["bacon"]]
+    ]);
+    expect(getCartSnapshot().reduce((total, line) => total + line.unitPriceCents * BigInt(line.quantity), 0n)).toBe(2700000n);
+  });
+
+  it("un combo editado recupera cuántos de cada extra lleva cada unidad", () => {
+    const burger = fallbackProducts.find((product) => product.id === "smash-doble")!;
+    const line = (quantity: number, extras: string[]): CartLine => ({
+      id: extras.join("-") || "plain",
+      productId: burger.id,
+      productSlug: burger.slug,
+      productName: burger.name,
+      unitPriceCents: burger.priceCents,
+      quantity,
+      notes: "",
+      selectedOptions: { patty: ["double"], extras },
+      comboId: "combo"
+    });
+    const combo = { id: "combo", items: [{ productId: burger.id, quantity: 3 }] } as unknown as Parameters<typeof comboDrawerState>[0];
+    // 1 burger with 2 bacons, 2 with 1: bacon on all 3, the second one on 1.
+    const state = comboDrawerState(combo, [line(1, ["bacon", "bacon"]), line(2, ["bacon"])], [burger]);
+    expect(state.selections[0]?.extras).toEqual(["bacon"]);
+    expect(state.extraUnits[0]).toEqual({ bacon: [Infinity, 1] });
   });
 
   it("permite eliminar una línea individual y vaciar el carrito completo", async () => {

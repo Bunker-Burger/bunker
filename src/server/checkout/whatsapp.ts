@@ -27,7 +27,13 @@ function oneLine(text: string): string {
 
 function orderLines(pricing: CheckoutPricing): string[] {
   return pricing.lines.flatMap((line) => {
-    const options = line.selectedOptions.map((option) => oneLine(option.optionName)).filter(Boolean);
+    // The same extra twice reads "Bacon x2", not "Bacon, Bacon".
+    const counts = new Map<string, number>();
+    for (const option of line.selectedOptions) {
+      const name = oneLine(option.optionName);
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    const options = [...counts].map(([name, times]) => (times > 1 ? `${name} x${times}` : name));
     const notes = oneLine(line.notes);
     return [
       `• ${line.quantity}x ${oneLine(line.productName)} — ${formatWhatsAppArs(line.unitPriceCents * BigInt(line.quantity))}`,

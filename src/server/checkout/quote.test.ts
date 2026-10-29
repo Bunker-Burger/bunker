@@ -232,7 +232,7 @@ describe("createAuthoritativeQuote", () => {
     ).rejects.toThrow(/no está disponible/i);
   });
 
-  it("servidor cubre: duplicados", async () => {
+  it("servidor cubre: duplicados en una opción única", async () => {
     const { repository, quotes, storeStatus } = createTestContext();
 
     await expect(
@@ -242,7 +242,7 @@ describe("createAuthoritativeQuote", () => {
             {
               productId: "burger-1",
               quantity: 1,
-              optionSelections: { size: ["double"], extras: ["bacon", "bacon"] },
+              optionSelections: { size: ["double", "double"] },
               notes: ""
             }
           ],
@@ -252,6 +252,19 @@ describe("createAuthoritativeQuote", () => {
         { repository, quotes, storeStatus, createId: () => "q", now: () => new Date() }
       )
     ).rejects.toThrow(/contiene opciones duplicadas/i);
+  });
+
+  it("servidor cobra cada extra repetido (doble bacon)", async () => {
+    const { repository, quotes, storeStatus } = createTestContext();
+    const quote = await createAuthoritativeQuote(
+      {
+        items: [{ productId: "burger-1", quantity: 1, optionSelections: { size: ["double"], extras: ["bacon", "bacon"] }, notes: "" }],
+        fulfilment: "pickup",
+        paymentMethod: "transfer"
+      },
+      { repository, quotes, storeStatus, createId: () => "q", now: () => new Date() }
+    );
+    expect(quote.lines[0]?.unitPriceCents).toBe(780000n + 2n * 90000n);
   });
 
   it("servidor cubre: min/max - por debajo del mínimo", async () => {

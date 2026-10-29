@@ -14,13 +14,13 @@ import { CompareAt } from "../shared/compare-at";
 import { QuantityStepper } from "../shared/quantity-stepper";
 import { focalStyle } from "../focal-style";
 import { makeCartLine } from "../cart-lines";
-import { OptionGroups, unitGroupsOf } from "./option-groups";
+import { OptionGroups, paidExtraNames, unitGroupsOf, type ExtraLevels } from "./option-groups";
 
 /** Detail of a combo (issue #54): what it includes, its description and the extras of each product, then the price. */
 /** What the combo's detail starts from when a combo already in the cart is edited. */
 export interface ComboDrawerState {
   selections: SelectedOptions[];
-  extraUnits: Array<Record<string, number>>;
+  extraUnits: ExtraLevels[];
   notes: string;
 }
 
@@ -37,16 +37,21 @@ export function comboDrawerState(combo: PromotionRule, lines: readonly CartLine[
   const perProduct = entries.map((product) => {
     const mine = own.filter((line) => line.productId === product.id);
     const selected: SelectedOptions = {};
-    const units: Record<string, number> = {};
+    const units: ExtraLevels = {};
     for (const group of getApplicableOptionGroups(product)) {
       if (group.selectionMode === "multiple") {
         const ids = new Set(mine.flatMap((line) => line.selectedOptions[group.id] ?? []));
         selected[group.id] = [...ids];
         const total = mine.reduce((sum, line) => sum + line.quantity, 0);
         for (const id of ids) {
-          const carrying = mine.filter((line) => (line.selectedOptions[group.id] ?? []).includes(id)).reduce((sum, line) => sum + line.quantity, 0);
-          // On every unit: left unset, so it follows the quantity if the number of combos changes.
-          if (carrying < total) units[id] = carrying;
+          const timesIn = (line: CartLine) => (line.selectedOptions[group.id] ?? []).filter((optionId) => optionId === id).length;
+          const most = Math.max(...mine.map(timesIn));
+          // Level k: the units with more than k of this extra. On every unit: Infinity, so it follows the number of combos.
+          const levels = Array.from({ length: most }, (_, k) => {
+            const carrying = mine.filter((line) => timesIn(line) > k).reduce((sum, line) => sum + line.quantity, 0);
+            return carrying < total ? carrying : Infinity;
+          });
+          if (levels.length > 1 || levels[0] !== Infinity) units[id] = levels;
         }
       } else {
         const biggest = [...mine].sort((a, b) => b.quantity - a.quantity)[0];
@@ -80,7 +85,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
   });
   const editing = initial !== undefined;
   const [selections, setSelections] = useState<SelectedOptions[]>(() => initial?.selections ?? items.map((item) => getDefaultSelection(item.product)));
-  const [extraUnits, setExtraUnits] = useState<Array<Record<string, number>>>(() => initial?.extraUnits ?? items.map(() => ({})));
+  const [extraUnits, setExtraUnits] = useState<ExtraLevels[]>(() => initial?.extraUnits ?? items.map(() => ({})));
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -181,7 +186,7 @@ export function ComboDrawer({ combo, products, onClose, onAdd, copies = 1, initi
             {perItem.map((item) => {
               const cents = item.groups.reduce((sum, group) => sum + (calculateConfiguredUnitPrice(item.product, group.selected) - item.product.priceCents) * BigInt(group.quantity), 0n);
               if (cents <= 0n) return null;
-              const chosenNames = [...new Set(item.groups.flatMap((group) => getApplicableOptionGroups(item.product).flatMap((optionGroup) => optionGroup.options.filter((option) => option.priceDeltaCents > 0n && (group.selected[optionGroup.id] ?? []).includes(option.id)).map((option) => option.name))))];
+              const chosenNames = [...new Set(item.groups.flatMap((group) => paidExtraNames(item.product, group.selected)))];
               return (
                 <div className="order-summary-line current" key={item.product.id}>
                   <span><strong>{item.product.name}</strong><small>{chosenNames.map((name) => `+ ${name}`).join(", ")}</small></span>

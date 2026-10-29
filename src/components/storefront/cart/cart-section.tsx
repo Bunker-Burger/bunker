@@ -6,11 +6,11 @@ import {
   ShoppingCart
 } from "lucide-react";
 import { clearCart, removeCartLine } from "@/domain/cart";
-import { getApplicableOptionGroups } from "@/domain/catalog";
 import { comboCount, removeOneCombo } from "@/domain/combos";
 import type { CartLine, Product, PromotionRule } from "@/domain/types";
 import { formatArs } from "@/lib/money";
 import { changeLineQuantity } from "../storefront-state";
+import { paidExtraNames } from "../drawers/option-groups";
 import { QuantityStepper } from "../shared/quantity-stepper";
 import { ViewBar } from "../shared/view-bar";
 
@@ -18,9 +18,7 @@ import { ViewBar } from "../shared/view-bar";
 function chosenExtras(line: CartLine, products: readonly Product[]) {
   const product = products.find((candidate) => candidate.id === line.productId);
   if (!product) return [];
-  return getApplicableOptionGroups(product).flatMap((group) =>
-    group.options.filter((option) => (line.selectedOptions[group.id] ?? []).includes(option.id) && option.priceDeltaCents > 0n).map((option) => `+ ${option.name}`)
-  );
+  return paidExtraNames(product, line.selectedOptions).map((name) => `+ ${name}`);
 }
 
 export function CartSection({
